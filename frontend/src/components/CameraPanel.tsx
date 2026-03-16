@@ -13,11 +13,15 @@ const CANVAS_H = 300;
 const HUD_COLOR_THERMAL = "#3fb950";
 const HUD_COLOR_DAYLIGHT = "#58a6ff";
 
-// Camera field of view in degrees
-const FOV_H = 30;
-const FOV_V = 20;
+// Base camera field of view in degrees (at 1x zoom)
+const BASE_FOV_H = 30;
+const BASE_FOV_V = 20;
+
+const ZOOM_LEVELS = [1, 2, 4, 8] as const;
+type ZoomLevel = (typeof ZOOM_LEVELS)[number];
 
 type CameraMode = "thermal" | "daylight";
+type GimbalMode = "auto-track" | "manual" | "standby";
 
 function calcRange(x: number, y: number): number {
   return Math.sqrt(x * x + y * y);
@@ -470,7 +474,6 @@ function VirtualJoystick({
       if (knobRef.current) {
         knobRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
       }
-      // Normalize to -1..1
       onMove(dx / MAX_OFFSET, dy / MAX_OFFSET);
     },
     [onMove, MAX_OFFSET],
@@ -564,37 +567,65 @@ export default function CameraPanel({
   const acquireStartRef = useRef(Date.now());
   const prevTrackIdRef = useRef<string | null>(null);
 
-  // Camera bearing and elevation (absolute)
+  // Gimbal state
+  const [gimbalMode, setGimbalMode] = useState<GimbalMode>("standby");
   const [cameraBearing, setCameraBearing] = useState(0);
   const [cameraElevation, setCameraElevation] = useState(15);
-  // Joystick offset (applied on top of base bearing/elevation when slewed)
-  const [bearingOffset, setBearingOffset] = useState(0);
-  const [elevationOffset, setElevationOffset] = useState(0);
-  // Whether joystick is actively being dragged (for continuous panning)
+  const [zoom, setZoom] = useState<ZoomLevel>(1);
+
+  // Track lost state
+  const [trackLost, setTrackLost] = useState(false);
+
+  // Joystick refs for continuous panning
   const joystickActiveRef = useRef(false);
   const joystickDxRef = useRef(0);
   const joystickDyRef = useRef(0);
 
-  // Reset acquiring animation when target changes
+  // Effective FOV based on zoom
+  const fovH = BASE_FOV_H / zoom;
+  const fovV = BASE_FOV_V / zoom;
+
+  // When a new track is slewed, enter auto-track mode
   useEffect(() => {
-    if (track && track.id !== prevTrackIdRef.current) {
-      setAcquiring(true);
-      acquireStartRef.current = Date.now();
-      setBearingOffset(0);
-      setElevationOffset(0);
+    if (track) {
+      if (track.id !== prevTrackIdRef.current) {
+        // New track slewed — acquire then auto-track
+        setAcquiring(true);
+        acquireStartRef.current = Date.now();
+        setGimbalMode("auto-track");
+        setTrackLost(false);
+      }
+      prevTrackIdRef.current = track.id;
+    } else {
+      // Track unslewed
+      if (prevTrackIdRef.current !== null) {
+        // Was tracking something — if joystick not active, go standby
+        if (!joystickActiveRef.current) {
+          setGimbalMode("standby");
+        }
+        setTrackLost(false);
+      }
+      prevTrackIdRef.current = null;
     }
-    prevTrackIdRef.current = track?.id ?? null;
   }, [track]);
 
-  // When slewed to a track, update base camera bearing/elevation to track position
+  // Auto-track: continuously update gimbal to follow the tracked target
   useEffect(() => {
-    if (!track) return;
+    if (!track || gimbalMode !== "auto-track") return;
+
+    if (track.neutralized) {
+      // Target destroyed — hold position, show TRACK LOST
+      setTrackLost(true);
+      return;
+    }
+
     const trackBearing = calcBearing(track.x, track.y);
     const trackRange = calcRange(track.x, track.y);
     const trackElev = calcElevation(track.altitude_ft, trackRange);
     setCameraBearing(trackBearing);
     setCameraElevation(trackElev);
-  }, [track]);
+    setTrackLost(false);
+  }, [track, track?.x, track?.y, track?.altitude_ft, track?.neutralized, gimbalMode]);
 
   // Auto-finish acquiring after 1.5s
   useEffect(() => {
@@ -603,7 +634,7 @@ export default function CameraPanel({
     return () => clearTimeout(timer);
   }, [acquiring]);
 
-  // Continuous pan while joystick is held
+  // Continuous pan while joystick is held (MANUAL mode)
   useEffect(() => {
     let animFrame: number;
     const panSpeed = 2; // degrees per frame at full deflection
@@ -612,86 +643,109 @@ export default function CameraPanel({
       if (joystickActiveRef.current) {
         const dx = joystickDxRef.current;
         const dy = joystickDyRef.current;
-        if (track) {
-          // When slewed, adjust offset
-          setBearingOffset((prev) => {
-            const next = prev + dx * panSpeed;
-            return Math.max(-90, Math.min(90, next));
-          });
-          setElevationOffset((prev) => {
-            const next = prev - dy * panSpeed;
-            return Math.max(-45, Math.min(45, next));
-          });
-        } else {
-          // When not slewed, adjust absolute camera bearing/elevation
-          setCameraBearing((prev) => (prev + dx * panSpeed + 360) % 360);
-          setCameraElevation((prev) => {
-            const next = prev - dy * panSpeed;
-            return Math.max(-10, Math.min(80, next));
-          });
-        }
+        setCameraBearing((prev) => (prev + dx * panSpeed + 360) % 360);
+        setCameraElevation((prev) => {
+          const next = prev - dy * panSpeed;
+          return Math.max(-45, Math.min(90, next));
+        });
       }
       animFrame = requestAnimationFrame(tick);
     };
     animFrame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame);
-  }, [track]);
+  }, []);
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickActiveRef.current = true;
     joystickDxRef.current = dx;
     joystickDyRef.current = dy;
+    // Switch to manual mode when joystick is used
+    setGimbalMode("manual");
+    setTrackLost(false);
   }, []);
 
   const handleJoystickRelease = useCallback(() => {
     joystickActiveRef.current = false;
     joystickDxRef.current = 0;
     joystickDyRef.current = 0;
+    // Stay in manual mode — don't auto-revert
   }, []);
 
+  // CENTER button: snap back to auto-track if we have a track
   const handleCenter = useCallback(() => {
-    setBearingOffset(0);
-    setElevationOffset(0);
+    if (track && !track.neutralized) {
+      setGimbalMode("auto-track");
+      const trackBearing = calcBearing(track.x, track.y);
+      const trackRange = calcRange(track.x, track.y);
+      const trackElev = calcElevation(track.altitude_ft, trackRange);
+      setCameraBearing(trackBearing);
+      setCameraElevation(trackElev);
+      setTrackLost(false);
+    }
+  }, [track]);
+
+  // Zoom controls
+  const handleZoomIn = useCallback(() => {
+    setZoom((prev) => {
+      const idx = ZOOM_LEVELS.indexOf(prev);
+      return idx < ZOOM_LEVELS.length - 1 ? ZOOM_LEVELS[idx + 1] : prev;
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((prev) => {
+      const idx = ZOOM_LEVELS.indexOf(prev);
+      return idx > 0 ? ZOOM_LEVELS[idx - 1] : prev;
+    });
+  }, []);
+
+  // Mouse wheel zoom on the canvas viewport
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      setZoom((prev) => {
+        const idx = ZOOM_LEVELS.indexOf(prev);
+        return idx < ZOOM_LEVELS.length - 1 ? ZOOM_LEVELS[idx + 1] : prev;
+      });
+    } else {
+      setZoom((prev) => {
+        const idx = ZOOM_LEVELS.indexOf(prev);
+        return idx > 0 ? ZOOM_LEVELS[idx - 1] : prev;
+      });
+    }
   }, []);
 
   const hudColor = mode === "thermal" ? HUD_COLOR_THERMAL : HUD_COLOR_DAYLIGHT;
 
-  // Effective camera direction
-  const effectiveBearing = track
-    ? (cameraBearing + bearingOffset + 360) % 360
-    : cameraBearing;
-  const effectiveElevation = track
-    ? cameraElevation + elevationOffset
-    : cameraElevation;
-
   // Find which track(s) are visible in the camera FOV
   const getVisibleTrack = useCallback((): { track: TrackData; pixelOffsetX: number; pixelOffsetY: number } | null => {
-    const candidates = track ? [track] : allTracks.filter((t) => !t.neutralized);
+    const candidates = track && gimbalMode === "auto-track" && !trackLost
+      ? [track]
+      : allTracks.filter((t) => !t.neutralized);
     for (const t of candidates) {
       const tBearing = calcBearing(t.x, t.y);
       const tRange = calcRange(t.x, t.y);
       const tElev = calcElevation(t.altitude_ft, tRange);
 
-      const dBearing = angleDiff(tBearing, effectiveBearing);
-      const dElev = angleDiff(tElev, effectiveElevation);
+      const dBearing = angleDiff(tBearing, cameraBearing);
+      const dElev = angleDiff(tElev, cameraElevation);
 
-      if (Math.abs(dBearing) <= FOV_H / 2 && Math.abs(dElev) <= FOV_V / 2) {
-        // Convert angle offset to pixel offset
-        const pixelOffsetX = (dBearing / (FOV_H / 2)) * (CANVAS_W / 2);
-        const pixelOffsetY = -(dElev / (FOV_V / 2)) * (CANVAS_H / 2);
+      if (Math.abs(dBearing) <= fovH / 2 && Math.abs(dElev) <= fovV / 2) {
+        const pixelOffsetX = (dBearing / (fovH / 2)) * (CANVAS_W / 2);
+        const pixelOffsetY = -(dElev / (fovV / 2)) * (CANVAS_H / 2);
         return { track: t, pixelOffsetX, pixelOffsetY };
       }
     }
     return null;
-  }, [track, allTracks, effectiveBearing, effectiveElevation]);
+  }, [track, allTracks, cameraBearing, cameraElevation, fovH, fovV, gimbalMode, trackLost]);
 
-  // Camera always works if an EO/IR sensor is equipped — range just affects image quality
+  // Camera only degraded if no EO/IR sensor equipped at all
   const isDegraded = useCallback(
-    (_t: TrackData): boolean => {
+    (): boolean => {
       const eoirSensors = sensorConfigs.filter(
         (s) => s.type === "eoir" && s.status === "active",
       );
-      return eoirSensors.length === 0; // only degraded if no camera equipped at all
+      return eoirSensors.length === 0;
     },
     [sensorConfigs],
   );
@@ -710,16 +764,36 @@ export default function CameraPanel({
     drawBackground(ctx, w, h, mode);
 
     const visibleTarget = getVisibleTrack();
-    const isStandby = !track;
-    const showDegraded = visibleTarget ? (degraded || isDegraded(visibleTarget.track)) : false;
+    const isStandby = gimbalMode === "standby";
+    const showDegraded = degraded || isDegraded();
 
-    if (isStandby && !visibleTarget) {
+    if (showDegraded) {
+      // No EO/IR sensor — heavy static
+      drawNoise(ctx, w, h, 1.0, mode);
+      drawNoise(ctx, w, h, 0.8, mode);
+      drawReticle(ctx, w, h, hudColor);
+    } else if (trackLost) {
+      // Track lost — hold position, show scan lines + message
+      drawScanLines(ctx, w, h, time);
+      drawNoise(ctx, w, h, 0.4, mode);
+      drawReticle(ctx, w, h, hudColor);
+
+      const alpha = 0.6 + 0.3 * Math.sin(time * 3);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#f85149";
+      ctx.font = "bold 16px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("TRACK LOST", w / 2, h / 2 - 5);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = hudColor;
+      ctx.font = "10px monospace";
+      ctx.fillText("HOLDING LAST POSITION", w / 2, h / 2 + 14);
+    } else if (isStandby && !visibleTarget) {
       // Standby mode — no target in view
       drawScanLines(ctx, w, h, time);
       drawNoise(ctx, w, h, 0.3, mode);
       drawReticle(ctx, w, h, hudColor);
 
-      // STANDBY text
       const alpha = 0.4 + 0.2 * Math.sin(time * 2);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = hudColor;
@@ -730,11 +804,6 @@ export default function CameraPanel({
       ctx.globalAlpha = 0.5;
       ctx.fillText("USE JOYSTICK TO SCAN", w / 2, h / 2 + 16);
       ctx.globalAlpha = 1;
-    } else if (showDegraded && visibleTarget) {
-      // Degraded — heavy static
-      drawNoise(ctx, w, h, 1.0, mode);
-      drawNoise(ctx, w, h, 0.8, mode);
-      drawReticle(ctx, w, h, hudColor);
     } else if (acquiring && track) {
       // Acquiring animation
       const elapsed = (Date.now() - acquireStartRef.current) / 1500;
@@ -746,8 +815,9 @@ export default function CameraPanel({
       const { track: vt, pixelOffsetX, pixelOffsetY } = visibleTarget;
       const rangeKm = calcRange(vt.x, vt.y);
       const noise = noiseFactor(rangeKm);
-      const scale = silhouetteScale(rangeKm);
-      const amp = shakeAmplitude(rangeKm);
+      const baseScale = silhouetteScale(rangeKm);
+      const scale = baseScale * Math.sqrt(zoom); // Zoom magnifies the silhouette
+      const amp = shakeAmplitude(rangeKm) * (1 + (zoom - 1) * 0.3); // More shake at higher zoom
       const jx = (Math.random() - 0.5) * amp;
       const jy = (Math.random() - 0.5) * amp;
 
@@ -772,14 +842,14 @@ export default function CameraPanel({
       drawNoise(ctx, w, h, noise, mode);
       drawReticle(ctx, w, h, hudColor);
     } else {
-      // Standby with scan lines (fallback)
+      // Manual/standby with no visible target — scan lines
       drawScanLines(ctx, w, h, time);
       drawNoise(ctx, w, h, 0.3, mode);
       drawReticle(ctx, w, h, hudColor);
     }
 
     rafRef.current = requestAnimationFrame(draw);
-  }, [track, mode, acquiring, hudColor, degraded, getVisibleTrack, isDegraded]);
+  }, [track, mode, acquiring, hudColor, degraded, getVisibleTrack, isDegraded, gimbalMode, trackLost, zoom]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
@@ -788,6 +858,16 @@ export default function CameraPanel({
 
   const visibleTarget = getVisibleTrack();
   const displayTrackId = track?.id ?? visibleTarget?.track?.id ?? null;
+
+  // Gimbal mode color and label
+  const gimbalModeLabel = trackLost ? "TRACK LOST" : gimbalMode === "auto-track" ? "AUTO-TRACK" : gimbalMode === "manual" ? "MANUAL" : "STANDBY";
+  const gimbalModeColor = trackLost ? "#f85149" : gimbalMode === "auto-track" ? "#3fb950" : gimbalMode === "manual" ? "#d29922" : "#8b949e";
+
+  // Target data for HUD (only in auto-track with a live track)
+  const tgtRange = track && gimbalMode === "auto-track" && !trackLost
+    ? calcRange(track.x, track.y) : null;
+  const tgtBearing = track && gimbalMode === "auto-track" && !trackLost
+    ? calcBearing(track.x, track.y) : null;
 
   return (
     <div
@@ -822,7 +902,7 @@ export default function CameraPanel({
             fontWeight: 600,
           }}
         >
-          EO/IR — {displayTrackId ? displayTrackId.toUpperCase() : "STANDBY"}
+          EO/IR — {displayTrackId ? displayTrackId.toUpperCase() : "NO TARGET"}
         </span>
 
         {/* Thermal / Daylight toggle */}
@@ -864,6 +944,7 @@ export default function CameraPanel({
 
       {/* Viewport */}
       <div
+        onWheel={handleWheel}
         style={{
           position: "relative",
           width: "100%",
@@ -879,7 +960,7 @@ export default function CameraPanel({
         />
 
         {/* Degraded overlay message */}
-        {visibleTarget && (degraded || isDegraded(visibleTarget.track)) && (
+        {(degraded || isDegraded()) && (
           <div
             style={{
               position: "absolute",
@@ -901,7 +982,7 @@ export default function CameraPanel({
                 marginBottom: 4,
               }}
             >
-              TARGET OUT OF CAMERA RANGE
+              NO EO/IR SENSOR
             </div>
             <div
               style={{
@@ -911,16 +992,51 @@ export default function CameraPanel({
                 letterSpacing: 0.5,
               }}
             >
-              MOVE CAMERA CLOSER OR WAIT FOR APPROACH
+              CAMERA OFFLINE
             </div>
           </div>
         )}
 
-        {/* HUD Overlay — bearing & elevation */}
+        {/* HUD Overlay — Top-left: Gimbal mode */}
         <span
           style={{
             position: "absolute",
             top: 6,
+            left: 8,
+            fontFamily: "monospace",
+            fontSize: 10,
+            fontWeight: 700,
+            color: gimbalModeColor,
+            textShadow: `0 0 6px ${gimbalModeColor}80`,
+            pointerEvents: "none",
+            letterSpacing: 1,
+          }}
+        >
+          {gimbalModeLabel}
+        </span>
+
+        {/* HUD Overlay — Top-right: Zoom level */}
+        <span
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 8,
+            fontFamily: "monospace",
+            fontSize: 10,
+            fontWeight: 700,
+            color: hudColor,
+            textShadow: `0 0 4px ${hudColor}80`,
+            pointerEvents: "none",
+          }}
+        >
+          {zoom}x
+        </span>
+
+        {/* HUD Overlay — Bottom-left: PAN / TILT */}
+        <span
+          style={{
+            position: "absolute",
+            bottom: 6,
             left: 8,
             fontFamily: "monospace",
             fontSize: 9,
@@ -929,89 +1045,64 @@ export default function CameraPanel({
             pointerEvents: "none",
           }}
         >
-          BRG: {String(Math.round(effectiveBearing)).padStart(3, "0")}&deg;
-        </span>
-        <span
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 8,
-            fontFamily: "monospace",
-            fontSize: 9,
-            color: hudColor,
-            textShadow: `0 0 4px ${hudColor}80`,
-            pointerEvents: "none",
-          }}
-        >
-          ELEV: {effectiveElevation.toFixed(1)}&deg;
+          PAN: {cameraBearing.toFixed(1).padStart(5, " ")}&deg; | TILT: {cameraElevation >= 0 ? "+" : ""}{cameraElevation.toFixed(1)}&deg;
         </span>
 
-        {/* Target data HUD */}
-        {visibleTarget && !acquiring && (
-          <>
-            <span
-              style={{
-                position: "absolute",
-                bottom: 6,
-                left: 8,
-                fontFamily: "monospace",
-                fontSize: 9,
-                color: hudColor,
-                textShadow: `0 0 4px ${hudColor}80`,
-                pointerEvents: "none",
-              }}
-            >
-              RNG: {calcRange(visibleTarget.track.x, visibleTarget.track.y).toFixed(2)} km
-            </span>
-            <span
-              style={{
-                position: "absolute",
-                bottom: 6,
-                right: 8,
-                fontFamily: "monospace",
-                fontSize: 9,
-                color: hudColor,
-                textShadow: `0 0 4px ${hudColor}80`,
-                pointerEvents: "none",
-              }}
-            >
-              ALT: {Math.round(visibleTarget.track.altitude_ft)} ft
-            </span>
-            <span
-              style={{
-                position: "absolute",
-                top: 6,
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontFamily: "monospace",
-                fontSize: 9,
-                color: hudColor,
-                textShadow: `0 0 4px ${hudColor}80`,
-                pointerEvents: "none",
-              }}
-            >
-              {Math.round(visibleTarget.track.speed_kts)} kts | HDG {String(Math.round(visibleTarget.track.heading_deg)).padStart(3, "0")}&deg;
-            </span>
-          </>
+        {/* HUD Overlay — Bottom-right: Target data (auto-track only) */}
+        {tgtRange !== null && tgtBearing !== null && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: 6,
+              right: 8,
+              fontFamily: "monospace",
+              fontSize: 9,
+              color: hudColor,
+              textShadow: `0 0 4px ${hudColor}80`,
+              pointerEvents: "none",
+            }}
+          >
+            TGT RNG: {tgtRange.toFixed(2)} km | TGT BRG: {String(Math.round(tgtBearing)).padStart(3, "0")}&deg;
+          </span>
         )}
 
-        {/* Mode indicator */}
+        {/* HUD Overlay — Top-center: speed/heading when target visible */}
+        {visibleTarget && !acquiring && (
+          <span
+            style={{
+              position: "absolute",
+              top: 6,
+              left: "50%",
+              transform: "translateX(-50%)",
+              fontFamily: "monospace",
+              fontSize: 9,
+              color: hudColor,
+              textShadow: `0 0 4px ${hudColor}80`,
+              pointerEvents: "none",
+            }}
+          >
+            {Math.round(visibleTarget.track.speed_kts)} kts | HDG {String(Math.round(visibleTarget.track.heading_deg)).padStart(3, "0")}&deg;
+          </span>
+        )}
+
+        {/* HUD Overlay — Bottom-center: Slewed track ID or NO TARGET */}
         <span
           style={{
             position: "absolute",
-            bottom: 6,
+            bottom: 18,
             left: "50%",
             transform: "translateX(-50%)",
             fontFamily: "monospace",
             fontSize: 8,
-            color: hudColor + "88",
+            color: hudColor + "aa",
             pointerEvents: "none",
+            letterSpacing: 0.5,
           }}
         >
-          {mode === "thermal" ? "IR" : "VIS"} | FOV {FOV_H}&deg;
+          {displayTrackId ? displayTrackId.toUpperCase() : "NO TARGET"} | {mode === "thermal" ? "IR" : "VIS"} | FOV {fovH.toFixed(0)}&deg;
         </span>
 
-        {/* Joystick + CENTER button */}
+        {/* Controls: Joystick + CENTER + Zoom */}
         <div
           style={{
             position: "absolute",
@@ -1023,7 +1114,57 @@ export default function CameraPanel({
             gap: 4,
           }}
         >
-          {track && (bearingOffset !== 0 || elevationOffset !== 0) && (
+          {/* Zoom buttons */}
+          <div style={{ display: "flex", gap: 3 }}>
+            <button
+              onClick={handleZoomOut}
+              style={{
+                background: "rgba(30,35,42,0.8)",
+                border: `1px solid ${hudColor}44`,
+                color: hudColor,
+                cursor: "pointer",
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "1px 7px",
+                borderRadius: 3,
+                lineHeight: "16px",
+              }}
+            >
+              -
+            </button>
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: 9,
+                color: hudColor,
+                alignSelf: "center",
+                minWidth: 20,
+                textAlign: "center",
+              }}
+            >
+              {zoom}x
+            </span>
+            <button
+              onClick={handleZoomIn}
+              style={{
+                background: "rgba(30,35,42,0.8)",
+                border: `1px solid ${hudColor}44`,
+                color: hudColor,
+                cursor: "pointer",
+                fontFamily: "monospace",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "1px 7px",
+                borderRadius: 3,
+                lineHeight: "16px",
+              }}
+            >
+              +
+            </button>
+          </div>
+          {/* CENTER button — returns to auto-track */}
+          {gimbalMode === "manual" && track && !track.neutralized && (
             <button
               onClick={handleCenter}
               style={{
@@ -1054,15 +1195,15 @@ export function isTrackInCameraFov(
   t: TrackData,
   cameraBearing: number,
   cameraElevation: number,
-  bearingOffset: number,
-  elevationOffset: number,
+  _bearingOffset: number,
+  _elevationOffset: number,
   slewedTrack: TrackData | null,
 ): boolean {
   const effBearing = slewedTrack
-    ? (calcBearing(slewedTrack.x, slewedTrack.y) + bearingOffset + 360) % 360
+    ? calcBearing(slewedTrack.x, slewedTrack.y)
     : cameraBearing;
   const effElev = slewedTrack
-    ? calcElevation(slewedTrack.altitude_ft, calcRange(slewedTrack.x, slewedTrack.y)) + elevationOffset
+    ? calcElevation(slewedTrack.altitude_ft, calcRange(slewedTrack.x, slewedTrack.y))
     : cameraElevation;
 
   const tBearing = calcBearing(t.x, t.y);
@@ -1070,5 +1211,5 @@ export function isTrackInCameraFov(
   const tElev = calcElevation(t.altitude_ft, tRange);
   const dBearing = angleDiff(tBearing, effBearing);
   const dElev = angleDiff(tElev, effElev);
-  return Math.abs(dBearing) <= FOV_H / 2 && Math.abs(dElev) <= FOV_V / 2;
+  return Math.abs(dBearing) <= BASE_FOV_H / 2 && Math.abs(dElev) <= BASE_FOV_V / 2;
 }
