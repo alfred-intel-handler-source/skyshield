@@ -23,6 +23,7 @@ class DroneType(str, Enum):
     FIXED_WING = "fixed_wing"
     MICRO = "micro"
     SWARM = "swarm"
+    BIRD = "bird"
 
 
 class ThreatClassification(str, Enum):
@@ -139,8 +140,21 @@ class DroneStartConfig(BaseModel):
     altitude: float
     speed: float
     heading: float
-    behavior: str  # "direct_approach", "orbit", "coordinated"
+    behavior: str  # "direct_approach", "orbit", "waypoint_path", "evasive"
     rf_emitting: bool = True
+    spawn_delay: float = 0.0  # seconds after scenario start before drone appears
+    # Orbit behavior params
+    orbit_center: list[float] | None = None  # [x, y] center point
+    orbit_radius: float | None = None  # km
+    # Waypoint behavior params
+    waypoints: list[list[float]] | None = None  # [[x,y], [x,y], ...]
+    # Per-drone scoring overrides (for multi-track scenarios)
+    correct_classification: str | None = None
+    correct_affiliation: str | None = None
+    optimal_effectors: list[str] | None = None
+    acceptable_effectors: list[str] | None = None
+    roe_violations: list[str] | None = None
+    should_engage: bool = True  # False for birds/false positives
 
 
 class ScenarioConfig(BaseModel):
@@ -159,6 +173,8 @@ class ScenarioConfig(BaseModel):
     optimal_effectors: list[str] = []
     acceptable_effectors: list[str] = []
     roe_violations: list[str] = []
+    tutorial: bool = False
+    tutorial_prompts: list[dict[str, str]] | None = None  # [{"trigger": "...", "message": "..."}]
 
 
 class PlayerAction(BaseModel):
