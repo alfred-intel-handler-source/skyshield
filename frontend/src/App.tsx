@@ -72,6 +72,25 @@ export default function App() {
   // Camera panel
   const [cameraTrackId, setCameraTrackId] = useState<string | null>(null);
 
+  // Track which tracks have already auto-opened the camera (so we only do it once)
+  const autoOpenedCameraRef = useRef<Set<string>>(new Set());
+
+  // Auto-open camera when a track first enters 'tracked' phase
+  useEffect(() => {
+    if (phase !== "running") return;
+    for (const t of tracks) {
+      if (
+        t.dtid_phase === "tracked" &&
+        !autoOpenedCameraRef.current.has(t.id)
+      ) {
+        autoOpenedCameraRef.current.add(t.id);
+        setCameraTrackId(t.id);
+        soundEngine.play("camera_slew");
+        break; // only auto-open one at a time
+      }
+    }
+  }, [tracks, phase]);
+
   // Tutorial state
   const [isTutorial, setIsTutorial] = useState(false);
   const [tutorialMessage, setTutorialMessage] = useState<string | null>(null);
@@ -364,6 +383,7 @@ export default function App() {
     setTimeRemaining(0);
     setThreatLevel("green");
     setCameraTrackId(null);
+    autoOpenedCameraRef.current.clear();
     setTutorialMessage(null);
     setIsTutorial(false);
     setPaused(false);
@@ -393,6 +413,7 @@ export default function App() {
     setTimeRemaining(0);
     setThreatLevel("green");
     setCameraTrackId(null);
+    autoOpenedCameraRef.current.clear();
     setPlacementConfig(null);
     setTutorialMessage(null);
     setIsTutorial(false);
@@ -625,6 +646,34 @@ export default function App() {
   const cameraTrack =
     cameraTrackId ? tracks.find((t) => t.id === cameraTrackId) || null : null;
 
+  // Check if camera target is covered by an active EO/IR sensor
+  const cameraIsDegraded = (() => {
+    if (!cameraTrack) return false;
+    const eoirSensors = sensorConfigs.filter(
+      (s) => s.type === "eoir" && s.status === "active",
+    );
+    for (const sensor of eoirSensors) {
+      const sx = sensor.x ?? 0;
+      const sy = sensor.y ?? 0;
+      const dist = Math.sqrt(
+        (cameraTrack.x - sx) ** 2 + (cameraTrack.y - sy) ** 2,
+      );
+      const range = sensor.range_km ?? 1.5;
+      if (dist > range) continue;
+      const fov = sensor.fov_deg ?? 360;
+      if (fov >= 360) return false;
+      const bearing =
+        ((Math.atan2(cameraTrack.x - sx, cameraTrack.y - sy) * 180) /
+          Math.PI +
+          360) %
+        360;
+      const facing = sensor.facing_deg ?? 0;
+      const diff = Math.abs(((bearing - facing + 180) % 360) - 180);
+      if (diff <= fov / 2) return false;
+    }
+    return true;
+  })();
+
   return (
     <div
       style={{
@@ -787,7 +836,6 @@ export default function App() {
         <EngagementPanel
           track={selectedTrack}
           effectors={effectors}
-          sensors={sensorConfigs}
           onConfirmTrack={confirmTrack}
           onIdentify={identify}
           onEngage={engage}
@@ -821,6 +869,7 @@ export default function App() {
         <CameraPanel
           track={cameraTrack}
           onClose={() => setCameraTrackId(null)}
+          degraded={cameraIsDegraded}
         />
       )}
 

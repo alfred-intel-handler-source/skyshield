@@ -1,9 +1,8 @@
-import type { EffectorStatus, SensorStatus, TrackData } from "../types";
+import type { EffectorStatus, TrackData } from "../types";
 
 interface Props {
   track: TrackData | null;
   effectors: EffectorStatus[];
-  sensors: SensorStatus[];
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
   onEngage: (trackId: string, effectorId: string) => void;
@@ -29,33 +28,10 @@ const EFFECTOR_COLORS: Record<string, string> = {
   directed_energy: "#bc8cff",
 };
 
-function isInEoirFov(track: TrackData, sensors: SensorStatus[]): boolean {
-  const eoirSensors = sensors.filter(
-    (s) => s.type === "eoir" && s.status === "active",
-  );
-  for (const sensor of eoirSensors) {
-    const sx = sensor.x ?? 0;
-    const sy = sensor.y ?? 0;
-    const dist = Math.sqrt((track.x - sx) ** 2 + (track.y - sy) ** 2);
-    const range = sensor.range_km ?? 1.5;
-    if (dist > range) continue;
-
-    const fov = sensor.fov_deg ?? 360;
-    if (fov >= 360) return true;
-
-    const bearing =
-      ((Math.atan2(track.x - sx, track.y - sy) * 180) / Math.PI + 360) % 360;
-    const facing = sensor.facing_deg ?? 0;
-    const diff = Math.abs(((bearing - facing + 180) % 360) - 180);
-    if (diff <= fov / 2) return true;
-  }
-  return false;
-}
 
 export default function EngagementPanel({
   track,
   effectors,
-  sensors,
   onConfirmTrack,
   onIdentify,
   onEngage,
@@ -79,10 +55,6 @@ export default function EngagementPanel({
       </div>
     );
   }
-
-  const canSlew =
-    (track.dtid_phase === "tracked" || track.dtid_phase === "identified") &&
-    isInEoirFov(track, sensors);
 
   return (
     <div style={{ padding: "12px 14px", minHeight: 120 }}>
@@ -133,8 +105,8 @@ export default function EngagementPanel({
 
       {track.dtid_phase === "tracked" && (
         <div>
-          {/* SLEW CAMERA button */}
-          {canSlew && onSlewCamera && (
+          {/* SLEW CAMERA button — always visible */}
+          {onSlewCamera && (
             <button
               onClick={() => onSlewCamera(track.id)}
               style={{
@@ -161,25 +133,6 @@ export default function EngagementPanel({
             >
               SLEW CAMERA
             </button>
-          )}
-
-          {!canSlew && (
-            <div
-              style={{
-                fontSize: 10,
-                color: "#484f58",
-                marginBottom: 8,
-                padding: "6px 8px",
-                background: "#161b22",
-                border: "1px solid #21262d",
-                borderRadius: 4,
-                letterSpacing: 0.5,
-              }}
-            >
-              {sensors.some((s) => s.type === "eoir")
-                ? "TARGET NOT IN CAMERA FOV"
-                : "NO EO/IR CAMERA AVAILABLE"}
-            </div>
           )}
 
           <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
@@ -225,8 +178,8 @@ export default function EngagementPanel({
 
       {track.dtid_phase === "identified" && (
         <div>
-          {/* SLEW CAMERA in identified phase too */}
-          {canSlew && onSlewCamera && (
+          {/* SLEW CAMERA in identified phase too — always visible */}
+          {onSlewCamera && (
             <button
               onClick={() => onSlewCamera(track.id)}
               style={{

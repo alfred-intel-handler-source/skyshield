@@ -4,10 +4,11 @@ import type { TrackData } from "../types";
 interface Props {
   track: TrackData;
   onClose: () => void;
+  degraded?: boolean;
 }
 
-const CANVAS_W = 720;
-const CANVAS_H = 540;
+const CANVAS_W = 960;
+const CANVAS_H = 640;
 const RETICLE_COLOR = "#3fb95088";
 const HUD_COLOR_THERMAL = "#3fb950";
 const HUD_COLOR_DAYLIGHT = "#58a6ff";
@@ -392,7 +393,7 @@ function drawAcquiring(
 // Component
 // ---------------------------------------------------------------------------
 
-export default function CameraPanel({ track, onClose }: Props) {
+export default function CameraPanel({ track, onClose, degraded = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const [mode, setMode] = useState<CameraMode>("thermal");
@@ -439,7 +440,12 @@ export default function CameraPanel({ track, onClose }: Props) {
     // Background
     drawBackground(ctx, w, h, mode);
 
-    if (acquiring) {
+    if (degraded) {
+      // Heavy static — no EO/IR coverage
+      drawNoise(ctx, w, h, 1.0, mode);
+      drawNoise(ctx, w, h, 0.8, mode);
+      drawReticle(ctx, w, h, hudColor);
+    } else if (acquiring) {
       // Acquiring animation
       const elapsed = (Date.now() - acquireStartRef.current) / 1500;
       drawNoise(ctx, w, h, 0.9, mode);
@@ -473,7 +479,7 @@ export default function CameraPanel({ track, onClose }: Props) {
     }
 
     rafRef.current = requestAnimationFrame(draw);
-  }, [track, mode, acquiring, hudColor]);
+  }, [track, mode, acquiring, hudColor, degraded]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
@@ -505,16 +511,24 @@ export default function CameraPanel({ track, onClose }: Props) {
         justifyContent: "center",
       }}
     >
+      <style>{`
+        @keyframes camera-glow {
+          0%, 100% { box-shadow: 0 0 15px rgba(63, 185, 80, 0.3), 0 0 30px rgba(63, 185, 80, 0.1); }
+          50% { box-shadow: 0 0 25px rgba(63, 185, 80, 0.6), 0 0 50px rgba(63, 185, 80, 0.2); }
+        }
+      `}</style>
       <div
         style={{
           background: "#0d1117",
-          border: "1px solid #30363d",
-          borderRadius: 6,
+          border: "1px solid #3fb95066",
+          borderRadius: 8,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          maxWidth: "95vw",
-          maxHeight: "95vh",
+          width: "65vw",
+          maxWidth: 1100,
+          maxHeight: "90vh",
+          animation: "camera-glow 2s ease-in-out 3",
         }}
       >
         {/* Header */}
@@ -538,7 +552,7 @@ export default function CameraPanel({ track, onClose }: Props) {
               fontWeight: 600,
             }}
           >
-            EO/IR CAMERA FEED
+            {degraded ? "EO/IR CAMERA — NO SIGNAL" : "EO/IR CAMERA FEED"}
           </span>
 
           {/* Thermal / Daylight toggle */}
@@ -589,26 +603,27 @@ export default function CameraPanel({ track, onClose }: Props) {
           <button
             onClick={onClose}
             style={{
-              background: "none",
-              border: "1px solid #30363d",
-              color: "#8b949e",
+              background: "#f8514918",
+              border: "1px solid #f8514944",
+              color: "#f85149",
               cursor: "pointer",
               fontFamily: "monospace",
-              fontSize: 14,
-              padding: "2px 8px",
-              borderRadius: 4,
+              fontSize: 18,
+              fontWeight: 700,
+              padding: "4px 14px",
+              borderRadius: 5,
               lineHeight: 1,
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "#f85149";
+              (e.currentTarget as HTMLButtonElement).style.background = "#f8514930";
               (e.currentTarget as HTMLButtonElement).style.borderColor = "#f85149";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = "#8b949e";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#30363d";
+              (e.currentTarget as HTMLButtonElement).style.background = "#f8514918";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#f8514944";
             }}
           >
-            X
+            CLOSE [4]
           </button>
         </div>
 
@@ -616,16 +631,65 @@ export default function CameraPanel({ track, onClose }: Props) {
         <div
           style={{
             position: "relative",
-            width: CANVAS_W,
-            height: CANVAS_H,
+            width: "100%",
+            aspectRatio: `${CANVAS_W} / ${CANVAS_H}`,
           }}
         >
           <canvas
             ref={canvasRef}
             width={CANVAS_W}
             height={CANVAS_H}
-            style={{ display: "block", width: CANVAS_W, height: CANVAS_H }}
+            style={{ display: "block", width: "100%", height: "100%" }}
           />
+
+          {/* Degraded overlay message */}
+          {degraded && (
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#f85149",
+                  letterSpacing: 2,
+                  textShadow: "0 0 10px rgba(248, 81, 73, 0.6)",
+                  marginBottom: 8,
+                }}
+              >
+                NO EO/IR COVERAGE
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 12,
+                  color: "#d29922",
+                  letterSpacing: 1,
+                }}
+              >
+                SENSOR DATA ONLY — NO VISUAL FEED AVAILABLE
+              </div>
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 10,
+                  color: "#484f58",
+                  letterSpacing: 0.5,
+                  marginTop: 12,
+                }}
+              >
+                Equip an EO/IR sensor or reposition for coverage
+              </div>
+            </div>
+          )}
 
           {/* HUD Overlay */}
           <span style={hudStyle({ top: 10, left: 12 })}>
