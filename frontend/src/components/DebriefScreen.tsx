@@ -89,6 +89,8 @@ export default function DebriefScreen({
   onRestart,
 }: Props) {
   const gradeColor = GRADE_COLORS[score.grade] || "#8b949e";
+  const hasPlacement =
+    score.placement_score !== null && score.placement_score !== undefined;
 
   return (
     <div
@@ -109,8 +111,10 @@ export default function DebriefScreen({
           border: "1px solid #30363d",
           borderRadius: 8,
           padding: 32,
-          maxWidth: 480,
+          maxWidth: 520,
           width: "90%",
+          maxHeight: "90vh",
+          overflowY: "auto",
           boxShadow: "0 16px 48px rgba(0, 0, 0, 0.5)",
         }}
       >
@@ -179,6 +183,19 @@ export default function DebriefScreen({
           </div>
         </div>
 
+        {/* Execution scores */}
+        <div
+          style={{
+            fontSize: 10,
+            color: "#8b949e",
+            letterSpacing: 1.5,
+            fontWeight: 600,
+            marginBottom: 12,
+          }}
+        >
+          EXECUTION
+        </div>
+
         <ScoreBar
           label="DETECTION RESPONSE (20%)"
           score={score.detection_response_score}
@@ -205,6 +222,60 @@ export default function DebriefScreen({
           detail={score.details.roe || ""}
         />
 
+        {/* Placement scores */}
+        {hasPlacement && score.placement_details && (
+          <>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#8b949e",
+                letterSpacing: 1.5,
+                fontWeight: 600,
+                marginTop: 20,
+                marginBottom: 12,
+                paddingTop: 16,
+                borderTop: "1px solid #30363d",
+              }}
+            >
+              DEFENSE PLANNING
+            </div>
+
+            <ScoreBar
+              label="OVERALL PLACEMENT"
+              score={score.placement_score!}
+              detail=""
+            />
+            <ScoreBar
+              label="APPROACH COVERAGE (40%)"
+              score={
+                parseScoreFromDetail(score.placement_details.coverage)
+              }
+              detail={score.placement_details.coverage || ""}
+            />
+            <ScoreBar
+              label="SENSOR OVERLAP (25%)"
+              score={
+                parseScoreFromDetail(score.placement_details.overlap)
+              }
+              detail={score.placement_details.overlap || ""}
+            />
+            <ScoreBar
+              label="EFFECTOR REACH (25%)"
+              score={
+                parseScoreFromDetail(score.placement_details.effector_reach)
+              }
+              detail={score.placement_details.effector_reach || ""}
+            />
+            <ScoreBar
+              label="LOS MANAGEMENT (10%)"
+              score={
+                parseScoreFromDetail(score.placement_details.los)
+              }
+              detail={score.placement_details.los || ""}
+            />
+          </>
+        )}
+
         <button
           onClick={onRestart}
           style={{
@@ -229,9 +300,26 @@ export default function DebriefScreen({
             (e.currentTarget as HTMLElement).style.background = "#58a6ff18";
           }}
         >
-          RESTART MISSION
+          NEW MISSION
         </button>
       </div>
     </div>
   );
+}
+
+function parseScoreFromDetail(detail: string | undefined): number {
+  if (!detail) return 0;
+  // Extract fraction like "3/5" and convert to percentage
+  const match = detail.match(/(\d+)\/(\d+)/);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    const den = parseInt(match[2], 10);
+    return den > 0 ? (num / den) * 100 : 0;
+  }
+  // Extract percentage like "85%"
+  const pctMatch = detail.match(/(\d+)%/);
+  if (pctMatch) {
+    return parseInt(pctMatch[1], 10);
+  }
+  return 0;
 }

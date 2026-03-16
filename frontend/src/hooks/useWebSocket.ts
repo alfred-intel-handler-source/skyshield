@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ServerMessage } from "../types";
+import type { PlacementConfig, ServerMessage } from "../types";
 
 type MessageHandler = (msg: ServerMessage) => void;
+
+export interface ConnectOptions {
+  scenarioId: string;
+  baseId?: string;
+  placement?: PlacementConfig;
+}
 
 export function useWebSocket(onMessage: MessageHandler) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
 
   const connect = useCallback(
-    (scenarioId: string) => {
+    (opts: ConnectOptions | string) => {
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -19,7 +25,25 @@ export function useWebSocket(onMessage: MessageHandler) {
 
       ws.onopen = () => {
         setConnected(true);
-        ws.send(JSON.stringify({ scenario_id: scenarioId }));
+        if (typeof opts === "string") {
+          // Legacy: just scenario_id
+          ws.send(JSON.stringify({ scenario_id: opts }));
+        } else {
+          const initMsg: Record<string, unknown> = {
+            scenario_id: opts.scenarioId,
+          };
+          if (opts.baseId) {
+            initMsg.base_id = opts.baseId;
+          }
+          if (opts.placement) {
+            initMsg.placement = {
+              base_id: opts.placement.base_id,
+              sensors: opts.placement.sensors,
+              effectors: opts.placement.effectors,
+            };
+          }
+          ws.send(JSON.stringify(initMsg));
+        }
       };
 
       ws.onmessage = (event) => {

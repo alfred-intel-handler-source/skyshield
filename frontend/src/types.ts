@@ -1,4 +1,4 @@
-export type GamePhase = "waiting" | "running" | "debrief";
+export type GamePhase = "waiting" | "scenario_select" | "equip" | "plan" | "running" | "debrief";
 export type DTIDPhase = "detected" | "tracked" | "identified" | "defeated";
 export type Affiliation = "unknown" | "hostile" | "friendly" | "neutral";
 export type ThreatLevel = "green" | "yellow" | "orange" | "red";
@@ -26,6 +26,10 @@ export interface SensorStatus {
   range_km?: number;
   status: string;
   detecting: string[];
+  x?: number;
+  y?: number;
+  fov_deg?: number;
+  facing_deg?: number;
 }
 
 export interface EffectorStatus {
@@ -35,6 +39,10 @@ export interface EffectorStatus {
   range_km?: number;
   status: string;
   recharge_seconds?: number;
+  x?: number;
+  y?: number;
+  fov_deg?: number;
+  facing_deg?: number;
 }
 
 export interface EngagementZones {
@@ -57,6 +65,8 @@ export interface ScoreBreakdown {
   total_score: number;
   grade: string;
   details: Record<string, string>;
+  placement_score: number | null;
+  placement_details: Record<string, string> | null;
 }
 
 // Server messages
@@ -66,6 +76,13 @@ export interface GameStartMsg {
   sensors: SensorStatus[];
   effectors: EffectorStatus[];
   engagement_zones: EngagementZones;
+  base?: {
+    id: string;
+    name: string;
+    boundary: number[][];
+    protected_assets: ProtectedAsset[];
+    terrain: TerrainFeature[];
+  };
 }
 
 export interface StateMsg {
@@ -104,3 +121,103 @@ export type ServerMessage =
   | EventMsg
   | EngagementResultMsg
   | DebriefMsg;
+
+// Phase 2: Base Defense Planner types
+
+export interface ProtectedAsset {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  priority: number;
+}
+
+export interface TerrainFeature {
+  id: string;
+  type: string;
+  name: string;
+  polygon: number[][];
+  blocks_los: boolean;
+  height_m: number;
+}
+
+export interface ApproachCorridor {
+  name: string;
+  bearing_deg: number;
+  width_deg: number;
+}
+
+export interface BaseTemplate {
+  id: string;
+  name: string;
+  description: string;
+  size: string;
+  boundary: number[][];
+  protected_assets: ProtectedAsset[];
+  terrain: TerrainFeature[];
+  approach_corridors: ApproachCorridor[];
+  max_sensors: number;
+  max_effectors: number;
+  placement_bounds_km: number;
+}
+
+export interface CatalogSensor {
+  catalog_id: string;
+  name: string;
+  type: string;
+  range_km: number;
+  fov_deg: number;
+  description: string;
+  pros: string[];
+  cons: string[];
+  requires_los: boolean;
+}
+
+export interface CatalogEffector {
+  catalog_id: string;
+  name: string;
+  type: string;
+  range_km: number;
+  fov_deg: number;
+  recharge_seconds: number;
+  single_use: boolean;
+  description: string;
+  pros: string[];
+  cons: string[];
+  requires_los: boolean;
+  collateral_risk: string;
+}
+
+export interface EquipmentCatalog {
+  sensors: CatalogSensor[];
+  effectors: CatalogEffector[];
+}
+
+export interface ScenarioInfo {
+  id: string;
+  name: string;
+  description: string;
+  difficulty: string;
+}
+
+export interface BaseInfo {
+  id: string;
+  name: string;
+  description: string;
+  size: string;
+  max_sensors: number;
+  max_effectors: number;
+}
+
+export interface PlacedEquipment {
+  catalog_id: string;
+  x: number;
+  y: number;
+  facing_deg: number;
+}
+
+export interface PlacementConfig {
+  base_id: string;
+  sensors: PlacedEquipment[];
+  effectors: PlacedEquipment[];
+}

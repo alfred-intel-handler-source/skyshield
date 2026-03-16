@@ -5,24 +5,94 @@ from __future__ import annotations
 import math
 import random
 
-from app.models import DroneState, SensorConfig, SensorType
+from app.models import DroneState, SensorConfig, SensorType, TerrainFeature
+
+
+def _distance(x1: float, y1: float, x2: float, y2: float) -> float:
+    return math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+
+def _bearing_between(x1: float, y1: float, x2: float, y2: float) -> float:
+    """Bearing in degrees from (x1,y1) to (x2,y2), 0=north, clockwise."""
+    dx = x2 - x1
+    dy = y2 - y1
+    return math.degrees(math.atan2(dx, dy)) % 360
+
+
+def _angle_diff(a: float, b: float) -> float:
+    """Smallest signed angle difference between two angles in degrees."""
+    diff = (b - a + 180) % 360 - 180
+    return abs(diff)
+
+
+def _in_fov(sensor: SensorConfig, bearing_to_target: float) -> bool:
+    """Check if a bearing falls within the sensor's field of view."""
+    if sensor.fov_deg >= 360:
+        return True
+    half_fov = sensor.fov_deg / 2.0
+    return _angle_diff(sensor.facing_deg, bearing_to_target) <= half_fov
+
+
+def _segments_intersect(
+    ax: float, ay: float, bx: float, by: float,
+    cx: float, cy: float, dx: float, dy: float,
+) -> bool:
+    """Check if line segment AB intersects line segment CD."""
+    def cross(o_x: float, o_y: float, a_x: float, a_y: float, b_x: float, b_y: float) -> float:
+        return (a_x - o_x) * (b_y - o_y) - (a_y - o_y) * (b_x - o_x)
+
+    d1 = cross(cx, cy, dx, dy, ax, ay)
+    d2 = cross(cx, cy, dx, dy, bx, by)
+    d3 = cross(ax, ay, bx, by, cx, cy)
+    d4 = cross(ax, ay, bx, by, dx, dy)
+
+    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+       ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+        return True
+    return False
+
+
+def _los_blocked(
+    sx: float, sy: float, tx: float, ty: float,
+    terrain: list[TerrainFeature],
+) -> bool:
+    """Check if line of sight from sensor to target is blocked by terrain."""
+    for feature in terrain:
+        if not feature.blocks_los:
+            continue
+        poly = feature.polygon
+        n = len(poly)
+        for i in range(n):
+            px1, py1 = poly[i]
+            px2, py2 = poly[(i + 1) % n]
+            if _segments_intersect(sx, sy, tx, ty, px1, py1, px2, py2):
+                return True
+    return False
 
 
 class SensorSimulator:
     """Simulates multi-sensor detection of drone targets."""
 
+    def __init__(self, terrain: list[TerrainFeature] | None = None):
+        self.terrain = terrain or []
+
     def detect_radar(
         self, drone: DroneState, sensor: SensorConfig
     ) -> dict | None:
         """Radar: detects based on range. Provides range, altitude, speed, heading."""
-        dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
+        dist = _distance(sensor.x, sensor.y, drone.x, drone.y)
         if dist > sensor.range_km:
+            return None
+
+        # Check FOV
+        bearing = _bearing_between(sensor.x, sensor.y, drone.x, drone.y)
+        if not _in_fov(sensor, bearing):
             return None
 
         # High reliability within range, slight falloff at edge
         ratio = dist / sensor.range_km
         if ratio > 0.9:
-            detect_prob = 1.0 - (ratio - 0.9) * 5.0  # falloff at edge
+            detect_prob = 1.0 - (ratio - 0.9) * 5.0
         else:
             detect_prob = 1.0
 
@@ -45,8 +115,12 @@ class SensorSimulator:
         if not drone.rf_emitting:
             return None
 
-        dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
+        dist = _distance(sensor.x, sensor.y, drone.x, drone.y)
         if dist > sensor.range_km:
+            return None
+
+        bearing = _bearing_between(sensor.x, sensor.y, drone.x, drone.y)
+        if not _in_fov(sensor, bearing):
             return None
 
         ratio = dist / sensor.range_km
@@ -54,7 +128,6 @@ class SensorSimulator:
         if random.random() > max(0, detect_prob):
             return None
 
-        bearing = math.degrees(math.atan2(drone.x, drone.y)) % 360
         noise_factor = dist * 0.03
         return {
             "sensor_id": sensor.id,
@@ -64,9 +137,17 @@ class SensorSimulator:
     def detect_eoir(
         self, drone: DroneState, sensor: SensorConfig
     ) -> dict | None:
-        """EO/IR Camera: close range detection with visual classification hint."""
-        dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
+        """EO/IR Camera: close range detection with visual classification hint. LOS required."""
+        dist = _distance(sensor.x, sensor.y, drone.x, drone.y)
         if dist > sensor.range_km:
+            return None
+
+        bearing = _bearing_between(sensor.x, sensor.y, drone.x, drone.y)
+        if not _in_fov(sensor, bearing):
+            return None
+
+        # LOS check for EO/IR
+        if self.terrain and _los_blocked(sensor.x, sensor.y, drone.x, drone.y, self.terrain):
             return None
 
         ratio = dist / sensor.range_km
@@ -74,7 +155,6 @@ class SensorSimulator:
         if random.random() > max(0, detect_prob):
             return None
 
-        # Classification hint based on drone type
         classification_hints = {
             "commercial_quad": "multi-rotor silhouette",
             "fixed_wing": "fixed-wing silhouette",
@@ -93,8 +173,12 @@ class SensorSimulator:
         self, drone: DroneState, sensor: SensorConfig
     ) -> dict | None:
         """Acoustic: very short range, detects all drones. Provides bearing."""
-        dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
+        dist = _distance(sensor.x, sensor.y, drone.x, drone.y)
         if dist > sensor.range_km:
+            return None
+
+        bearing = _bearing_between(sensor.x, sensor.y, drone.x, drone.y)
+        if not _in_fov(sensor, bearing):
             return None
 
         ratio = dist / sensor.range_km
@@ -102,7 +186,6 @@ class SensorSimulator:
         if random.random() > max(0, detect_prob):
             return None
 
-        bearing = math.degrees(math.atan2(drone.x, drone.y)) % 360
         return {
             "sensor_id": sensor.id,
             "bearing_deg": round(bearing + random.gauss(0, 5), 1) % 360,
@@ -128,10 +211,12 @@ class SensorSimulator:
 
 
 def update_sensors(
-    drone: DroneState, sensors: list[SensorConfig]
+    drone: DroneState,
+    sensors: list[SensorConfig],
+    terrain: list[TerrainFeature] | None = None,
 ) -> tuple[list[str], list[dict]]:
     """Run all sensors against a drone. Returns (detecting_sensor_ids, sensor_data_list)."""
-    simulator = SensorSimulator()
+    simulator = SensorSimulator(terrain=terrain)
     detecting: list[str] = []
     readings: list[dict] = []
 
@@ -149,7 +234,6 @@ def calculate_confidence(sensors_detecting: list[str], range_km: float) -> float
     if not sensors_detecting:
         return 0.0
 
-    # Base confidence from sensor count
     sensor_count = len(sensors_detecting)
     if sensor_count >= 4:
         base_confidence = 0.95
@@ -160,7 +244,6 @@ def calculate_confidence(sensors_detecting: list[str], range_km: float) -> float
     else:
         base_confidence = 0.5
 
-    # Range modifier: closer = higher confidence
     if range_km < 1.0:
         range_modifier = 1.0
     elif range_km < 2.0:

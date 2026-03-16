@@ -72,6 +72,9 @@ class GamePhase(str, Enum):
     DEBRIEF = "debrief"
 
 
+# --- Core game state models ---
+
+
 class DroneState(BaseModel):
     id: str
     drone_type: DroneType
@@ -98,6 +101,12 @@ class SensorConfig(BaseModel):
     type: SensorType
     range_km: float
     status: str = "active"
+    # Phase 2: placement position & FOV
+    x: float = 0.0
+    y: float = 0.0
+    fov_deg: float = 360.0
+    facing_deg: float = 0.0  # direction camera faces (for limited FOV)
+    requires_los: bool = False
 
 
 class EffectorConfig(BaseModel):
@@ -107,6 +116,13 @@ class EffectorConfig(BaseModel):
     range_km: float
     status: str = "ready"
     recharge_seconds: int = 0
+    # Phase 2: placement position & FOV
+    x: float = 0.0
+    y: float = 0.0
+    fov_deg: float = 360.0
+    facing_deg: float = 0.0
+    requires_los: bool = False
+    single_use: bool = False
 
 
 class EngagementZones(BaseModel):
@@ -172,3 +188,91 @@ class ScoreBreakdown(BaseModel):
     total_score: float
     grade: str
     details: dict[str, str]
+    # Phase 2: optional placement scores
+    placement_score: float | None = None
+    placement_details: dict[str, str] | None = None
+
+
+# --- Phase 2: Base Defense Planner models ---
+
+
+class ProtectedAsset(BaseModel):
+    id: str
+    name: str
+    x: float
+    y: float
+    priority: int
+
+
+class TerrainFeature(BaseModel):
+    id: str
+    type: str  # building, tower, berm, treeline, runway
+    name: str
+    polygon: list[list[float]]
+    blocks_los: bool
+    height_m: float
+
+
+class ApproachCorridor(BaseModel):
+    name: str
+    bearing_deg: float
+    width_deg: float
+
+
+class BaseTemplate(BaseModel):
+    id: str
+    name: str
+    description: str
+    size: str  # small, medium, large
+    boundary: list[list[float]]
+    protected_assets: list[ProtectedAsset]
+    terrain: list[TerrainFeature]
+    approach_corridors: list[ApproachCorridor]
+    max_sensors: int
+    max_effectors: int
+    placement_bounds_km: float
+
+
+class CatalogSensor(BaseModel):
+    catalog_id: str
+    name: str
+    type: str
+    range_km: float
+    fov_deg: float
+    description: str
+    pros: list[str]
+    cons: list[str]
+    requires_los: bool
+
+
+class CatalogEffector(BaseModel):
+    catalog_id: str
+    name: str
+    type: str
+    range_km: float
+    fov_deg: float
+    recharge_seconds: int
+    single_use: bool
+    description: str
+    pros: list[str]
+    cons: list[str]
+    requires_los: bool
+    collateral_risk: str
+
+
+class EquipmentCatalog(BaseModel):
+    sensors: list[CatalogSensor]
+    effectors: list[CatalogEffector]
+
+
+class PlacedEquipment(BaseModel):
+    catalog_id: str
+    x: float
+    y: float
+    facing_deg: float = 0.0
+
+
+class PlacementConfig(BaseModel):
+    base_id: str
+    sensors: list[PlacedEquipment]
+    effectors: list[PlacedEquipment]

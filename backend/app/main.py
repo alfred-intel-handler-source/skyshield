@@ -9,22 +9,30 @@ import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.bases import list_bases, load_base, load_equipment_catalog
 from app.drone import create_drone, update_drone, distance_to_base
 from app.detection import update_sensors, calculate_confidence
 from app.models import (
+    BaseTemplate,
+    CatalogEffector,
+    CatalogSensor,
     DTIDPhase,
     Affiliation,
     DroneState,
     EffectorConfig,
     EffectorStatus,
+    EffectorType,
     GamePhase,
+    PlacedEquipment,
+    PlacementConfig,
     PlayerAction,
     SensorConfig,
+    SensorType,
 )
 from app.scenario import list_scenarios, load_scenario
 from app.scoring import calculate_score
 
-app = FastAPI(title="SKYSHIELD", version="0.2.0")
+app = FastAPI(title="SKYSHIELD", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,12 +45,29 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"name": "SKYSHIELD", "version": "0.2.0"}
+    return {"name": "SKYSHIELD", "version": "0.3.0"}
 
 
 @app.get("/scenarios")
 async def get_scenarios():
     return list_scenarios()
+
+
+@app.get("/bases")
+async def get_bases():
+    return list_bases()
+
+
+@app.get("/bases/{base_id}")
+async def get_base(base_id: str):
+    base = load_base(base_id)
+    return base.model_dump()
+
+
+@app.get("/equipment")
+async def get_equipment():
+    catalog = load_equipment_catalog()
+    return catalog.model_dump()
 
 
 def _effector_effectiveness(effector_type: str, drone_type: str) -> float:
@@ -104,15 +129,118 @@ def _find_effector_config(
     return None
 
 
+def _build_sensors_from_placement(
+    placement: PlacementConfig,
+    catalog_sensors: dict[str, CatalogSensor],
+) -> list[SensorConfig]:
+    """Build SensorConfig list from player's placement choices."""
+    sensors = []
+    for i, placed in enumerate(placement.sensors):
+        cat = catalog_sensors.get(placed.catalog_id)
+        if cat is None:
+            continue
+        sensor_type = SensorType(cat.type)
+        sensors.append(SensorConfig(
+            id=f"sensor_{i}_{placed.catalog_id}",
+            name=cat.name,
+            type=sensor_type,
+            range_km=cat.range_km,
+            status="active",
+            x=placed.x,
+            y=placed.y,
+            fov_deg=cat.fov_deg,
+            facing_deg=placed.facing_deg,
+            requires_los=cat.requires_los,
+        ))
+    return sensors
+
+
+def _build_effectors_from_placement(
+    placement: PlacementConfig,
+    catalog_effectors: dict[str, CatalogEffector],
+) -> list[EffectorConfig]:
+    """Build EffectorConfig list from player's placement choices."""
+    effectors = []
+    for i, placed in enumerate(placement.effectors):
+        cat = catalog_effectors.get(placed.catalog_id)
+        if cat is None:
+            continue
+        eff_type = EffectorType(cat.type)
+        effectors.append(EffectorConfig(
+            id=f"effector_{i}_{placed.catalog_id}",
+            name=cat.name,
+            type=eff_type,
+            range_km=cat.range_km,
+            status="ready",
+            recharge_seconds=cat.recharge_seconds,
+            x=placed.x,
+            y=placed.y,
+            fov_deg=cat.fov_deg,
+            facing_deg=placed.facing_deg,
+            requires_los=cat.requires_los,
+            single_use=cat.single_use,
+        ))
+    return effectors
+
+
+def _check_effector_in_range(eff_state: dict, drone: DroneState) -> bool:
+    """Check if drone is within effector range and FOV."""
+    ex = eff_state.get("x", 0.0)
+    ey = eff_state.get("y", 0.0)
+    dist = math.sqrt((drone.x - ex) ** 2 + (drone.y - ey) ** 2)
+    if dist > eff_state.get("range_km", 999):
+        return False
+    fov = eff_state.get("fov_deg", 360)
+    if fov < 360:
+        dx = drone.x - ex
+        dy = drone.y - ey
+        bearing = math.degrees(math.atan2(dx, dy)) % 360
+        facing = eff_state.get("facing_deg", 0)
+        diff = abs(((bearing - facing) + 180) % 360 - 180)
+        if diff > fov / 2:
+            return False
+    return True
+
+
 @app.websocket("/ws/game")
 async def game_websocket(ws: WebSocket):
     await ws.accept()
 
     try:
-        # Wait for scenario selection
+        # Wait for scenario selection — now includes optional base_id and placement
         init_msg = await ws.receive_json()
         scenario_id = init_msg.get("scenario_id", "lone_wolf")
         scenario = load_scenario(scenario_id)
+
+        # Phase 2: Check for placement config
+        placement_config: PlacementConfig | None = None
+        base_template: BaseTemplate | None = None
+        base_id = init_msg.get("base_id")
+
+        if base_id and "placement" in init_msg:
+            base_template = load_base(base_id)
+            placement_data = init_msg["placement"]
+            placement_config = PlacementConfig(
+                base_id=base_id,
+                sensors=[PlacedEquipment(**s) for s in placement_data.get("sensors", [])],
+                effectors=[PlacedEquipment(**e) for e in placement_data.get("effectors", [])],
+            )
+
+            # Build sensors/effectors from placement
+            catalog = load_equipment_catalog()
+            cat_sensors = {s.catalog_id: s for s in catalog.sensors}
+            cat_effectors = {e.catalog_id: e for e in catalog.effectors}
+
+            sensor_configs: list[SensorConfig] = _build_sensors_from_placement(
+                placement_config, cat_sensors
+            )
+            effector_configs_list: list[EffectorConfig] = _build_effectors_from_placement(
+                placement_config, cat_effectors
+            )
+        else:
+            # Legacy mode: use scenario-defined sensors/effectors at base (0,0)
+            sensor_configs = list(scenario.sensors)
+            effector_configs_list = list(scenario.effectors)
 
         # Initialize drones
         drones: list[DroneState] = []
@@ -121,12 +249,9 @@ async def game_websocket(ws: WebSocket):
             drones.append(create_drone(drone_cfg))
             behaviors[drone_cfg.id] = drone_cfg.behavior
 
-        # Initialize sensor configs
-        sensor_configs: list[SensorConfig] = list(scenario.sensors)
-
         # Initialize effector state (mutable runtime state)
         effector_states: list[dict] = []
-        for eff in scenario.effectors:
+        for eff in effector_configs_list:
             effector_states.append({
                 "id": eff.id,
                 "name": eff.name,
@@ -135,6 +260,12 @@ async def game_websocket(ws: WebSocket):
                 "status": eff.status,
                 "recharge_seconds": eff.recharge_seconds,
                 "recharge_remaining": 0.0,
+                "x": eff.x,
+                "y": eff.y,
+                "fov_deg": eff.fov_deg,
+                "facing_deg": eff.facing_deg,
+                "requires_los": eff.requires_los,
+                "single_use": eff.single_use,
             })
 
         # Sensor runtime state (for detecting lists)
@@ -145,6 +276,9 @@ async def game_websocket(ws: WebSocket):
                 "status": s.status,
                 "detecting": [],
             })
+
+        # Get terrain for LOS checks
+        terrain = base_template.terrain if base_template else []
 
         phase = GamePhase.RUNNING
         actions: list[PlayerAction] = []
@@ -163,10 +297,10 @@ async def game_websocket(ws: WebSocket):
         confidence_at_identify: dict[str, float] = {}
 
         # Previously detected set (for event tracking)
-        previously_detected: dict[str, set[str]] = {}  # drone_id -> set of sensor_ids
+        previously_detected: dict[str, set[str]] = {}
 
         # Send game_start
-        await ws.send_json({
+        game_start_msg: dict = {
             "type": "game_start",
             "scenario": {
                 "name": scenario.name,
@@ -180,6 +314,10 @@ async def game_websocket(ws: WebSocket):
                     "type": s.type.value,
                     "range_km": s.range_km,
                     "status": s.status,
+                    "x": s.x,
+                    "y": s.y,
+                    "fov_deg": s.fov_deg,
+                    "facing_deg": s.facing_deg,
                 }
                 for s in sensor_configs
             ],
@@ -191,11 +329,27 @@ async def game_websocket(ws: WebSocket):
                     "range_km": e.range_km,
                     "status": e.status,
                     "recharge_seconds": e.recharge_seconds,
+                    "x": e.x,
+                    "y": e.y,
+                    "fov_deg": e.fov_deg,
+                    "facing_deg": e.facing_deg,
                 }
-                for e in scenario.effectors
+                for e in effector_configs_list
             ],
             "engagement_zones": scenario.engagement_zones.model_dump(),
-        })
+        }
+
+        # Include base template info if present
+        if base_template:
+            game_start_msg["base"] = {
+                "id": base_template.id,
+                "name": base_template.name,
+                "boundary": base_template.boundary,
+                "protected_assets": [a.model_dump() for a in base_template.protected_assets],
+                "terrain": [t.model_dump() for t in base_template.terrain],
+            }
+
+        await ws.send_json(game_start_msg)
 
         while phase == GamePhase.RUNNING:
             elapsed = time.time() - start_time
@@ -228,7 +382,9 @@ async def game_websocket(ws: WebSocket):
 
                 # Run sensors for this drone
                 if not drones[i].neutralized:
-                    detecting_ids, _ = update_sensors(drones[i], sensor_configs)
+                    detecting_ids, _ = update_sensors(
+                        drones[i], sensor_configs, terrain=terrain
+                    )
                     dist = distance_to_base(drones[i])
                     confidence = calculate_confidence(detecting_ids, dist)
 
@@ -241,7 +397,6 @@ async def game_websocket(ws: WebSocket):
                     new_sensors = set(detecting_ids) - prev
 
                     if not prev and detecting_ids:
-                        # First detection of this drone
                         events.append({
                             "type": "event",
                             "timestamp": round(elapsed, 1),
@@ -351,7 +506,6 @@ async def game_websocket(ws: WebSocket):
                     target_id = msg.get("target_id", drones[0].id if drones else "")
 
                     if action_name == "confirm_track":
-                        # Transition DETECTED -> TRACKED
                         for j, d in enumerate(drones):
                             if d.id == target_id and d.dtid_phase == DTIDPhase.DETECTED:
                                 drones[j] = d.model_copy(update={
@@ -370,7 +524,6 @@ async def game_websocket(ws: WebSocket):
                                 })
 
                     elif action_name == "identify":
-                        # Transition TRACKED -> IDENTIFIED
                         classification = msg.get("classification")
                         affiliation = msg.get("affiliation", "unknown")
 
@@ -401,13 +554,21 @@ async def game_websocket(ws: WebSocket):
                                 })
 
                     elif action_name == "engage":
-                        # Engage target with effector
                         effector_id = msg.get("effector", "")
                         eff_state = _find_effector_config(effector_states, effector_id)
 
                         if eff_state and eff_state["status"] == "ready":
                             for j, d in enumerate(drones):
                                 if d.id == target_id:
+                                    # Check range
+                                    if not _check_effector_in_range(eff_state, d):
+                                        await ws.send_json({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"ENGAGEMENT: {eff_state['name']} — Target out of range",
+                                        })
+                                        break
+
                                     effectiveness = _effector_effectiveness(
                                         eff_state["type"], d.drone_type.value
                                     )
@@ -425,17 +586,15 @@ async def game_websocket(ws: WebSocket):
                                         timestamp=elapsed,
                                     ))
 
-                                    # Handle effector recharge
-                                    if eff_state["recharge_seconds"] > 0:
+                                    # Handle effector recharge/single-use
+                                    if eff_state.get("single_use") or eff_state["recharge_seconds"] == 0:
+                                        eff_state["status"] = "offline"
+                                    elif eff_state["recharge_seconds"] > 0:
                                         eff_state["status"] = "recharging"
                                         eff_state["recharge_remaining"] = float(
                                             eff_state["recharge_seconds"]
                                         )
-                                    else:
-                                        # Single use (kinetic, interceptor)
-                                        eff_state["status"] = "offline"
 
-                                    # Send engagement result
                                     await ws.send_json({
                                         "type": "engagement_result",
                                         "target_id": target_id,
@@ -459,7 +618,6 @@ async def game_websocket(ws: WebSocket):
                 pass
 
         # -- Debrief --
-        # Score per drone (use first drone for now)
         primary_drone_id = drones[0].id if drones else ""
         score = calculate_score(
             scenario=scenario,
@@ -473,6 +631,8 @@ async def game_websocket(ws: WebSocket):
             effector_used=effector_used.get(primary_drone_id),
             drone_reached_base=drone_reached_base,
             confidence_at_identify=confidence_at_identify.get(primary_drone_id, 0.0),
+            placement_config=placement_config,
+            base_template=base_template,
         )
 
         await ws.send_json({

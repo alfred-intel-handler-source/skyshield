@@ -7,12 +7,20 @@ import TrackDetailPanel from "./components/TrackDetailPanel";
 import EngagementPanel from "./components/EngagementPanel";
 import EventLog from "./components/EventLog";
 import DebriefScreen from "./components/DebriefScreen";
+import ScenarioSelect from "./components/ScenarioSelect";
+import LoadoutScreen from "./components/LoadoutScreen";
+import PlacementScreen from "./components/PlacementScreen";
+import CameraPanel from "./components/CameraPanel";
 import { useWebSocket } from "./hooks/useWebSocket";
 import type {
+  BaseTemplate,
+  CatalogEffector,
+  CatalogSensor,
   EffectorStatus,
   EngagementZones,
   EventEntry,
   GamePhase,
+  PlacementConfig,
   ScoreBreakdown,
   SensorStatus,
   ServerMessage,
@@ -20,8 +28,30 @@ import type {
   TrackData,
 } from "./types";
 
+const API_BASE = window.location.origin;
+
 export default function App() {
+  // --- Flow state ---
   const [phase, setPhase] = useState<GamePhase>("waiting");
+
+  // Scenario + base selection
+  const [scenarioId, setScenarioId] = useState<string>("");
+  const [baseId, setBaseId] = useState<string>("");
+  const [baseTemplate, setBaseTemplate] = useState<BaseTemplate | null>(null);
+
+  // Equipment loadout
+  const [selectedSensors, setSelectedSensors] = useState<CatalogSensor[]>([]);
+  const [selectedEffectors, setSelectedEffectors] = useState<CatalogEffector[]>(
+    [],
+  );
+  const [maxSensors, setMaxSensors] = useState(4);
+  const [maxEffectors, setMaxEffectors] = useState(3);
+
+  // Placement
+  const [placementConfig, setPlacementConfig] =
+    useState<PlacementConfig | null>(null);
+
+  // Running phase state
   const [tracks, setTracks] = useState<TrackData[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [sensors, setSensors] = useState<SensorStatus[]>([]);
@@ -33,17 +63,18 @@ export default function App() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [threatLevel, setThreatLevel] = useState<ThreatLevel>("green");
   const [scenarioName, setScenarioName] = useState("");
-  const [scenarioDesc, setScenarioDesc] = useState("");
   const [score, setScore] = useState<ScoreBreakdown | null>(null);
   const [droneReachedBase, setDroneReachedBase] = useState(false);
   const [engagementZones, setEngagementZones] =
     useState<EngagementZones | null>(null);
 
+  // Camera panel
+  const [cameraTrackId, setCameraTrackId] = useState<string | null>(null);
+
   const handleMessage = useCallback((msg: ServerMessage) => {
     switch (msg.type) {
       case "game_start":
         setScenarioName(msg.scenario.name);
-        setScenarioDesc(msg.scenario.description);
         setSensors(msg.sensors);
         setSensorConfigs(msg.sensors);
         setEffectors(msg.effectors);
@@ -63,7 +94,6 @@ export default function App() {
         setElapsed(msg.elapsed);
         setTimeRemaining(msg.time_remaining);
         setThreatLevel(msg.threat_level);
-        // Merge runtime status with initial configs (state msgs only have id+status)
         setSensors((prev) => {
           const configs = prev.length ? prev : [];
           return msg.sensors.map((s) => {
@@ -79,7 +109,6 @@ export default function App() {
           });
         });
 
-        // Auto-select first detected track if nothing selected
         if (msg.tracks.length > 0) {
           setSelectedTrackId((prev) => {
             if (prev && msg.tracks.some((t) => t.id === prev)) return prev;
@@ -116,7 +145,39 @@ export default function App() {
 
   const { connect, send, connected } = useWebSocket(handleMessage);
 
-  const handleStart = () => {
+  // --- Flow handlers ---
+
+  const handleScenarioSelect = async (selScenarioId: string, selBaseId: string) => {
+    setScenarioId(selScenarioId);
+    setBaseId(selBaseId);
+
+    // Fetch base template for the loadout screen limits
+    try {
+      const res = await fetch(`${API_BASE}/bases/${selBaseId}`);
+      const data = await res.json();
+      setBaseTemplate(data);
+      setMaxSensors(data.max_sensors);
+      setMaxEffectors(data.max_effectors);
+    } catch {
+      setMaxSensors(4);
+      setMaxEffectors(3);
+    }
+
+    setPhase("equip");
+  };
+
+  const handleLoadoutConfirm = (
+    sensors: CatalogSensor[],
+    effectors: CatalogEffector[],
+  ) => {
+    setSelectedSensors(sensors);
+    setSelectedEffectors(effectors);
+    setPhase("plan");
+  };
+
+  const handlePlacementConfirm = (placement: PlacementConfig) => {
+    setPlacementConfig(placement);
+    // Reset running state
     setScore(null);
     setTracks([]);
     setSelectedTrackId(null);
@@ -129,13 +190,34 @@ export default function App() {
     setElapsed(0);
     setTimeRemaining(0);
     setThreatLevel("green");
-    setPhase("waiting");
-    connect("lone_wolf");
+    setCameraTrackId(null);
+
+    // Connect with placement data
+    connect({
+      scenarioId,
+      baseId,
+      placement,
+    });
   };
 
   const handleRestart = () => {
     send({ type: "restart" });
-    handleStart();
+    // Go back to scenario select
+    setPhase("waiting");
+    setScore(null);
+    setTracks([]);
+    setSelectedTrackId(null);
+    setEvents([]);
+    setSensors([]);
+    setSensorConfigs([]);
+    setEffectors([]);
+    setEffectorConfigs([]);
+    setEngagementZones(null);
+    setElapsed(0);
+    setTimeRemaining(0);
+    setThreatLevel("green");
+    setCameraTrackId(null);
+    setPlacementConfig(null);
   };
 
   const confirmTrack = (trackId: string) => {
@@ -165,8 +247,12 @@ export default function App() {
     });
   };
 
-  // --- Waiting / Start screen ---
-  if (phase === "waiting" && !connected) {
+  const handleSlewCamera = (trackId: string) => {
+    setCameraTrackId(trackId);
+  };
+
+  // --- Phase: Waiting (title screen) ---
+  if (phase === "waiting") {
     return (
       <div
         style={{
@@ -180,7 +266,6 @@ export default function App() {
           overflow: "hidden",
         }}
       >
-        {/* Subtle grid background */}
         <div
           style={{
             position: "absolute",
@@ -191,7 +276,6 @@ export default function App() {
             opacity: 0.6,
           }}
         />
-
         <div
           style={{
             position: "relative",
@@ -202,7 +286,6 @@ export default function App() {
             gap: 24,
           }}
         >
-          {/* Logo */}
           <div>
             <div
               style={{
@@ -229,7 +312,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Scenario Card */}
           <div
             style={{
               marginTop: 16,
@@ -244,69 +326,41 @@ export default function App() {
           >
             <div
               style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: "#8b949e",
+                letterSpacing: 1.5,
+                marginBottom: 12,
+              }}
+            >
+              TRAINING FLOW
+            </div>
+            <div
+              style={{
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
                 gap: 8,
-                marginBottom: 12,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 9,
-                  fontWeight: 600,
-                  color: "#8b949e",
-                  letterSpacing: 1.5,
-                }}
-              >
-                SCENARIO
-              </span>
-            </div>
-            <div
-              style={{
-                color: "#e6edf3",
-                fontSize: 18,
-                fontWeight: 700,
-                marginBottom: 10,
-                letterSpacing: 1,
-              }}
-            >
-              LONE WOLF
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
                 justifyContent: "center",
-                marginBottom: 12,
+                marginBottom: 16,
               }}
             >
-              <span
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: 10,
-                  background: "#d2992222",
-                  border: "1px solid #d2992244",
-                  color: "#d29922",
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
-              >
-                BEGINNER
-              </span>
-              <span
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: 10,
-                  background: "#58a6ff11",
-                  border: "1px solid #58a6ff33",
-                  color: "#58a6ff",
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
-              >
-                SINGLE TARGET
-              </span>
+              {["SELECT", "EQUIP", "PLAN", "EXECUTE", "DEBRIEF"].map(
+                (step) => (
+                  <span
+                    key={step}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 4,
+                      background: "#21262d",
+                      color: "#8b949e",
+                      fontSize: 9,
+                      fontWeight: 600,
+                      letterSpacing: 1,
+                    }}
+                  >
+                    {step}
+                  </span>
+                ),
+              )}
             </div>
             <div
               style={{
@@ -315,15 +369,13 @@ export default function App() {
                 lineHeight: 1.6,
               }}
             >
-              Commercial quadcopter (DJI-class) on direct approach. Low altitude,
-              single target. Classify the threat and select an appropriate
-              countermeasure before it reaches the base.
+              Select a scenario and base, choose your equipment, plan your
+              defense, then execute the DTID kill chain.
             </div>
           </div>
 
-          {/* Start button */}
           <button
-            onClick={handleStart}
+            onClick={() => setPhase("scenario_select")}
             style={{
               marginTop: 8,
               padding: "14px 56px",
@@ -350,16 +402,48 @@ export default function App() {
                 "0 4px 16px rgba(88, 166, 255, 0.3)";
             }}
           >
-            START MISSION
+            BEGIN TRAINING
           </button>
         </div>
       </div>
     );
   }
 
-  // --- Running / Active state ---
+  // --- Phase: Scenario Select ---
+  if (phase === "scenario_select") {
+    return <ScenarioSelect onSelect={handleScenarioSelect} />;
+  }
+
+  // --- Phase: Equipment Loadout ---
+  if (phase === "equip") {
+    return (
+      <LoadoutScreen
+        maxSensors={maxSensors}
+        maxEffectors={maxEffectors}
+        onConfirm={handleLoadoutConfirm}
+        onBack={() => setPhase("scenario_select")}
+      />
+    );
+  }
+
+  // --- Phase: Placement ---
+  if (phase === "plan" && baseTemplate) {
+    return (
+      <PlacementScreen
+        baseTemplate={baseTemplate}
+        selectedSensors={selectedSensors}
+        selectedEffectors={selectedEffectors}
+        onConfirm={handlePlacementConfirm}
+        onBack={() => setPhase("equip")}
+      />
+    );
+  }
+
+  // --- Phase: Running ---
   const selectedTrack =
     tracks.find((t) => t.id === selectedTrackId) || null;
+  const cameraTrack =
+    cameraTrackId ? tracks.find((t) => t.id === cameraTrackId) || null : null;
 
   return (
     <div
@@ -428,14 +512,24 @@ export default function App() {
         <EngagementPanel
           track={selectedTrack}
           effectors={effectors}
+          sensors={sensorConfigs}
           onConfirmTrack={confirmTrack}
           onIdentify={identify}
           onEngage={engage}
+          onSlewCamera={handleSlewCamera}
         />
       </div>
 
       {/* Bottom: Event Log */}
       <EventLog events={events} />
+
+      {/* Camera panel overlay */}
+      {cameraTrack && (
+        <CameraPanel
+          track={cameraTrack}
+          onClose={() => setCameraTrackId(null)}
+        />
+      )}
 
       {/* Debrief overlay */}
       {phase === "debrief" && score && (
