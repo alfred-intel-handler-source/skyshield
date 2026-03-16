@@ -71,6 +71,30 @@ const COLORS = {
   success: "#3fb950",
 };
 
+// Per-system range ring styling keyed by catalog_id
+const RANGE_RING_STYLES: Record<string, { color: string; dashArray?: string }> = {
+  tpq50:         { color: "#58a6ff", dashArray: "8,4" },      // blue, dashed
+  kurfs:         { color: "#d29922" },                          // orange, solid (sector)
+  nighthawk:     { color: "#3fb950", dashArray: "2,4" },       // green, dotted
+  rf_jammer:     { color: "#e3b341", dashArray: "8,4" },       // yellow, dashed
+  coyote_pallet: { color: "#f85149", dashArray: "8,4" },       // red, dashed
+};
+
+function getRingStyle(catalogId: string, isSensor: boolean): { color: string; dashArray?: string } {
+  return RANGE_RING_STYLES[catalogId] || { color: isSensor ? "#58a6ff" : "#f85149", dashArray: "6,4" };
+}
+
+// Create a ring label DivIcon
+function createRingLabel(name: string, rangeKm: number, color: string): L.DivIcon {
+  const html = `<span style="font:600 9px 'JetBrains Mono',monospace;color:${color};white-space:nowrap;pointer-events:none;background:rgba(13,17,23,0.75);padding:1px 5px;border-radius:2px;">${name} — ${rangeKm}km</span>`;
+  return L.divIcon({
+    html,
+    className: "",
+    iconSize: [120, 14],
+    iconAnchor: [60, 7],
+  });
+}
+
 const TERRAIN_STYLES: Record<string, { fill: string; stroke: string }> = {
   building: { fill: "#30363d", stroke: "#484f58" },
   tower: { fill: "#484f58", stroke: "#8b949e" },
@@ -265,6 +289,7 @@ export default function PlacementScreen({
   const [selectedPalette, setSelectedPalette] = useState<number | null>(null);
   const [selectedPlaced, setSelectedPlaced] = useState<number | null>(null);
   const [facingDeg, setFacingDeg] = useState(0);
+  const [showRangeRings, setShowRangeRings] = useState(true);
 
   const { lat: baseLat, lng: baseLng } = getBaseCenter(baseTemplate);
   const baseCenter: [number, number] = [baseLat, baseLng];
@@ -1100,6 +1125,7 @@ export default function PlacementScreen({
               if (item.kind !== "sensor") return null;
               const cat = selectedSensors[item.catalogIndex];
               const eq = item.equipment;
+              const style = getRingStyle(eq.catalog_id, true);
 
               const arcPositions = generateFovArc(
                 eq.x,
@@ -1117,7 +1143,7 @@ export default function PlacementScreen({
                   positions={arcPositions}
                   pathOptions={{
                     color: "transparent",
-                    fillColor: "#58a6ff",
+                    fillColor: style.color,
                     fillOpacity: 0.04,
                     weight: 0,
                   }}
@@ -1132,6 +1158,8 @@ export default function PlacementScreen({
               const pos = gameXYToLatLng(eq.x, eq.y, baseLat, baseLng);
               const isSelected = selectedPlaced === pi;
               const isSensor = item.kind === "sensor";
+              const ringStyle = getRingStyle(eq.catalog_id, isSensor);
+              const shouldShowRing = showRangeRings || isSelected;
 
               // Range arc/circle
               const rangeArcPositions = generateFovArc(
@@ -1144,33 +1172,48 @@ export default function PlacementScreen({
                 baseLng,
               );
 
-              const rangeColor = isSensor ? "#58a6ff" : "#f85149";
+              // Ring label position: offset north of the ring edge
+              const labelAngleRad = degToRad(90 - eq.facing_deg);
+              const labelX = eq.x + Math.cos(labelAngleRad) * cat.range_km;
+              const labelY = eq.y + Math.sin(labelAngleRad) * cat.range_km;
+              const labelPos = gameXYToLatLng(labelX, labelY, baseLat, baseLng);
 
               return (
                 <span key={`item-${pi}`}>
                   {/* Range arc/ring */}
-                  {cat.fov_deg >= 360 ? (
+                  {shouldShowRing && (cat.fov_deg >= 360 ? (
                     <Circle
                       center={pos}
                       radius={cat.range_km * 1000}
                       pathOptions={{
-                        color: rangeColor,
-                        fillColor: rangeColor,
-                        fillOpacity: isSensor ? 0.05 : 0.03,
-                        weight: isSelected ? 2 : 1,
-                        opacity: 0.4,
+                        color: ringStyle.color,
+                        fillColor: ringStyle.color,
+                        fillOpacity: isSelected ? 0.08 : 0.05,
+                        weight: isSelected ? 2 : 1.5,
+                        opacity: 0.7,
+                        dashArray: ringStyle.dashArray,
                       }}
                     />
                   ) : (
                     <Polygon
                       positions={rangeArcPositions}
                       pathOptions={{
-                        color: rangeColor,
-                        fillColor: rangeColor,
-                        fillOpacity: 0.1,
-                        weight: isSelected ? 2 : 1,
-                        opacity: 0.4,
+                        color: ringStyle.color,
+                        fillColor: ringStyle.color,
+                        fillOpacity: isSelected ? 0.12 : 0.08,
+                        weight: isSelected ? 2 : 1.5,
+                        opacity: 0.7,
+                        dashArray: ringStyle.dashArray,
                       }}
+                    />
+                  ))}
+
+                  {/* Ring label */}
+                  {shouldShowRing && (
+                    <Marker
+                      position={labelPos}
+                      icon={createRingLabel(cat.name, cat.range_km, ringStyle.color)}
+                      interactive={false}
                     />
                   )}
 
@@ -1229,6 +1272,30 @@ export default function PlacementScreen({
               }}
             />
           </MapContainer>
+
+          {/* Range rings toggle */}
+          <button
+            onClick={() => setShowRangeRings((v) => !v)}
+            style={{
+              position: "absolute",
+              top: 10,
+              left: 10,
+              zIndex: 1000,
+              padding: "5px 10px",
+              background: showRangeRings ? "rgba(88, 166, 255, 0.15)" : "rgba(13, 17, 23, 0.8)",
+              border: `1px solid ${showRangeRings ? "#58a6ff55" : COLORS.border}`,
+              borderRadius: 4,
+              color: showRangeRings ? "#58a6ff" : COLORS.muted,
+              fontSize: 10,
+              fontWeight: 600,
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: 1,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            RANGE RINGS {showRangeRings ? "ON" : "OFF"}
+          </button>
 
           {/* Instructions overlay */}
           {placedItems.length === 0 && selectedPalette === null && (

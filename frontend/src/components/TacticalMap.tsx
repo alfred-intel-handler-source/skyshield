@@ -44,6 +44,28 @@ interface WheelState {
   screenY: number;
 }
 
+// Per-system range ring styling by name/type pattern
+function getRingStyleByName(name?: string, type?: string): { color: string; dashArray?: string } {
+  const n = (name || "").toLowerCase();
+  if (n.includes("tpq")) return { color: "#58a6ff", dashArray: "8,4" };
+  if (n.includes("kurfs")) return { color: "#d29922" };
+  if (n.includes("nighthawk") || type === "eoir") return { color: "#3fb950", dashArray: "2,4" };
+  if (n.includes("jammer") || type === "electronic") return { color: "#e3b341", dashArray: "8,4" };
+  if (n.includes("coyote") || type === "kinetic") return { color: "#f85149", dashArray: "8,4" };
+  if (type === "radar") return { color: "#58a6ff", dashArray: "6,4" };
+  return { color: "#8b949e", dashArray: "6,4" };
+}
+
+function createRingLabel(name: string, rangeKm: number, color: string): L.DivIcon {
+  const html = `<span style="font:600 9px 'JetBrains Mono',monospace;color:${color};white-space:nowrap;pointer-events:none;background:rgba(13,17,23,0.75);padding:1px 5px;border-radius:2px;">${name} — ${rangeKm}km</span>`;
+  return L.divIcon({
+    html,
+    className: "",
+    iconSize: [120, 14],
+    iconAnchor: [60, 7],
+  });
+}
+
 const AFFILIATION_COLORS: Record<Affiliation, string> = {
   unknown: "#d29922",
   hostile: "#f85149",
@@ -333,6 +355,7 @@ export default function TacticalMap({
 }: Props) {
   const baseCenter: [number, number] = [baseLat, baseLng];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
+  const [showRangeRings, setShowRangeRings] = useState(true);
 
   // Compute zoom from engagement zones to fit detection range
   const zoom = useMemo(() => {
@@ -492,6 +515,114 @@ export default function TacticalMap({
             }}
           />
         ))}
+
+        {/* Per-sensor range rings */}
+        {sensorConfigs.map((sensor) => {
+          if (!sensor.x && sensor.x !== 0) return null;
+          if (!sensor.range_km) return null;
+          const style = getRingStyleByName(sensor.name, sensor.type);
+          const sPos = gameXYToLatLng(sensor.x ?? 0, sensor.y ?? 0, baseLat, baseLng);
+          const rangeKm = sensor.range_km;
+          const fov = sensor.fov_deg ?? 360;
+          const facing = sensor.facing_deg ?? 0;
+          const isSelected = false; // sensors don't have selection in tactical map
+          const shouldShow = showRangeRings || isSelected;
+          if (!shouldShow) return null;
+
+          // For limited FOV sensors, draw a sector wedge
+          if (fov < 360) {
+            const steps = 32;
+            const facingRad = ((90 - facing) * Math.PI) / 180;
+            const halfFov = (fov / 2 * Math.PI) / 180;
+            const points: [number, number][] = [sPos];
+            for (let i = 0; i <= steps; i++) {
+              const angle = facingRad - halfFov + (2 * halfFov * i) / steps;
+              const px = (sensor.x ?? 0) + Math.cos(angle) * rangeKm;
+              const py = (sensor.y ?? 0) + Math.sin(angle) * rangeKm;
+              points.push(gameXYToLatLng(px, py, baseLat, baseLng));
+            }
+            // Label at the tip of the sector
+            const labelAngle = facingRad;
+            const labelX = (sensor.x ?? 0) + Math.cos(labelAngle) * rangeKm;
+            const labelY = (sensor.y ?? 0) + Math.sin(labelAngle) * rangeKm;
+            const labelPos = gameXYToLatLng(labelX, labelY, baseLat, baseLng);
+            return (
+              <span key={`sensor-ring-${sensor.id}`}>
+                <Polygon
+                  positions={points}
+                  pathOptions={{
+                    color: style.color,
+                    fillColor: style.color,
+                    fillOpacity: 0.06,
+                    weight: 1.5,
+                    opacity: 0.6,
+                    dashArray: style.dashArray,
+                  }}
+                />
+                <Marker
+                  position={labelPos}
+                  icon={createRingLabel(sensor.name || sensor.id, rangeKm, style.color)}
+                  interactive={false}
+                />
+              </span>
+            );
+          }
+
+          // Full 360° ring
+          const labelPos = gameXYToLatLng(sensor.x ?? 0, (sensor.y ?? 0) + rangeKm, baseLat, baseLng);
+          return (
+            <span key={`sensor-ring-${sensor.id}`}>
+              <Circle
+                center={sPos}
+                radius={rangeKm * 1000}
+                pathOptions={{
+                  color: style.color,
+                  fillColor: style.color,
+                  fillOpacity: 0.04,
+                  weight: 1.5,
+                  opacity: 0.6,
+                  dashArray: style.dashArray,
+                }}
+              />
+              <Marker
+                position={labelPos}
+                icon={createRingLabel(sensor.name || sensor.id, rangeKm, style.color)}
+                interactive={false}
+              />
+            </span>
+          );
+        })}
+
+        {/* Per-effector range rings */}
+        {showRangeRings && effectors.map((eff) => {
+          if (!eff.x && eff.x !== 0) return null;
+          if (!eff.range_km) return null;
+          const style = getRingStyleByName(eff.name, eff.type);
+          const ePos = gameXYToLatLng(eff.x ?? 0, eff.y ?? 0, baseLat, baseLng);
+          const rangeKm = eff.range_km;
+          const labelPos = gameXYToLatLng(eff.x ?? 0, (eff.y ?? 0) + rangeKm, baseLat, baseLng);
+          return (
+            <span key={`effector-ring-${eff.id}`}>
+              <Circle
+                center={ePos}
+                radius={rangeKm * 1000}
+                pathOptions={{
+                  color: style.color,
+                  fillColor: style.color,
+                  fillOpacity: 0.03,
+                  weight: 1.5,
+                  opacity: 0.5,
+                  dashArray: style.dashArray,
+                }}
+              />
+              <Marker
+                position={labelPos}
+                icon={createRingLabel(eff.name || eff.id, rangeKm, style.color)}
+                interactive={false}
+              />
+            </span>
+          );
+        })}
 
         {/* Base marker with pulsing circle */}
         <PulsingBaseCircle center={baseCenter} />
@@ -663,6 +794,30 @@ export default function TacticalMap({
           );
         })}
       </MapContainer>
+
+      {/* Range rings toggle */}
+      <button
+        onClick={() => setShowRangeRings((v) => !v)}
+        style={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          zIndex: 1000,
+          padding: "5px 10px",
+          background: showRangeRings ? "rgba(88, 166, 255, 0.15)" : "rgba(13, 17, 23, 0.8)",
+          border: `1px solid ${showRangeRings ? "#58a6ff55" : "#30363d"}`,
+          borderRadius: 4,
+          color: showRangeRings ? "#58a6ff" : "#8b949e",
+          fontSize: 10,
+          fontWeight: 600,
+          fontFamily: "'JetBrains Mono', monospace",
+          letterSpacing: 1,
+          cursor: "pointer",
+          transition: "all 0.15s",
+        }}
+      >
+        RANGE RINGS {showRangeRings ? "ON" : "OFF"}
+      </button>
 
       {/* Zone labels overlay (positioned absolutely over map) */}
       {engagementZones && (
