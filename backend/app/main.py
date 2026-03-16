@@ -761,11 +761,11 @@ async def game_websocket(ws: WebSocket):
                                 "message": f"ENGAGEMENT: BLOCKED — Hold fire active on {target_id.upper()}",
                             })
                         else:
-                          effector_id = msg.get("effector", "")
-                          eff_state = _find_effector_config(effector_states, effector_id)
+                            effector_id = msg.get("effector", "")
+                            eff_state = _find_effector_config(effector_states, effector_id)
 
-                          if eff_state and eff_state["status"] == "ready":
-                            for j, d in enumerate(drones):
+                            if eff_state and eff_state["status"] == "ready":
+                              for j, d in enumerate(drones):
                                 if d.id == target_id:
                                     # Check range
                                     if not _check_effector_in_range(eff_state, d):

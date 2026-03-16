@@ -17,6 +17,8 @@ export interface TrackData {
   trail: [number, number][];
   sensors_detecting: string[];
   neutralized: boolean;
+  coasting?: boolean;
+  hold_fire?: boolean;
 }
 
 export interface SensorStatus {

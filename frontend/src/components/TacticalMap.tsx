@@ -51,52 +51,98 @@ function createTrackIcon(
   affiliation: Affiliation,
   isSelected: boolean,
   neutralized: boolean,
+  coasting?: boolean,
+  holdFire?: boolean,
+  headingDeg?: number,
+  speedKts?: number,
 ): L.DivIcon {
   const color = AFFILIATION_COLORS[affiliation];
-  const size = 24;
+  const size = 40; // Increased to fit HF box and velocity line
+  const cx = 20;
+  const cy = 20;
+  const iconR = 12; // half the icon shape size
   let svg: string;
+
+  const opacity = coasting ? 0.4 : 1.0;
+  const dashArray = coasting ? 'stroke-dasharray="3,2"' : "";
 
   if (neutralized) {
     svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-      <line x1="4" y1="4" x2="20" y2="20" stroke="#484f58" stroke-width="2.5"/>
-      <line x1="20" y1="4" x2="4" y2="20" stroke="#484f58" stroke-width="2.5"/>
+      <line x1="${cx - 8}" y1="${cy - 8}" x2="${cx + 8}" y2="${cy + 8}" stroke="#484f58" stroke-width="2.5"/>
+      <line x1="${cx + 8}" y1="${cy - 8}" x2="${cx - 8}" y2="${cy + 8}" stroke="#484f58" stroke-width="2.5"/>
     </svg>`;
   } else {
     const fill = `${color}33`;
     const stroke = color;
     const sw = isSelected ? 2.5 : 1.5;
 
+    // Velocity indicator line (FAAD C2 style)
+    let velocityLine = "";
+    if (speedKts != null && headingDeg != null && speedKts > 0) {
+      const speedMs = speedKts * 0.5144; // knots to m/s
+      const headingRad = ((headingDeg - 90) * Math.PI) / 180;
+      const cosH = Math.cos(headingRad);
+      const sinH = Math.sin(headingRad);
+      // Brighten color for velocity line
+      const velColor = color;
+
+      if (speedMs >= 160) {
+        // High speed: long line extending past icon edge
+        const len = iconR + 8;
+        velocityLine = `<line x1="${cx}" y1="${cy}" x2="${cx + cosH * len}" y2="${cy + sinH * len}" stroke="${velColor}" stroke-width="2" opacity="${opacity}" stroke-linecap="round"/>`;
+      } else if (speedMs >= 20) {
+        // Medium speed: short line from center to icon edge
+        const len = iconR;
+        velocityLine = `<line x1="${cx}" y1="${cy}" x2="${cx + cosH * len}" y2="${cy + sinH * len}" stroke="${velColor}" stroke-width="1.5" opacity="${opacity}" stroke-linecap="round"/>`;
+      }
+      // Low speed (<20 m/s): no line
+    }
+
+    let shape: string;
     switch (affiliation) {
       case "hostile":
         // Diamond
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="12,2 22,12 12,22 2,12" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-          ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>` : ""}
-        </svg>`;
+        shape = `<polygon points="${cx},${cy - 10} ${cx + 10},${cy} ${cx},${cy + 10} ${cx - 10},${cy}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dashArray} opacity="${opacity}"/>`;
         break;
       case "friendly":
         // Rectangle
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="4" width="22" height="16" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-          ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>` : ""}
-        </svg>`;
+        shape = `<rect x="${cx - 11}" y="${cy - 8}" width="22" height="16" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dashArray} opacity="${opacity}"/>`;
         break;
       case "neutral":
-        // Square
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="18" height="18" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-          ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>` : ""}
-        </svg>`;
+        shape = `<rect x="${cx - 9}" y="${cy - 9}" width="18" height="18" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dashArray} opacity="${opacity}"/>`;
         break;
       case "unknown":
       default:
-        // Square (yellow)
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="3" width="18" height="18" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-          ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>` : ""}
-        </svg>`;
+        shape = `<rect x="${cx - 9}" y="${cy - 9}" width="18" height="18" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${dashArray} opacity="${opacity}"/>`;
         break;
     }
+
+    const selectedRing = isSelected
+      ? `<circle cx="${cx}" cy="${cy}" r="14" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>`
+      : "";
+
+    // Hold Fire indicator: dashed rectangle with "HF" text
+    let hfIndicator = "";
+    if (holdFire) {
+      hfIndicator = `
+        <rect x="${cx - 14}" y="${cy - 14}" width="28" height="28" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.8"/>
+        <text x="${cx + 12}" y="${cy - 10}" text-anchor="middle" font-size="7" font-weight="700" font-family="monospace" fill="${stroke}" opacity="0.9">HF</text>
+      `;
+    }
+
+    // Coasting indicator text
+    let coastIndicator = "";
+    if (coasting) {
+      coastIndicator = `<text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="6" font-weight="600" font-family="monospace" fill="${stroke}" opacity="0.6">COAST</text>`;
+    }
+
+    svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+      ${velocityLine}
+      ${shape}
+      ${selectedRing}
+      ${hfIndicator}
+      ${coastIndicator}
+    </svg>`;
   }
 
   return L.divIcon({
@@ -209,16 +255,27 @@ function TrackDataBlock({
   // Offset to avoid overlaps: alternate right/left for stacked tracks
   const yOff = offsetIndex * 18;
 
+  const isCoasting = track.coasting;
+  const blockOpacity = isCoasting ? 0.5 : 1.0;
+  const coastLabel = isCoasting
+    ? `<span style="color:#d29922;font-size:7px;font-weight:700;margin-left:4px;">COAST</span>`
+    : "";
+  const hfLabel = track.hold_fire
+    ? `<span style="color:#f85149;font-size:7px;font-weight:700;margin-left:4px;">HF</span>`
+    : "";
+
   const html = `<div style="
     pointer-events:none;
     background:rgba(13,17,23,${isSelected ? "0.92" : "0.78"});
     border:1px solid ${isSelected ? color : "#30363d"};
+    ${isCoasting ? "border-style:dashed;" : ""}
     border-radius:3px;
     padding:2px 5px;
     white-space:nowrap;
     font-family:'JetBrains Mono',monospace;
     line-height:1.35;
     position:relative;
+    opacity:${blockOpacity};
   ">
     <div style="
       position:absolute;
@@ -229,7 +286,7 @@ function TrackDataBlock({
       background:${isSelected ? color : "#30363d"};
     "></div>
     <div style="color:${color};font-size:${isSelected ? "10px" : "9px"};font-weight:600;letter-spacing:0.5px;">
-      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>
+      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>${coastLabel}${hfLabel}
     </div>
     ${!track.neutralized ? `
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
@@ -450,7 +507,8 @@ export default function TacticalMap({
                   pathOptions={{
                     color,
                     weight: 1,
-                    opacity: 0.5,
+                    opacity: track.coasting ? 0.2 : 0.5,
+                    dashArray: track.coasting ? "4,4" : undefined,
                   }}
                 />
               )}
@@ -487,6 +545,10 @@ export default function TacticalMap({
                   track.affiliation,
                   isSelected,
                   track.neutralized,
+                  track.coasting,
+                  track.hold_fire,
+                  track.heading_deg,
+                  track.speed_kts,
                 )}
                 eventHandlers={{
                   click: (e) => {
