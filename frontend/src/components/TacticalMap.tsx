@@ -4,6 +4,7 @@ import {
   TileLayer,
   Circle,
   Polyline,
+  Polygon,
   Marker,
   useMap,
   ScaleControl,
@@ -499,6 +500,81 @@ export default function TacticalMap({
           icon={baseIcon}
           interactive={false}
         />
+
+        {/* Camera FOV Cone */}
+        {(() => {
+          // Find the EO/IR camera sensor
+          const cameraSensor = sensorConfigs.find(
+            (s) => s.type === "eoir" || s.name?.toLowerCase().includes("camera") || s.name?.toLowerCase().includes("eo"),
+          );
+          if (!cameraSensor) return null;
+
+          const camX = cameraSensor.x ?? 0;
+          const camY = cameraSensor.y ?? 0;
+          const camRange = cameraSensor.range_km ?? 2;
+          const camFov = cameraSensor.fov_deg ?? 30;
+          const camPos = gameXYToLatLng(camX, camY, baseLat, baseLng);
+
+          // Determine cone direction: toward slewed track, or facing_deg
+          const cameraTarget = cameraTrackId
+            ? tracks.find((t) => t.id === cameraTrackId)
+            : null;
+
+          let bearingDeg: number;
+          if (cameraTarget) {
+            const dx = cameraTarget.x - camX;
+            const dy = cameraTarget.y - camY;
+            bearingDeg = (Math.atan2(dx, dy) * 180) / Math.PI;
+          } else {
+            bearingDeg = cameraSensor.facing_deg ?? 0;
+          }
+
+          // Build cone polygon: camera position -> arc at range
+          const halfFov = camFov / 2;
+          const steps = 16;
+          const conePoints: [number, number][] = [camPos];
+
+          for (let i = 0; i <= steps; i++) {
+            const angle = bearingDeg - halfFov + (camFov * i) / steps;
+            const angleRad = (angle * Math.PI) / 180;
+            const px = camX + Math.sin(angleRad) * camRange;
+            const py = camY + Math.cos(angleRad) * camRange;
+            conePoints.push(gameXYToLatLng(px, py, baseLat, baseLng));
+          }
+
+          // LOS center line to target or center of cone
+          const centerAngleRad = (bearingDeg * Math.PI) / 180;
+          const losDist = cameraTarget
+            ? Math.sqrt((cameraTarget.x - camX) ** 2 + (cameraTarget.y - camY) ** 2)
+            : camRange;
+          const losEndX = camX + Math.sin(centerAngleRad) * losDist;
+          const losEndY = camY + Math.cos(centerAngleRad) * losDist;
+          const losEnd = gameXYToLatLng(losEndX, losEndY, baseLat, baseLng);
+
+          return (
+            <>
+              <Polygon
+                positions={conePoints}
+                pathOptions={{
+                  color: "#3fb950",
+                  fillColor: "#3fb950",
+                  fillOpacity: 0.08,
+                  weight: 1,
+                  opacity: 0.4,
+                }}
+              />
+              <Polyline
+                positions={[camPos, losEnd]}
+                pathOptions={{
+                  color: "#d29922",
+                  weight: 1.5,
+                  opacity: 0.7,
+                  dashArray: "6,3",
+                }}
+              />
+            </>
+          );
+        })()}
 
         {/* Tracks */}
         {tracks.map((track) => {
