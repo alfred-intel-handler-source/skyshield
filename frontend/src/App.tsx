@@ -75,22 +75,6 @@ export default function App() {
   // Track which tracks have already auto-opened the camera (so we only do it once)
   const autoOpenedCameraRef = useRef<Set<string>>(new Set());
 
-  // Auto-open camera when a track first enters 'tracked' phase
-  useEffect(() => {
-    if (phase !== "running") return;
-    for (const t of tracks) {
-      if (
-        t.dtid_phase === "tracked" &&
-        !autoOpenedCameraRef.current.has(t.id)
-      ) {
-        autoOpenedCameraRef.current.add(t.id);
-        setCameraTrackId(t.id);
-        soundEngine.play("camera_slew");
-        break; // only auto-open one at a time
-      }
-    }
-  }, [tracks, phase]);
-
   // Tutorial state
   const [isTutorial, setIsTutorial] = useState(false);
   const [tutorialMessage, setTutorialMessage] = useState<string | null>(null);
@@ -291,7 +275,7 @@ export default function App() {
           break;
         }
         case "Digit2": {
-          // Open identify (handled by EngagementPanel, but we can trigger camera for visual ID)
+          // Slew camera to selected track (re-center)
           const tid = selectedTrackIdRef.current;
           if (tid) {
             setCameraTrackId(tid);
@@ -305,7 +289,7 @@ export default function App() {
           break;
         }
         case "Digit4": {
-          // Close camera / clear selection
+          // Unslew camera (return to standby/free-look)
           setCameraTrackId(null);
           break;
         }
@@ -646,34 +630,6 @@ export default function App() {
   const cameraTrack =
     cameraTrackId ? tracks.find((t) => t.id === cameraTrackId) || null : null;
 
-  // Check if camera target is covered by an active EO/IR sensor
-  const cameraIsDegraded = (() => {
-    if (!cameraTrack) return false;
-    const eoirSensors = sensorConfigs.filter(
-      (s) => s.type === "eoir" && s.status === "active",
-    );
-    for (const sensor of eoirSensors) {
-      const sx = sensor.x ?? 0;
-      const sy = sensor.y ?? 0;
-      const dist = Math.sqrt(
-        (cameraTrack.x - sx) ** 2 + (cameraTrack.y - sy) ** 2,
-      );
-      const range = sensor.range_km ?? 1.5;
-      if (dist > range) continue;
-      const fov = sensor.fov_deg ?? 360;
-      if (fov >= 360) return false;
-      const bearing =
-        ((Math.atan2(cameraTrack.x - sx, cameraTrack.y - sy) * 180) /
-          Math.PI +
-          360) %
-        360;
-      const facing = sensor.facing_deg ?? 0;
-      const diff = Math.abs(((bearing - facing + 180) % 360) - 180);
-      if (diff <= fov / 2) return false;
-    }
-    return true;
-  })();
-
   return (
     <div
       style={{
@@ -820,7 +776,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar — split: top scrollable (track+engagement), bottom fixed (camera) */}
       <div
         style={{
           gridRow: "2",
@@ -829,17 +785,24 @@ export default function App() {
           borderLeft: "1px solid #30363d",
           display: "flex",
           flexDirection: "column",
-          overflow: "auto",
+          overflow: "hidden",
         }}
       >
-        <TrackDetailPanel track={selectedTrack} />
-        <EngagementPanel
-          track={selectedTrack}
-          effectors={effectors}
-          onConfirmTrack={confirmTrack}
-          onIdentify={identify}
-          onEngage={engage}
-          onSlewCamera={handleSlewCamera}
+        <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+          <TrackDetailPanel track={selectedTrack} />
+          <EngagementPanel
+            track={selectedTrack}
+            effectors={effectors}
+            onConfirmTrack={confirmTrack}
+            onIdentify={identify}
+            onEngage={engage}
+            onSlewCamera={handleSlewCamera}
+          />
+        </div>
+        <CameraPanel
+          track={cameraTrack}
+          allTracks={tracks}
+          sensorConfigs={sensorConfigs}
         />
       </div>
 
@@ -852,7 +815,7 @@ export default function App() {
           style={{
             position: "fixed",
             bottom: 6,
-            right: 8,
+            left: 8,
             zIndex: 50,
             fontFamily: "monospace",
             fontSize: 9,
@@ -860,17 +823,8 @@ export default function App() {
             letterSpacing: 0.5,
           }}
         >
-          SPACE:Pause TAB:Cycle 1:Confirm 2:Camera 4:Close M:Mute
+          SPACE:Pause TAB:Cycle 1:Confirm 2:Slew 4:Unslew M:Mute
         </div>
-      )}
-
-      {/* Camera panel overlay */}
-      {cameraTrack && (
-        <CameraPanel
-          track={cameraTrack}
-          onClose={() => setCameraTrackId(null)}
-          degraded={cameraIsDegraded}
-        />
       )}
 
       {/* Debrief overlay */}

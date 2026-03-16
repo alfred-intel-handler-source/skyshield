@@ -1,17 +1,21 @@
 import { useRef, useEffect, useCallback, useState } from "react";
-import type { TrackData } from "../types";
+import type { TrackData, SensorStatus } from "../types";
 
 interface Props {
-  track: TrackData;
-  onClose: () => void;
+  track: TrackData | null;
+  allTracks: TrackData[];
+  sensorConfigs: SensorStatus[];
   degraded?: boolean;
 }
 
-const CANVAS_W = 960;
-const CANVAS_H = 640;
-const RETICLE_COLOR = "#3fb95088";
+const CANVAS_W = 480;
+const CANVAS_H = 300;
 const HUD_COLOR_THERMAL = "#3fb950";
 const HUD_COLOR_DAYLIGHT = "#58a6ff";
+
+// Camera field of view in degrees
+const FOV_H = 30;
+const FOV_V = 20;
 
 type CameraMode = "thermal" | "daylight";
 
@@ -22,6 +26,12 @@ function calcRange(x: number, y: number): number {
 function calcBearing(x: number, y: number): number {
   const rad = Math.atan2(x, -y);
   return ((rad * 180) / Math.PI + 360) % 360;
+}
+
+function calcElevation(altFt: number, rangeKm: number): number {
+  if (rangeKm < 0.01) return 45;
+  const altKm = altFt * 0.0003048;
+  return Math.atan2(altKm, rangeKm) * (180 / Math.PI);
 }
 
 function noiseFactor(rangeKm: number): number {
@@ -40,12 +50,18 @@ function silhouetteScale(rangeKm: number): number {
   return 0.35;
 }
 
-/** Camera shake amplitude increases with range */
 function shakeAmplitude(rangeKm: number): number {
   if (rangeKm < 0.3) return 1;
   if (rangeKm < 0.8) return 3;
   if (rangeKm < 1.5) return 6;
   return 10;
+}
+
+/** Normalize angle difference to [-180, 180] */
+function angleDiff(a: number, b: number): number {
+  let d = ((a - b + 180) % 360) - 180;
+  if (d < -180) d += 360;
+  return d;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,10 +261,10 @@ function drawSilhouette(
 function drawReticle(ctx: CanvasRenderingContext2D, w: number, h: number, hudColor: string) {
   const cx = w / 2;
   const cy = h / 2;
-  const gap = 18;
-  const lineLen = 60;
-  const tickSpacing = 15;
-  const tickSize = 4;
+  const gap = 14;
+  const lineLen = 45;
+  const tickSpacing = 12;
+  const tickSize = 3;
 
   ctx.strokeStyle = hudColor + "88";
   ctx.lineWidth = 1;
@@ -277,8 +293,8 @@ function drawReticle(ctx: CanvasRenderingContext2D, w: number, h: number, hudCol
     ctx.stroke();
   }
 
-  const boxHalf = 80;
-  const bracketLen = 20;
+  const boxHalf = 60;
+  const bracketLen = 15;
 
   const corners: [number, number, number, number][] = [
     [-1, -1, cx - boxHalf, cy - boxHalf],
@@ -355,6 +371,30 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, mod
 }
 
 // ---------------------------------------------------------------------------
+// Scan lines for standby
+// ---------------------------------------------------------------------------
+
+function drawScanLines(ctx: CanvasRenderingContext2D, w: number, h: number, time: number) {
+  ctx.strokeStyle = "rgba(60,70,80,0.15)";
+  ctx.lineWidth = 1;
+  const spacing = 4;
+  for (let y = 0; y < h; y += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+  // Moving scan bar
+  const barY = (time * 40) % (h + 60) - 30;
+  const grad = ctx.createLinearGradient(0, barY - 30, 0, barY + 30);
+  grad.addColorStop(0, "rgba(63,185,80,0)");
+  grad.addColorStop(0.5, "rgba(63,185,80,0.06)");
+  grad.addColorStop(1, "rgba(63,185,80,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, barY - 30, w, 60);
+}
+
+// ---------------------------------------------------------------------------
 // Acquiring animation
 // ---------------------------------------------------------------------------
 
@@ -368,47 +408,193 @@ function drawAcquiring(
   const cx = w / 2;
   const cy = h / 2;
 
-  // Spinning arc
   ctx.strokeStyle = hudColor;
   ctx.lineWidth = 2;
   const startAngle = progress * Math.PI * 4;
   ctx.beginPath();
-  ctx.arc(cx, cy, 50, startAngle, startAngle + Math.PI * 0.8);
+  ctx.arc(cx, cy, 40, startAngle, startAngle + Math.PI * 0.8);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cy, 50, startAngle + Math.PI, startAngle + Math.PI * 1.8);
+  ctx.arc(cx, cy, 40, startAngle + Math.PI, startAngle + Math.PI * 1.8);
   ctx.stroke();
 
-  // Text
   const alpha = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
   ctx.fillStyle = hudColor;
   ctx.globalAlpha = alpha;
-  ctx.font = "bold 14px monospace";
+  ctx.font = "bold 12px monospace";
   ctx.textAlign = "center";
-  ctx.fillText("ACQUIRING...", cx, cy + 80);
+  ctx.fillText("ACQUIRING...", cx, cy + 65);
   ctx.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Virtual Joystick Component
+// ---------------------------------------------------------------------------
+
+function VirtualJoystick({
+  onMove,
+  onRelease,
+}: {
+  onMove: (dx: number, dy: number) => void;
+  onRelease: () => void;
+}) {
+  const baseRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const knobRef = useRef<HTMLDivElement>(null);
+
+  const BASE_SIZE = 76;
+  const KNOB_SIZE = 28;
+  const MAX_OFFSET = (BASE_SIZE - KNOB_SIZE) / 2;
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    draggingRef.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!draggingRef.current || !baseRef.current) return;
+      e.preventDefault();
+      const rect = baseRef.current.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let dx = e.clientX - cx;
+      let dy = e.clientY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > MAX_OFFSET) {
+        dx = (dx / dist) * MAX_OFFSET;
+        dy = (dy / dist) * MAX_OFFSET;
+      }
+      if (knobRef.current) {
+        knobRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+      }
+      // Normalize to -1..1
+      onMove(dx / MAX_OFFSET, dy / MAX_OFFSET);
+    },
+    [onMove, MAX_OFFSET],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      draggingRef.current = false;
+      if (knobRef.current) {
+        knobRef.current.style.transform = "translate(0px, 0px)";
+      }
+      onRelease();
+    },
+    [onRelease],
+  );
+
+  return (
+    <div
+      ref={baseRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{
+        width: BASE_SIZE,
+        height: BASE_SIZE,
+        borderRadius: "50%",
+        background: "rgba(30,35,42,0.7)",
+        border: "1px solid rgba(63,185,80,0.3)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "grab",
+        touchAction: "none",
+        userSelect: "none",
+        position: "relative",
+      }}
+    >
+      {/* Crosshair guides */}
+      <div
+        style={{
+          position: "absolute",
+          width: "60%",
+          height: 1,
+          background: "rgba(63,185,80,0.15)",
+          top: "50%",
+          left: "20%",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          height: "60%",
+          width: 1,
+          background: "rgba(63,185,80,0.15)",
+          left: "50%",
+          top: "20%",
+        }}
+      />
+      <div
+        ref={knobRef}
+        style={{
+          width: KNOB_SIZE,
+          height: KNOB_SIZE,
+          borderRadius: "50%",
+          background: "radial-gradient(circle at 40% 35%, rgba(63,185,80,0.5), rgba(63,185,80,0.2))",
+          border: "1px solid rgba(63,185,80,0.6)",
+          transition: draggingRef.current ? "none" : "transform 0.15s ease-out",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export default function CameraPanel({ track, onClose, degraded = false }: Props) {
+export default function CameraPanel({
+  track,
+  allTracks,
+  sensorConfigs,
+  degraded = false,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
   const [mode, setMode] = useState<CameraMode>("thermal");
-  const [acquiring, setAcquiring] = useState(true);
+  const [acquiring, setAcquiring] = useState(false);
   const acquireStartRef = useRef(Date.now());
-  const prevTrackIdRef = useRef(track.id);
+  const prevTrackIdRef = useRef<string | null>(null);
+
+  // Camera bearing and elevation (absolute)
+  const [cameraBearing, setCameraBearing] = useState(0);
+  const [cameraElevation, setCameraElevation] = useState(15);
+  // Joystick offset (applied on top of base bearing/elevation when slewed)
+  const [bearingOffset, setBearingOffset] = useState(0);
+  const [elevationOffset, setElevationOffset] = useState(0);
+  // Whether joystick is actively being dragged (for continuous panning)
+  const joystickActiveRef = useRef(false);
+  const joystickDxRef = useRef(0);
+  const joystickDyRef = useRef(0);
 
   // Reset acquiring animation when target changes
   useEffect(() => {
-    if (track.id !== prevTrackIdRef.current) {
+    if (track && track.id !== prevTrackIdRef.current) {
       setAcquiring(true);
       acquireStartRef.current = Date.now();
-      prevTrackIdRef.current = track.id;
+      setBearingOffset(0);
+      setElevationOffset(0);
     }
-  }, [track.id]);
+    prevTrackIdRef.current = track?.id ?? null;
+  }, [track]);
+
+  // When slewed to a track, update base camera bearing/elevation to track position
+  useEffect(() => {
+    if (!track) return;
+    const trackBearing = calcBearing(track.x, track.y);
+    const trackRange = calcRange(track.x, track.y);
+    const trackElev = calcElevation(track.altitude_ft, trackRange);
+    setCameraBearing(trackBearing);
+    setCameraElevation(trackElev);
+  }, [track]);
 
   // Auto-finish acquiring after 1.5s
   useEffect(() => {
@@ -417,7 +603,112 @@ export default function CameraPanel({ track, onClose, degraded = false }: Props)
     return () => clearTimeout(timer);
   }, [acquiring]);
 
+  // Continuous pan while joystick is held
+  useEffect(() => {
+    let animFrame: number;
+    const panSpeed = 2; // degrees per frame at full deflection
+
+    const tick = () => {
+      if (joystickActiveRef.current) {
+        const dx = joystickDxRef.current;
+        const dy = joystickDyRef.current;
+        if (track) {
+          // When slewed, adjust offset
+          setBearingOffset((prev) => {
+            const next = prev + dx * panSpeed;
+            return Math.max(-90, Math.min(90, next));
+          });
+          setElevationOffset((prev) => {
+            const next = prev - dy * panSpeed;
+            return Math.max(-45, Math.min(45, next));
+          });
+        } else {
+          // When not slewed, adjust absolute camera bearing/elevation
+          setCameraBearing((prev) => (prev + dx * panSpeed + 360) % 360);
+          setCameraElevation((prev) => {
+            const next = prev - dy * panSpeed;
+            return Math.max(-10, Math.min(80, next));
+          });
+        }
+      }
+      animFrame = requestAnimationFrame(tick);
+    };
+    animFrame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animFrame);
+  }, [track]);
+
+  const handleJoystickMove = useCallback((dx: number, dy: number) => {
+    joystickActiveRef.current = true;
+    joystickDxRef.current = dx;
+    joystickDyRef.current = dy;
+  }, []);
+
+  const handleJoystickRelease = useCallback(() => {
+    joystickActiveRef.current = false;
+    joystickDxRef.current = 0;
+    joystickDyRef.current = 0;
+  }, []);
+
+  const handleCenter = useCallback(() => {
+    setBearingOffset(0);
+    setElevationOffset(0);
+  }, []);
+
   const hudColor = mode === "thermal" ? HUD_COLOR_THERMAL : HUD_COLOR_DAYLIGHT;
+
+  // Effective camera direction
+  const effectiveBearing = track
+    ? (cameraBearing + bearingOffset + 360) % 360
+    : cameraBearing;
+  const effectiveElevation = track
+    ? cameraElevation + elevationOffset
+    : cameraElevation;
+
+  // Find which track(s) are visible in the camera FOV
+  const getVisibleTrack = useCallback((): { track: TrackData; pixelOffsetX: number; pixelOffsetY: number } | null => {
+    const candidates = track ? [track] : allTracks.filter((t) => !t.neutralized);
+    for (const t of candidates) {
+      const tBearing = calcBearing(t.x, t.y);
+      const tRange = calcRange(t.x, t.y);
+      const tElev = calcElevation(t.altitude_ft, tRange);
+
+      const dBearing = angleDiff(tBearing, effectiveBearing);
+      const dElev = angleDiff(tElev, effectiveElevation);
+
+      if (Math.abs(dBearing) <= FOV_H / 2 && Math.abs(dElev) <= FOV_V / 2) {
+        // Convert angle offset to pixel offset
+        const pixelOffsetX = (dBearing / (FOV_H / 2)) * (CANVAS_W / 2);
+        const pixelOffsetY = -(dElev / (FOV_V / 2)) * (CANVAS_H / 2);
+        return { track: t, pixelOffsetX, pixelOffsetY };
+      }
+    }
+    return null;
+  }, [track, allTracks, effectiveBearing, effectiveElevation]);
+
+  // Check if track is covered by an EO/IR sensor
+  const isDegraded = useCallback(
+    (t: TrackData): boolean => {
+      const eoirSensors = sensorConfigs.filter(
+        (s) => s.type === "eoir" && s.status === "active",
+      );
+      for (const sensor of eoirSensors) {
+        const sx = sensor.x ?? 0;
+        const sy = sensor.y ?? 0;
+        const dist = Math.sqrt((t.x - sx) ** 2 + (t.y - sy) ** 2);
+        const range = sensor.range_km ?? 1.5;
+        if (dist > range) continue;
+        const fov = sensor.fov_deg ?? 360;
+        if (fov >= 360) return false;
+        const bearing =
+          ((Math.atan2(t.x - sx, t.y - sy) * 180) / Math.PI + 360) % 360;
+        const facing = sensor.facing_deg ?? 0;
+        const diff = Math.abs(((bearing - facing + 180) % 360) - 180);
+        if (diff <= fov / 2) return false;
+      }
+      return true;
+    },
+    [sensorConfigs],
+  );
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -427,34 +718,55 @@ export default function CameraPanel({ track, onClose, degraded = false }: Props)
 
     const w = canvas.width;
     const h = canvas.height;
-
-    const rangeKm = calcRange(track.x, track.y);
-    const noise = noiseFactor(rangeKm);
-    const scale = silhouetteScale(rangeKm);
-
-    // Range-based camera shake
-    const amp = shakeAmplitude(rangeKm);
-    const jx = (Math.random() - 0.5) * amp;
-    const jy = (Math.random() - 0.5) * amp;
+    const time = Date.now() / 1000;
 
     // Background
     drawBackground(ctx, w, h, mode);
 
-    if (degraded) {
-      // Heavy static — no EO/IR coverage
+    const visibleTarget = getVisibleTrack();
+    const isStandby = !track;
+    const showDegraded = visibleTarget ? (degraded || isDegraded(visibleTarget.track)) : false;
+
+    if (isStandby && !visibleTarget) {
+      // Standby mode — no target in view
+      drawScanLines(ctx, w, h, time);
+      drawNoise(ctx, w, h, 0.3, mode);
+      drawReticle(ctx, w, h, hudColor);
+
+      // STANDBY text
+      const alpha = 0.4 + 0.2 * Math.sin(time * 2);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = hudColor;
+      ctx.font = "bold 24px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("STANDBY", w / 2, h / 2 - 10);
+      ctx.font = "11px monospace";
+      ctx.globalAlpha = 0.5;
+      ctx.fillText("USE JOYSTICK TO SCAN", w / 2, h / 2 + 16);
+      ctx.globalAlpha = 1;
+    } else if (showDegraded && visibleTarget) {
+      // Degraded — heavy static
       drawNoise(ctx, w, h, 1.0, mode);
       drawNoise(ctx, w, h, 0.8, mode);
       drawReticle(ctx, w, h, hudColor);
-    } else if (acquiring) {
+    } else if (acquiring && track) {
       // Acquiring animation
       const elapsed = (Date.now() - acquireStartRef.current) / 1500;
       drawNoise(ctx, w, h, 0.9, mode);
       drawAcquiring(ctx, w, h, elapsed, hudColor);
       drawReticle(ctx, w, h, hudColor);
-    } else {
-      // Silhouette
+    } else if (visibleTarget) {
+      // Draw the visible target
+      const { track: vt, pixelOffsetX, pixelOffsetY } = visibleTarget;
+      const rangeKm = calcRange(vt.x, vt.y);
+      const noise = noiseFactor(rangeKm);
+      const scale = silhouetteScale(rangeKm);
+      const amp = shakeAmplitude(rangeKm);
+      const jx = (Math.random() - 0.5) * amp;
+      const jy = (Math.random() - 0.5) * amp;
+
       ctx.save();
-      ctx.translate(w / 2 + jx, h / 2 + jy);
+      ctx.translate(w / 2 + pixelOffsetX + jx, h / 2 + pixelOffsetY + jy);
 
       if (rangeKm > 0.8) {
         ctx.shadowColor = mode === "thermal"
@@ -468,256 +780,309 @@ export default function CameraPanel({ track, onClose, degraded = false }: Props)
         ctx.shadowBlur = 5;
       }
 
-      drawSilhouette(ctx, track.classification, scale, mode);
+      drawSilhouette(ctx, vt.classification, scale, mode);
       ctx.restore();
 
-      // Noise overlay
       drawNoise(ctx, w, h, noise, mode);
-
-      // Reticle
+      drawReticle(ctx, w, h, hudColor);
+    } else {
+      // Standby with scan lines (fallback)
+      drawScanLines(ctx, w, h, time);
+      drawNoise(ctx, w, h, 0.3, mode);
       drawReticle(ctx, w, h, hudColor);
     }
 
     rafRef.current = requestAnimationFrame(draw);
-  }, [track, mode, acquiring, hudColor, degraded]);
+  }, [track, mode, acquiring, hudColor, degraded, getVisibleTrack, isDegraded]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(rafRef.current);
   }, [draw]);
 
-  const rangeKm = calcRange(track.x, track.y);
-  const bearingDeg = calcBearing(track.x, track.y);
-
-  const hudStyle = (pos: Record<string, unknown>) => ({
-    position: "absolute" as const,
-    fontFamily: "monospace",
-    fontSize: 11,
-    color: hudColor,
-    textShadow: `0 0 6px ${hudColor}80`,
-    pointerEvents: "none" as const,
-    ...pos,
-  });
+  const visibleTarget = getVisibleTrack();
+  const displayTrackId = track?.id ?? visibleTarget?.track?.id ?? null;
 
   return (
     <div
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(0,0,0,0.85)",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "column",
+        background: "#0d1117",
+        borderTop: "1px solid #30363d",
+        minHeight: 0,
+        flex: "0 0 auto",
       }}
     >
-      <style>{`
-        @keyframes camera-glow {
-          0%, 100% { box-shadow: 0 0 15px rgba(63, 185, 80, 0.3), 0 0 30px rgba(63, 185, 80, 0.1); }
-          50% { box-shadow: 0 0 25px rgba(63, 185, 80, 0.6), 0 0 50px rgba(63, 185, 80, 0.2); }
-        }
-      `}</style>
+      {/* Header */}
       <div
         style={{
-          background: "#0d1117",
-          border: "1px solid #3fb95066",
-          borderRadius: 8,
-          overflow: "hidden",
           display: "flex",
-          flexDirection: "column",
-          width: "65vw",
-          maxWidth: 1100,
-          maxHeight: "90vh",
-          animation: "camera-glow 2s ease-in-out 3",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "5px 10px",
+          background: "#161b22",
+          borderBottom: "1px solid #30363d",
+          gap: 8,
+          flexShrink: 0,
         }}
       >
-        {/* Header */}
-        <div
+        <span
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 14px",
-            background: "#161b22",
-            borderBottom: "1px solid #30363d",
-            gap: 12,
+            fontFamily: "monospace",
+            fontSize: 10,
+            color: hudColor,
+            letterSpacing: 1.2,
+            fontWeight: 600,
           }}
         >
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: 13,
-              color: hudColor,
-              letterSpacing: 1.5,
-              fontWeight: 600,
-            }}
-          >
-            {degraded ? "EO/IR CAMERA — NO SIGNAL" : "EO/IR CAMERA FEED"}
-          </span>
+          EO/IR — {displayTrackId ? displayTrackId.toUpperCase() : "STANDBY"}
+        </span>
 
-          {/* Thermal / Daylight toggle */}
-          <div style={{ display: "flex", gap: 4 }}>
-            <button
-              onClick={() => setMode("thermal")}
-              style={{
-                background: mode === "thermal" ? "#21262d" : "transparent",
-                border: `1px solid ${mode === "thermal" ? HUD_COLOR_THERMAL : "#30363d"}`,
-                color: mode === "thermal" ? HUD_COLOR_THERMAL : "#8b949e",
-                cursor: "pointer",
-                fontFamily: "monospace",
-                fontSize: 10,
-                padding: "2px 8px",
-                borderRadius: 3,
-                letterSpacing: 0.5,
-              }}
-            >
-              THERMAL
-            </button>
-            <button
-              onClick={() => setMode("daylight")}
-              style={{
-                background: mode === "daylight" ? "#21262d" : "transparent",
-                border: `1px solid ${mode === "daylight" ? HUD_COLOR_DAYLIGHT : "#30363d"}`,
-                color: mode === "daylight" ? HUD_COLOR_DAYLIGHT : "#8b949e",
-                cursor: "pointer",
-                fontFamily: "monospace",
-                fontSize: 10,
-                padding: "2px 8px",
-                borderRadius: 3,
-                letterSpacing: 0.5,
-              }}
-            >
-              DAYLIGHT
-            </button>
-          </div>
-
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: 12,
-              color: "#8b949e",
-            }}
-          >
-            TGT: {track.id.toUpperCase()}
-          </span>
+        {/* Thermal / Daylight toggle */}
+        <div style={{ display: "flex", gap: 3 }}>
           <button
-            onClick={onClose}
+            onClick={() => setMode("thermal")}
             style={{
-              background: "#f8514918",
-              border: "1px solid #f8514944",
-              color: "#f85149",
+              background: mode === "thermal" ? "#21262d" : "transparent",
+              border: `1px solid ${mode === "thermal" ? HUD_COLOR_THERMAL : "#30363d"}`,
+              color: mode === "thermal" ? HUD_COLOR_THERMAL : "#8b949e",
               cursor: "pointer",
               fontFamily: "monospace",
-              fontSize: 18,
-              fontWeight: 700,
-              padding: "4px 14px",
-              borderRadius: 5,
-              lineHeight: 1,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#f8514930";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#f85149";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = "#f8514918";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#f8514944";
+              fontSize: 9,
+              padding: "1px 6px",
+              borderRadius: 3,
+              letterSpacing: 0.5,
             }}
           >
-            CLOSE [4]
+            IR
+          </button>
+          <button
+            onClick={() => setMode("daylight")}
+            style={{
+              background: mode === "daylight" ? "#21262d" : "transparent",
+              border: `1px solid ${mode === "daylight" ? HUD_COLOR_DAYLIGHT : "#30363d"}`,
+              color: mode === "daylight" ? HUD_COLOR_DAYLIGHT : "#8b949e",
+              cursor: "pointer",
+              fontFamily: "monospace",
+              fontSize: 9,
+              padding: "1px 6px",
+              borderRadius: 3,
+              letterSpacing: 0.5,
+            }}
+          >
+            VIS
           </button>
         </div>
+      </div>
 
-        {/* Viewport */}
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            aspectRatio: `${CANVAS_W} / ${CANVAS_H}`,
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_W}
-            height={CANVAS_H}
-            style={{ display: "block", width: "100%", height: "100%" }}
-          />
+      {/* Viewport */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          aspectRatio: `${CANVAS_W} / ${CANVAS_H}`,
+          overflow: "hidden",
+        }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          style={{ display: "block", width: "100%", height: "100%" }}
+        />
 
-          {/* Degraded overlay message */}
-          {degraded && (
+        {/* Degraded overlay message */}
+        {visibleTarget && (degraded || isDegraded(visibleTarget.track)) && (
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              textAlign: "center",
+              pointerEvents: "none",
+            }}
+          >
             <div
               style={{
+                fontFamily: "monospace",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#f85149",
+                letterSpacing: 1.5,
+                textShadow: "0 0 10px rgba(248, 81, 73, 0.6)",
+                marginBottom: 4,
+              }}
+            >
+              NO EO/IR COVERAGE
+            </div>
+            <div
+              style={{
+                fontFamily: "monospace",
+                fontSize: 9,
+                color: "#d29922",
+                letterSpacing: 0.5,
+              }}
+            >
+              SENSOR DATA ONLY
+            </div>
+          </div>
+        )}
+
+        {/* HUD Overlay — bearing & elevation */}
+        <span
+          style={{
+            position: "absolute",
+            top: 6,
+            left: 8,
+            fontFamily: "monospace",
+            fontSize: 9,
+            color: hudColor,
+            textShadow: `0 0 4px ${hudColor}80`,
+            pointerEvents: "none",
+          }}
+        >
+          BRG: {String(Math.round(effectiveBearing)).padStart(3, "0")}&deg;
+        </span>
+        <span
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 8,
+            fontFamily: "monospace",
+            fontSize: 9,
+            color: hudColor,
+            textShadow: `0 0 4px ${hudColor}80`,
+            pointerEvents: "none",
+          }}
+        >
+          ELEV: {effectiveElevation.toFixed(1)}&deg;
+        </span>
+
+        {/* Target data HUD */}
+        {visibleTarget && !acquiring && (
+          <>
+            <span
+              style={{
                 position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                textAlign: "center",
+                bottom: 6,
+                left: 8,
+                fontFamily: "monospace",
+                fontSize: 9,
+                color: hudColor,
+                textShadow: `0 0 4px ${hudColor}80`,
                 pointerEvents: "none",
               }}
             >
-              <div
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: "#f85149",
-                  letterSpacing: 2,
-                  textShadow: "0 0 10px rgba(248, 81, 73, 0.6)",
-                  marginBottom: 8,
-                }}
-              >
-                NO EO/IR COVERAGE
-              </div>
-              <div
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 12,
-                  color: "#d29922",
-                  letterSpacing: 1,
-                }}
-              >
-                SENSOR DATA ONLY — NO VISUAL FEED AVAILABLE
-              </div>
-              <div
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: 10,
-                  color: "#484f58",
-                  letterSpacing: 0.5,
-                  marginTop: 12,
-                }}
-              >
-                Equip an EO/IR sensor or reposition for coverage
-              </div>
-            </div>
-          )}
+              RNG: {calcRange(visibleTarget.track.x, visibleTarget.track.y).toFixed(2)} km
+            </span>
+            <span
+              style={{
+                position: "absolute",
+                bottom: 6,
+                right: 8,
+                fontFamily: "monospace",
+                fontSize: 9,
+                color: hudColor,
+                textShadow: `0 0 4px ${hudColor}80`,
+                pointerEvents: "none",
+              }}
+            >
+              ALT: {Math.round(visibleTarget.track.altitude_ft)} ft
+            </span>
+            <span
+              style={{
+                position: "absolute",
+                top: 6,
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontFamily: "monospace",
+                fontSize: 9,
+                color: hudColor,
+                textShadow: `0 0 4px ${hudColor}80`,
+                pointerEvents: "none",
+              }}
+            >
+              {Math.round(visibleTarget.track.speed_kts)} kts | HDG {String(Math.round(visibleTarget.track.heading_deg)).padStart(3, "0")}&deg;
+            </span>
+          </>
+        )}
 
-          {/* HUD Overlay */}
-          <span style={hudStyle({ top: 10, left: 12 })}>
-            TGT: {track.id.toUpperCase()}
-          </span>
-          <span style={hudStyle({ top: 10, right: 12 })}>
-            RNG: {rangeKm.toFixed(2)} km
-          </span>
-          <span style={hudStyle({ bottom: 10, left: 12 })}>
-            BRG: {String(Math.round(bearingDeg)).padStart(3, "0")}&deg;
-          </span>
-          <span style={hudStyle({ bottom: 10, right: 12 })}>
-            ALT: {Math.round(track.altitude_ft)} ft
-          </span>
-          <span
-            style={hudStyle({
-              bottom: 10,
-              left: "50%",
-              transform: "translateX(-50%)",
-            })}
-          >
-            ZOOM: 4x | {mode === "thermal" ? "IR" : "VIS"}
-          </span>
-          <span style={hudStyle({ top: 10, left: "50%" , transform: "translateX(-50%)" })}>
-            SPD: {Math.round(track.speed_kts)} kts | HDG: {String(Math.round(track.heading_deg)).padStart(3, "0")}&deg;
-          </span>
+        {/* Mode indicator */}
+        <span
+          style={{
+            position: "absolute",
+            bottom: 6,
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontFamily: "monospace",
+            fontSize: 8,
+            color: hudColor + "88",
+            pointerEvents: "none",
+          }}
+        >
+          {mode === "thermal" ? "IR" : "VIS"} | FOV {FOV_H}&deg;
+        </span>
+
+        {/* Joystick + CENTER button */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            right: 8,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          {track && (bearingOffset !== 0 || elevationOffset !== 0) && (
+            <button
+              onClick={handleCenter}
+              style={{
+                background: "rgba(30,35,42,0.8)",
+                border: "1px solid rgba(63,185,80,0.4)",
+                color: HUD_COLOR_THERMAL,
+                cursor: "pointer",
+                fontFamily: "monospace",
+                fontSize: 8,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 3,
+                letterSpacing: 1,
+              }}
+            >
+              CENTER
+            </button>
+          )}
+          <VirtualJoystick onMove={handleJoystickMove} onRelease={handleJoystickRelease} />
         </div>
       </div>
     </div>
   );
+}
+
+/** Check if a track is within camera FOV — exported for use in track lists */
+export function isTrackInCameraFov(
+  t: TrackData,
+  cameraBearing: number,
+  cameraElevation: number,
+  bearingOffset: number,
+  elevationOffset: number,
+  slewedTrack: TrackData | null,
+): boolean {
+  const effBearing = slewedTrack
+    ? (calcBearing(slewedTrack.x, slewedTrack.y) + bearingOffset + 360) % 360
+    : cameraBearing;
+  const effElev = slewedTrack
+    ? calcElevation(slewedTrack.altitude_ft, calcRange(slewedTrack.x, slewedTrack.y)) + elevationOffset
+    : cameraElevation;
+
+  const tBearing = calcBearing(t.x, t.y);
+  const tRange = calcRange(t.x, t.y);
+  const tElev = calcElevation(t.altitude_ft, tRange);
+  const dBearing = angleDiff(tBearing, effBearing);
+  const dElev = angleDiff(tElev, effElev);
+  return Math.abs(dBearing) <= FOV_H / 2 && Math.abs(dElev) <= FOV_V / 2;
 }
