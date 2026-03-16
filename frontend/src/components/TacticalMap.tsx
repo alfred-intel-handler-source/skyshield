@@ -293,13 +293,13 @@ export default function TacticalMap({
 
         {/* Layer switcher */}
         <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="Dark">
+          <LayersControl.BaseLayer name="Dark">
             <TileLayer
               url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               maxZoom={20}
             />
           </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="Satellite">
+          <LayersControl.BaseLayer checked name="Satellite">
             <TileLayer
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               maxZoom={19}
