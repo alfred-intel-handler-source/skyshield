@@ -6,9 +6,18 @@
       "type": "radar",
       "range_km": 10.0,
       "fov_deg": 360,
-      "description": "Lightweight counter-fire/counter-UAS radar. 360° rotating antenna provides persistent surveillance. Primary detection sensor for Group 1-3 UAS.",
-      "pros": ["Long range", "360° coverage", "All-weather", "Altitude data"],
-      "cons": ["Large signature", "Requires power generator", "Ground clutter in urban terrain"],
+      "description": "Lightweight counter-fire/counter-UAS radar. 360\u00b0 rotating antenna provides persistent surveillance. Primary detection sensor for Group 1-3 UAS.",
+      "pros": [
+        "Long range",
+        "360\u00b0 coverage",
+        "All-weather",
+        "Altitude data"
+      ],
+      "cons": [
+        "Large signature",
+        "Requires power generator",
+        "Ground clutter in urban terrain"
+      ],
       "requires_los": false
     },
     {
@@ -16,10 +25,18 @@
       "name": "KURFS Radar",
       "type": "radar",
       "range_km": 8.0,
-      "fov_deg": 90,
-      "description": "Ku-band Radio Frequency Sensor. Precision fire-control radar that guides Coyote interceptors to target. Provides high-accuracy track data for engagement.",
-      "pros": ["Fire-control quality tracks", "Guides Coyote intercepts", "High accuracy"],
-      "cons": ["Limited 90° sector", "Must be oriented toward threat", "Single target track"],
+      "fov_deg": 360,
+      "description": "Ku-band Radio Frequency Sensor. Precision fire-control radar that guides Coyote interceptors to target. 360\u00b0 surveillance with high-accuracy track data for engagement.",
+      "pros": [
+        "Fire-control quality tracks",
+        "Guides Coyote intercepts",
+        "High accuracy",
+        "360\u00b0 coverage"
+      ],
+      "cons": [
+        "Requires line of sight",
+        "Single target track at a time"
+      ],
       "requires_los": true
     },
     {
@@ -28,9 +45,18 @@
       "type": "eoir",
       "range_km": 8.0,
       "fov_deg": 360,
-      "description": "Pan/tilt/zoom electro-optical and infrared camera. 360° continuous rotation gimbal with thermal and daylight imaging. Used for visual identification of UAS targets.",
-      "pros": ["Visual ID capability", "Day/night thermal", "360° pan", "Zoom 1x-40x"],
-      "cons": ["Weather dependent", "Operator intensive", "Requires LOS"],
+      "description": "Pan/tilt/zoom electro-optical and infrared camera. 360\u00b0 continuous rotation gimbal with thermal and daylight imaging. Used for visual identification of UAS targets.",
+      "pros": [
+        "Visual ID capability",
+        "Day/night thermal",
+        "360\u00b0 pan",
+        "Zoom 1x-40x"
+      ],
+      "cons": [
+        "Weather dependent",
+        "Operator intensive",
+        "Requires LOS"
+      ],
       "requires_los": true
     }
   ],
@@ -44,8 +70,16 @@
       "recharge_seconds": 10,
       "single_use": false,
       "description": "Radio frequency and Position/Navigation/Timing jammer. Disrupts UAS command links and GPS navigation. Effective against commercial drones.",
-      "pros": ["Rechargeable", "Low collateral", "Effective vs commercial UAS"],
-      "cons": ["Limited range", "Ineffective vs autonomous UAS", "Can affect friendly GPS"],
+      "pros": [
+        "Rechargeable",
+        "Low collateral",
+        "Effective vs commercial UAS"
+      ],
+      "cons": [
+        "Limited range",
+        "Ineffective vs autonomous UAS",
+        "Can affect friendly GPS"
+      ],
       "requires_los": false,
       "collateral_risk": "medium"
     },
@@ -58,8 +92,16 @@
       "recharge_seconds": 0,
       "single_use": true,
       "description": "Tube-launched interceptor guided by KURFS radar. Proximity-fused warhead. 4 interceptors per pallet. Requires KURFS for mid-course guidance.",
-      "pros": ["High Pk against all UAS types", "Fire-and-forget after launch", "Works vs autonomous UAS"],
-      "cons": ["Single-use (4 per pallet)", "Requires KURFS radar", "Self-destructs if intercept fails"],
+      "pros": [
+        "High Pk against all UAS types",
+        "Fire-and-forget after launch",
+        "Works vs autonomous UAS"
+      ],
+      "cons": [
+        "Single-use (4 per pallet)",
+        "Requires KURFS radar",
+        "Self-destructs if intercept fails"
+      ],
       "requires_los": false,
       "collateral_risk": "low",
       "ammo_count": 4
