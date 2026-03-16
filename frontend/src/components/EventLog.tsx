@@ -50,7 +50,7 @@ export default function EventLog({ events }: Props) {
       style={{
         gridColumn: "1 / -1",
         height: 120,
-        background: "#161b22",
+        background: "#0c1015",
         borderTop: "1px solid #30363d",
         display: "flex",
         flexDirection: "column",

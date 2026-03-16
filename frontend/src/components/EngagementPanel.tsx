@@ -81,7 +81,8 @@ export default function EngagementPanel({
   }
 
   const canSlew =
-    track.dtid_phase === "tracked" && isInEoirFov(track, sensors);
+    (track.dtid_phase === "tracked" || track.dtid_phase === "identified") &&
+    isInEoirFov(track, sensors);
 
   return (
     <div style={{ padding: "12px 14px", minHeight: 120 }}>
@@ -224,6 +225,35 @@ export default function EngagementPanel({
 
       {track.dtid_phase === "identified" && (
         <div>
+          {/* SLEW CAMERA in identified phase too */}
+          {canSlew && onSlewCamera && (
+            <button
+              onClick={() => onSlewCamera(track.id)}
+              style={{
+                width: "100%",
+                padding: "9px 12px",
+                marginBottom: 8,
+                background: "#d2992218",
+                border: "1px solid #d2992244",
+                borderRadius: 5,
+                color: "#d29922",
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: "'Inter', sans-serif",
+                letterSpacing: 1,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "#d2992230";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "#d2992218";
+              }}
+            >
+              SLEW CAMERA
+            </button>
+          )}
           <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
             Select effector to engage
           </div>

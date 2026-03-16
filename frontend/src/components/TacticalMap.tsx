@@ -72,7 +72,7 @@ export default function TacticalMap({
       const scale = scaleRef.current;
 
       let closestId: string | null = null;
-      let closestDist = 20; // minimum distance in pixels to select
+      let closestDist = 28; // minimum distance in pixels to select
 
       for (const track of tracks) {
         if (track.neutralized) continue;
@@ -119,21 +119,56 @@ export default function TacticalMap({
       ctx.fillStyle = "#0d1117";
       ctx.fillRect(0, 0, w, h);
 
-      // --- Grid ---
-      ctx.strokeStyle = "#1c2333";
+      // --- Fine grid (0.5km) ---
+      ctx.strokeStyle = "rgba(28, 35, 51, 0.4)";
       ctx.lineWidth = 0.5;
-      const gridSpacing = scale; // 1km per grid
-      for (let gx = cx % gridSpacing; gx < w; gx += gridSpacing) {
+      const fineGrid = scale * 0.5; // 0.5km spacing
+      for (let gx = cx % fineGrid; gx < w; gx += fineGrid) {
         ctx.beginPath();
         ctx.moveTo(gx, 0);
         ctx.lineTo(gx, h);
         ctx.stroke();
       }
-      for (let gy = cy % gridSpacing; gy < h; gy += gridSpacing) {
+      for (let gy = cy % fineGrid; gy < h; gy += fineGrid) {
         ctx.beginPath();
         ctx.moveTo(0, gy);
         ctx.lineTo(w, gy);
         ctx.stroke();
+      }
+      // --- Coarse grid (1km) ---
+      ctx.strokeStyle = "rgba(28, 35, 51, 0.8)";
+      ctx.lineWidth = 0.5;
+      const coarseGrid = scale; // 1km spacing
+      for (let gx = cx % coarseGrid; gx < w; gx += coarseGrid) {
+        ctx.beginPath();
+        ctx.moveTo(gx, 0);
+        ctx.lineTo(gx, h);
+        ctx.stroke();
+      }
+      for (let gy = cy % coarseGrid; gy < h; gy += coarseGrid) {
+        ctx.beginPath();
+        ctx.moveTo(0, gy);
+        ctx.lineTo(w, gy);
+        ctx.stroke();
+      }
+
+      // --- Range rings at 1km intervals ---
+      const maxRingRange = Math.ceil(Math.max(w, h) / scale) + 1;
+      ctx.font = "400 9px 'JetBrains Mono', monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      for (let r = 1; r <= maxRingRange; r++) {
+        const ringR = r * scale;
+        ctx.strokeStyle = "rgba(48, 54, 61, 0.6)";
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([4, 6]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // km label
+        ctx.fillStyle = "rgba(72, 79, 88, 0.7)";
+        ctx.fillText(`${r}km`, cx + ringR + 4, cy);
       }
 
       // --- Engagement zone rings ---
@@ -146,55 +181,86 @@ export default function TacticalMap({
         drawZoneRing(ctx, cx, cy, kmToPixels(engagementZones.identification_range_km, scale), "#d2992233", "ID");
       }
 
-      // --- Compass labels ---
-      ctx.font = "500 10px 'Inter', sans-serif";
+      // --- Compass bearing marks every 30° ---
+      ctx.font = "500 9px 'JetBrains Mono', monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#484f58";
-      ctx.fillText("N", cx, 14);
-      ctx.fillText("S", cx, h - 14);
-      ctx.fillText("E", w - 14, cy);
-      ctx.fillText("W", 14, cy);
+      const compassRadius = Math.min(w, h) / 2 - 16;
+      for (let deg = 0; deg < 360; deg += 30) {
+        const rad = (deg - 90) * (Math.PI / 180);
+        const tickInner = compassRadius - 6;
+        const tickOuter = compassRadius;
+        // Tick mark
+        ctx.strokeStyle = "rgba(72, 79, 88, 0.5)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(rad) * tickInner, cy + Math.sin(rad) * tickInner);
+        ctx.lineTo(cx + Math.cos(rad) * tickOuter, cy + Math.sin(rad) * tickOuter);
+        ctx.stroke();
+        // Label
+        const labelR = compassRadius + 10;
+        const lx = cx + Math.cos(rad) * labelR;
+        const ly = cy + Math.sin(rad) * labelR;
+        ctx.fillStyle = deg % 90 === 0 ? "#8b949e" : "#484f58";
+        ctx.font = deg % 90 === 0 ? "600 10px 'JetBrains Mono', monospace" : "400 9px 'JetBrains Mono', monospace";
+        ctx.fillText(String(deg).padStart(3, "0"), lx, ly);
+      }
 
-      // --- Radar sweep ---
-      const sweepAngle = ((elapsed * 0.8) % (Math.PI * 2));
+      // --- Radar sweep (subtle) ---
+      const sweepAngle = ((elapsed * 0.4) % (Math.PI * 2)); // half speed
       const sweepLen = Math.max(w, h);
       const gradient = ctx.createConicGradient(sweepAngle - 0.4, cx, cy);
       gradient.addColorStop(0, "transparent");
-      gradient.addColorStop(0.06, "#58a6ff12");
+      gradient.addColorStop(0.06, "rgba(88, 166, 255, 0.025)"); // 75% less visible
       gradient.addColorStop(0.12, "transparent");
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(cx, cy, sweepLen, 0, Math.PI * 2);
       ctx.fill();
 
-      // Sweep line
-      ctx.strokeStyle = "#58a6ff30";
+      // Sweep line (barely visible)
+      ctx.strokeStyle = "rgba(88, 166, 255, 0.08)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(sweepAngle) * sweepLen, cy + Math.sin(sweepAngle) * sweepLen);
       ctx.stroke();
 
-      // --- Base marker ---
+      // --- Base marker (prominent) ---
+      // Defended area circle
+      const defRadius = scale * 0.3; // ~300m defended perimeter
+      ctx.fillStyle = "rgba(88, 166, 255, 0.04)";
+      ctx.strokeStyle = "rgba(88, 166, 255, 0.15)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, defRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Base dot
       ctx.fillStyle = "#58a6ff";
       ctx.beginPath();
-      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
       ctx.fill();
 
       // Pulsing ring
-      const pulseRadius = 8 + Math.sin(elapsed * 3) * 3;
-      ctx.strokeStyle = `rgba(88, 166, 255, ${0.4 + Math.sin(elapsed * 3) * 0.2})`;
+      const pulseRadius = 12 + Math.sin(elapsed * 2) * 3;
+      ctx.strokeStyle = `rgba(88, 166, 255, ${0.35 + Math.sin(elapsed * 2) * 0.15})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
       ctx.stroke();
 
       // Base label
-      ctx.font = "500 9px 'Inter', sans-serif";
+      ctx.font = "600 10px 'JetBrains Mono', monospace";
       ctx.fillStyle = "#58a6ff";
       ctx.textAlign = "center";
-      ctx.fillText("BASE", cx, cy + 18);
+      ctx.fillText("BASE", cx, cy + 22);
+      ctx.font = "400 8px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "rgba(88, 166, 255, 0.5)";
+      ctx.fillText("DEFENDED", cx, cy + 32);
 
       // --- Tracks ---
       for (const track of tracks) {
@@ -222,18 +288,26 @@ export default function TacticalMap({
           }
         }
 
-        // Speed leader line
+        // Projected path (dashed heading line, longer)
         if (track.speed_kts > 0 && !track.neutralized) {
           const headingRad = (track.heading_deg - 90) * (Math.PI / 180);
-          const leaderLen = (track.speed_kts / 100) * scale * 0.8;
-          ctx.strokeStyle = hexWithAlpha(color, 0.5);
+          const projLen = Math.max((track.speed_kts / 60) * scale * 1.5, scale * 0.5);
+          ctx.strokeStyle = hexWithAlpha(color, 0.35);
           ctx.lineWidth = 1;
-          ctx.setLineDash([4, 3]);
+          ctx.setLineDash([6, 4]);
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(px + Math.cos(headingRad) * projLen, py + Math.sin(headingRad) * projLen);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // Speed leader (shorter solid)
+          const leaderLen = (track.speed_kts / 100) * scale * 0.5;
+          ctx.strokeStyle = hexWithAlpha(color, 0.7);
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
           ctx.moveTo(px, py);
           ctx.lineTo(px + Math.cos(headingRad) * leaderLen, py + Math.sin(headingRad) * leaderLen);
           ctx.stroke();
-          ctx.setLineDash([]);
         }
 
         // Selection ring
@@ -316,6 +390,15 @@ export default function TacticalMap({
         style={{ display: "block", cursor: "crosshair" }}
         onClick={handleClick}
       />
+      {/* Vignette overlay */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.35) 100%)",
+        }}
+      />
     </div>
   );
 }
@@ -350,7 +433,7 @@ function drawMilSymbol(
   affiliation: Affiliation,
   color: string,
 ) {
-  const s = 8; // half-size
+  const s = 11; // half-size (larger for visibility)
   ctx.fillStyle = `${color}33`;
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;

@@ -6,8 +6,8 @@ interface Props {
   onClose: () => void;
 }
 
-const CANVAS_W = 640;
-const CANVAS_H = 480;
+const CANVAS_W = 720;
+const CANVAS_H = 540;
 const RETICLE_COLOR = "#3fb95088";
 const HUD_COLOR_THERMAL = "#3fb950";
 const HUD_COLOR_DAYLIGHT = "#58a6ff";
