@@ -323,20 +323,44 @@ export default function App() {
   const handleScenarioSelect = async (
     selScenarioId: string,
     selBaseId: string,
+    customLocation?: { lat: number; lng: number; name: string },
   ) => {
     setScenarioId(selScenarioId);
     setBaseId(selBaseId);
 
-    // Fetch base template for the loadout screen limits
-    try {
-      const res = await fetch(`${API_BASE}/bases/${selBaseId}`);
-      const data = await res.json();
-      setBaseTemplate(data);
-      setMaxSensors(data.max_sensors);
-      setMaxEffectors(data.max_effectors);
-    } catch {
-      setMaxSensors(4);
-      setMaxEffectors(3);
+    if (customLocation) {
+      // Build a custom base template from Small FOB structure at the custom coordinates
+      try {
+        const res = await fetch(`${API_BASE}/bases/small_fob`);
+        const fobData = await res.json();
+        const customBase: BaseTemplate = {
+          ...fobData,
+          id: "custom_location",
+          name: `Custom: ${customLocation.name}`,
+          description: `Custom location at ${customLocation.lat.toFixed(4)}, ${customLocation.lng.toFixed(4)}`,
+          center_lat: customLocation.lat,
+          center_lng: customLocation.lng,
+          default_zoom: 15,
+        };
+        setBaseTemplate(customBase);
+        setMaxSensors(customBase.max_sensors);
+        setMaxEffectors(customBase.max_effectors);
+      } catch {
+        setMaxSensors(3);
+        setMaxEffectors(2);
+      }
+    } else {
+      // Fetch base template for the loadout screen limits
+      try {
+        const res = await fetch(`${API_BASE}/bases/${selBaseId}`);
+        const data = await res.json();
+        setBaseTemplate(data);
+        setMaxSensors(data.max_sensors);
+        setMaxEffectors(data.max_effectors);
+      } catch {
+        setMaxSensors(4);
+        setMaxEffectors(3);
+      }
     }
 
     setPhase("equip");

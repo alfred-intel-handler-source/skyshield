@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -234,6 +234,125 @@ function MapViewController({
     map.setView(center, zoom);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
+}
+
+// Map search control component — lives inside MapContainer to access useMap
+function MapSearchControl() {
+  const map = useMap();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ place_id: number; display_name: string; lat: string; lon: string }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<number>(0);
+
+  const doSearch = useCallback(async (q: string) => {
+    if (q.trim().length < 3) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
+        { headers: { "User-Agent": "SKYSHIELD-Training-Sim/1.0" } },
+      );
+      setResults(await res.json());
+    } catch { setResults([]); }
+    finally { setSearching(false); }
+  }, []);
+
+  const handleInput = useCallback((v: string) => {
+    setQuery(v);
+    window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => doSearch(v), 300);
+  }, [doSearch]);
+
+  if (!open) {
+    return (
+      <div
+        style={{
+          position: "absolute", bottom: 10, left: 10, zIndex: 1000,
+        }}
+        onClick={(e) => { e.stopPropagation(); L.DomEvent.disableClickPropagation(e.currentTarget); }}
+      >
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            padding: "5px 10px",
+            background: "rgba(13, 17, 23, 0.8)",
+            border: "1px solid #30363d",
+            borderRadius: 4,
+            color: "#8b949e",
+            fontSize: 10,
+            fontWeight: 600,
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: 1,
+            cursor: "pointer",
+          }}
+        >
+          &#128269; SEARCH LOCATION
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        position: "absolute", bottom: 10, left: 10, zIndex: 1000,
+        width: 280, background: "rgba(13, 17, 23, 0.92)", border: "1px solid #30363d",
+        borderRadius: 6, padding: 8,
+      }}
+      onClick={(e) => e.stopPropagation()}
+      ref={(el) => { if (el) L.DomEvent.disableClickPropagation(el); }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => handleInput(e.target.value)}
+          placeholder="Search location..."
+          autoFocus
+          style={{
+            flex: 1, padding: "6px 10px", background: "#0d1117",
+            border: "1px solid #30363d", borderRadius: 4, color: "#e6edf3",
+            fontSize: 12, fontFamily: "'Inter', sans-serif", outline: "none",
+          }}
+        />
+        <button
+          onClick={() => { setOpen(false); setQuery(""); setResults([]); }}
+          style={{
+            background: "none", border: "none", color: "#8b949e",
+            cursor: "pointer", fontSize: 14, padding: "2px 4px",
+          }}
+        >
+          &#10005;
+        </button>
+      </div>
+      {searching && <div style={{ fontSize: 10, color: "#8b949e", marginTop: 4 }}>Searching...</div>}
+      {results.length > 0 && (
+        <div style={{ marginTop: 4, maxHeight: 150, overflowY: "auto" }}>
+          {results.map((r) => (
+            <div
+              key={r.place_id}
+              onClick={() => {
+                map.setView([parseFloat(r.lat), parseFloat(r.lon)], map.getZoom());
+                setOpen(false);
+                setQuery("");
+                setResults([]);
+              }}
+              style={{
+                padding: "6px 8px", fontSize: 11, color: "#e6edf3",
+                cursor: "pointer", borderBottom: "1px solid #21262d",
+                lineHeight: 1.3,
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#161b22"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
+            >
+              {r.display_name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Generate FOV arc polygon points as lat/lng
@@ -1271,6 +1390,9 @@ export default function PlacementScreen({
                 weight: 0,
               }}
             />
+
+            {/* Location search control */}
+            <MapSearchControl />
           </MapContainer>
 
           {/* Range rings toggle */}
