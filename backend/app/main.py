@@ -16,6 +16,7 @@ from app.models import (
     BaseTemplate,
     CatalogEffector,
     CatalogSensor,
+    DroneStartConfig,
     DTIDPhase,
     Affiliation,
     DroneState,
@@ -242,12 +243,18 @@ async def game_websocket(ws: WebSocket):
             sensor_configs = list(scenario.sensors)
             effector_configs_list = list(scenario.effectors)
 
-        # Initialize drones
+        # Initialize drones (respecting spawn_delay)
         drones: list[DroneState] = []
         behaviors: dict[str, str] = {}
+        drone_configs: dict[str, DroneStartConfig] = {}
+        pending_spawns: list[DroneStartConfig] = []
         for drone_cfg in scenario.drones:
-            drones.append(create_drone(drone_cfg))
-            behaviors[drone_cfg.id] = drone_cfg.behavior
+            drone_configs[drone_cfg.id] = drone_cfg
+            if drone_cfg.spawn_delay <= 0:
+                drones.append(create_drone(drone_cfg))
+                behaviors[drone_cfg.id] = drone_cfg.behavior
+            else:
+                pending_spawns.append(drone_cfg)
 
         # Initialize effector state (mutable runtime state)
         effector_states: list[dict] = []
@@ -357,6 +364,21 @@ async def game_websocket(ws: WebSocket):
 
             events: list[dict] = []
 
+            # Spawn delayed drones
+            newly_spawned = []
+            for cfg in pending_spawns:
+                if elapsed >= cfg.spawn_delay:
+                    drones.append(create_drone(cfg))
+                    behaviors[cfg.id] = cfg.behavior
+                    newly_spawned.append(cfg)
+                    events.append({
+                        "type": "event",
+                        "timestamp": round(elapsed, 1),
+                        "message": f"RADAR: New contact emerging — {cfg.id.upper()}",
+                    })
+            for cfg in newly_spawned:
+                pending_spawns.remove(cfg)
+
             # Update effector recharge timers
             for eff_state in effector_states:
                 if eff_state["status"] == "recharging":
@@ -373,7 +395,16 @@ async def game_websocket(ws: WebSocket):
             # Update drones and run sensors
             for i, drone in enumerate(drones):
                 if not drone.neutralized:
-                    drones[i] = update_drone(drone, tick_rate, behaviors[drone.id])
+                    cfg = drone_configs[drone.id]
+                    drones[i] = update_drone(
+                        drone,
+                        tick_rate,
+                        behaviors[drone.id],
+                        waypoints=cfg.waypoints,
+                        orbit_radius=cfg.orbit_radius or 1.5,
+                        orbit_center=cfg.orbit_center,
+                        detected_by_player=drone.detected,
+                    )
 
                     # Check if drone reached base
                     if distance_to_base(drones[i]) < scenario.base_radius_km:
@@ -491,8 +522,8 @@ async def game_websocket(ws: WebSocket):
                 phase = GamePhase.DEBRIEF
                 break
 
-            # Check all drones defeated
-            if all(d.neutralized for d in drones):
+            # Check all drones defeated (only if no more pending spawns)
+            if not pending_spawns and drones and all(d.neutralized for d in drones):
                 phase = GamePhase.DEBRIEF
                 break
 
@@ -618,22 +649,43 @@ async def game_websocket(ws: WebSocket):
                 pass
 
         # -- Debrief --
-        primary_drone_id = drones[0].id if drones else ""
-        score = calculate_score(
-            scenario=scenario,
-            actions=actions,
-            detection_time=detection_times.get(primary_drone_id, 0.0),
-            confirm_time=confirm_times.get(primary_drone_id),
-            identify_time=identify_times.get(primary_drone_id),
-            engage_time=engage_times.get(primary_drone_id),
-            classification_given=classification_given.get(primary_drone_id),
-            affiliation_given=affiliation_given.get(primary_drone_id),
-            effector_used=effector_used.get(primary_drone_id),
-            drone_reached_base=drone_reached_base,
-            confidence_at_identify=confidence_at_identify.get(primary_drone_id, 0.0),
-            placement_config=placement_config,
-            base_template=base_template,
-        )
+        if len(drones) <= 1:
+            # Single-drone: use legacy scoring path
+            primary_drone_id = drones[0].id if drones else ""
+            score = calculate_score(
+                scenario=scenario,
+                actions=actions,
+                detection_time=detection_times.get(primary_drone_id, 0.0),
+                confirm_time=confirm_times.get(primary_drone_id),
+                identify_time=identify_times.get(primary_drone_id),
+                engage_time=engage_times.get(primary_drone_id),
+                classification_given=classification_given.get(primary_drone_id),
+                affiliation_given=affiliation_given.get(primary_drone_id),
+                effector_used=effector_used.get(primary_drone_id),
+                drone_reached_base=drone_reached_base,
+                confidence_at_identify=confidence_at_identify.get(primary_drone_id, 0.0),
+                placement_config=placement_config,
+                base_template=base_template,
+            )
+        else:
+            # Multi-drone: score each independently and average
+            from app.scoring import calculate_multi_track_score
+            score = calculate_multi_track_score(
+                scenario=scenario,
+                drone_configs=drone_configs,
+                actions=actions,
+                detection_times=detection_times,
+                confirm_times=confirm_times,
+                identify_times=identify_times,
+                engage_times=engage_times,
+                classifications_given=classification_given,
+                affiliations_given=affiliation_given,
+                effectors_used=effector_used,
+                confidences_at_identify=confidence_at_identify,
+                drone_reached_base=drone_reached_base,
+                placement_config=placement_config,
+                base_template=base_template,
+            )
 
         await ws.send_json({
             "type": "debrief",

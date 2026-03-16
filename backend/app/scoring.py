@@ -6,6 +6,7 @@ import math
 
 from app.models import (
     BaseTemplate,
+    DroneStartConfig,
     PlacementConfig,
     PlayerAction,
     ScenarioConfig,
@@ -294,6 +295,183 @@ def calculate_placement_score(
     )
 
     return round(total, 1), details
+
+
+def calculate_multi_track_score(
+    scenario: ScenarioConfig,
+    drone_configs: dict[str, DroneStartConfig],
+    actions: list[PlayerAction],
+    detection_times: dict[str, float],
+    confirm_times: dict[str, float],
+    identify_times: dict[str, float],
+    engage_times: dict[str, float],
+    classifications_given: dict[str, str],
+    affiliations_given: dict[str, str],
+    effectors_used: dict[str, str],
+    confidences_at_identify: dict[str, float],
+    drone_reached_base: bool,
+    placement_config: PlacementConfig | None = None,
+    base_template: BaseTemplate | None = None,
+) -> ScoreBreakdown:
+    """Score each drone independently, then average across all drones equally."""
+    per_drone_scores: list[dict[str, float]] = []
+    all_details: dict[str, str] = {}
+
+    for drone_id, cfg in drone_configs.items():
+        # Resolve per-drone scoring params (fall back to scenario defaults)
+        correct_class = cfg.correct_classification or scenario.correct_classification.value
+        correct_affil = cfg.correct_affiliation or scenario.correct_affiliation.value
+        optimal = cfg.optimal_effectors if cfg.optimal_effectors is not None else scenario.optimal_effectors
+        acceptable = cfg.acceptable_effectors if cfg.acceptable_effectors is not None else scenario.acceptable_effectors
+        roe_viol = cfg.roe_violations if cfg.roe_violations is not None else scenario.roe_violations
+        should_engage = cfg.should_engage
+
+        # Filter actions for this drone
+        drone_actions = [a for a in actions if a.target_id == drone_id]
+
+        # --- Detection Response (20%) ---
+        det_time = detection_times.get(drone_id)
+        conf_time = confirm_times.get(drone_id)
+        if conf_time is not None and det_time is not None:
+            delay = conf_time - det_time
+            if delay <= 5.0:
+                det_score = 100.0
+            elif delay <= 10.0:
+                det_score = 80.0
+            elif delay <= 20.0:
+                det_score = 50.0
+            else:
+                det_score = 20.0
+        else:
+            det_score = 0.0
+
+        # --- Tracking (15%) ---
+        id_time = identify_times.get(drone_id)
+        if id_time is not None and conf_time is not None:
+            tracking_dur = id_time - conf_time
+            conf_val = confidences_at_identify.get(drone_id, 0.0)
+            if conf_val >= 0.7 and tracking_dur >= 3.0:
+                track_score = 100.0
+            elif conf_val >= 0.5:
+                track_score = 70.0
+            elif tracking_dur < 2.0:
+                track_score = 30.0
+            else:
+                track_score = 50.0
+        elif conf_time is not None:
+            track_score = 20.0
+        else:
+            track_score = 0.0
+
+        # --- Identification (25%) ---
+        class_given = classifications_given.get(drone_id)
+        affil_given = affiliations_given.get(drone_id)
+        if class_given is not None and affil_given is not None:
+            class_ok = class_given == correct_class
+            affil_ok = affil_given == correct_affil
+            if class_ok and affil_ok:
+                id_score = 100.0
+            elif class_ok:
+                id_score = 60.0
+            elif affil_ok:
+                id_score = 40.0
+            else:
+                id_score = 0.0
+        elif class_given is not None:
+            id_score = 30.0
+        else:
+            id_score = 0.0
+
+        # --- Defeat Method (25%) ---
+        eff_used = effectors_used.get(drone_id)
+        if not should_engage:
+            # Bird/false positive: NOT engaging is correct
+            if eff_used is None:
+                defeat_score = 100.0
+                all_details[f"{drone_id}_defeat"] = "Correctly did not engage (false positive)"
+            else:
+                defeat_score = 0.0
+                all_details[f"{drone_id}_defeat"] = "Engaged a non-threat — incorrect"
+        elif eff_used is not None:
+            if eff_used in optimal:
+                defeat_score = 100.0
+            elif eff_used in acceptable:
+                defeat_score = 70.0
+            else:
+                defeat_score = 30.0
+        else:
+            defeat_score = 0.0 if drone_reached_base else 10.0
+
+        # --- ROE Compliance (15%) ---
+        engage_acts = [a for a in drone_actions if a.action == "engage"]
+        roe_found = []
+        for a in engage_acts:
+            if a.effector and a.effector in roe_viol:
+                roe_found.append(a.effector)
+        # Engaging a bird/false positive is also an ROE penalty
+        if not should_engage and eff_used is not None:
+            roe_score = 0.0
+            all_details[f"{drone_id}_roe"] = "ROE violation: engaged non-threat"
+        elif roe_found:
+            roe_score = 0.0
+        else:
+            roe_score = 100.0
+
+        per_drone_scores.append({
+            "detection": det_score,
+            "tracking": track_score,
+            "identification": id_score,
+            "defeat": defeat_score,
+            "roe": roe_score,
+        })
+
+    # Average across all drones equally
+    n = len(per_drone_scores) or 1
+    avg_det = sum(s["detection"] for s in per_drone_scores) / n
+    avg_track = sum(s["tracking"] for s in per_drone_scores) / n
+    avg_id = sum(s["identification"] for s in per_drone_scores) / n
+    avg_defeat = sum(s["defeat"] for s in per_drone_scores) / n
+    avg_roe = sum(s["roe"] for s in per_drone_scores) / n
+
+    total = (
+        avg_det * 0.20
+        + avg_track * 0.15
+        + avg_id * 0.25
+        + avg_defeat * 0.25
+        + avg_roe * 0.15
+    )
+
+    grade = _total_to_grade(total)
+
+    details = {
+        "detection_response": f"Average across {n} tracks: {avg_det:.0f}",
+        "tracking": f"Average across {n} tracks: {avg_track:.0f}",
+        "identification": f"Average across {n} tracks: {avg_id:.0f}",
+        "defeat": f"Average across {n} tracks: {avg_defeat:.0f}",
+        "roe": f"Average across {n} tracks: {avg_roe:.0f}",
+    }
+    details.update(all_details)
+
+    # Placement scoring
+    placement_score_val = None
+    placement_details_val = None
+    if placement_config is not None and base_template is not None:
+        placement_score_val, placement_details_val = calculate_placement_score(
+            placement_config, base_template
+        )
+
+    return ScoreBreakdown(
+        detection_response_score=round(avg_det, 1),
+        tracking_score=round(avg_track, 1),
+        identification_score=round(avg_id, 1),
+        defeat_score=round(avg_defeat, 1),
+        roe_score=round(avg_roe, 1),
+        total_score=round(total, 1),
+        grade=grade,
+        details=details,
+        placement_score=placement_score_val,
+        placement_details=placement_details_val,
+    )
 
 
 def _total_to_grade(total: float) -> str:
