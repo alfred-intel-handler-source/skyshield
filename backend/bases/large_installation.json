@@ -3,6 +3,9 @@
   "name": "Large Installation",
   "description": "Major military installation with multiple protected assets and a wide perimeter. Complex terrain requires careful sensor placement.",
   "size": "large",
+  "center_lat": 34.0,
+  "center_lng": 43.0,
+  "default_zoom": 13,
   "boundary": [
     [-1.2, -0.8], [-1.2, 0.8], [1.2, 0.8], [1.2, -0.8]
   ],

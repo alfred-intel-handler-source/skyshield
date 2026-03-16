@@ -1,13 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Circle,
+  Polygon,
+  Polyline,
+  Marker,
+  useMap,
+  useMapEvents,
+  ScaleControl,
+  LayersControl,
+} from "react-leaflet";
+import L from "leaflet";
 import type {
   BaseTemplate,
   CatalogSensor,
   CatalogEffector,
   PlacedEquipment,
   PlacementConfig,
-  TerrainFeature,
-  ProtectedAsset,
 } from "../types";
+import {
+  gameXYToLatLng,
+  latLngToGameXY,
+  gamePolygonToLatLng,
+  getBaseCenter,
+} from "../utils/coordinates";
+
+import "leaflet/dist/leaflet.css";
 
 interface Props {
   baseTemplate: BaseTemplate;
@@ -20,7 +39,7 @@ interface Props {
 interface PlacedItem {
   equipment: PlacedEquipment;
   kind: "sensor" | "effector";
-  catalogIndex: number; // index into selectedSensors or selectedEffectors
+  catalogIndex: number;
 }
 
 type PaletteItem = {
@@ -70,6 +89,171 @@ function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
+function polygonCentroid(points: number[][]): [number, number] {
+  let cx = 0;
+  let cy = 0;
+  for (const p of points) {
+    cx += p[0];
+    cy += p[1];
+  }
+  return [cx / points.length, cy / points.length];
+}
+
+// Create sensor icon (circle with type letter)
+function createSensorIcon(
+  type: string,
+  isSelected: boolean,
+): L.DivIcon {
+  const letter = SENSOR_TYPE_LETTERS[type] || "?";
+  const color = isSelected ? "#58a6ff" : "#58a6ffbb";
+  const svg = `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="10" fill="${color}" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="12" y="12" text-anchor="middle" dominant-baseline="central" fill="#0d1117" font-size="11" font-weight="700" font-family="monospace">${letter}</text>
+    ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="#ffffff88" stroke-width="2" stroke-dasharray="4,4"/>` : ""}
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+// Create effector icon (diamond with first letter)
+function createEffectorIcon(
+  name: string,
+  isSelected: boolean,
+): L.DivIcon {
+  const letter = name.charAt(0).toUpperCase();
+  const color = isSelected ? "#f85149" : "#f85149bb";
+  const svg = `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="12,2 22,12 12,22 2,12" fill="${color}" stroke="#f85149" stroke-width="1.5"/>
+    <text x="12" y="12" text-anchor="middle" dominant-baseline="central" fill="#0d1117" font-size="10" font-weight="700" font-family="monospace">${letter}</text>
+    ${isSelected ? `<circle cx="12" cy="12" r="14" fill="none" stroke="#ffffff88" stroke-width="2" stroke-dasharray="4,4"/>` : ""}
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+// Create protected asset icon (star)
+function createAssetIcon(
+  priority: number,
+  name: string,
+): L.DivIcon {
+  const color = PRIORITY_COLORS[priority] || COLORS.muted;
+  const html = `<div style="text-align:center;white-space:nowrap;">
+    <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="8,1 9.8,5.8 15,6 11,9.5 12.5,15 8,11.5 3.5,15 5,9.5 1,6 6.2,5.8" fill="${color}" stroke="${color}" stroke-width="0.5"/>
+    </svg>
+    <div style="font:500 9px 'Inter',sans-serif;color:${color};margin-top:1px;">${name}</div>
+    <div style="position:absolute;top:-4px;right:-8px;width:12px;height:12px;border-radius:50%;background:${color};font:600 7px 'JetBrains Mono',monospace;color:#0d1117;display:flex;align-items:center;justify-content:center;">${priority}</div>
+  </div>`;
+  return L.divIcon({
+    html,
+    className: "",
+    iconSize: [60, 32],
+    iconAnchor: [30, 8],
+  });
+}
+
+// Create terrain label
+function createTerrainLabel(name: string): L.DivIcon {
+  const html = `<span style="font:400 9px 'Inter',sans-serif;color:${COLORS.muted};white-space:nowrap;pointer-events:none;">${name}</span>`;
+  return L.divIcon({
+    html,
+    className: "",
+    iconSize: [80, 14],
+    iconAnchor: [40, 7],
+  });
+}
+
+// Create item name label
+function createItemLabel(name: string, isSensor: boolean): L.DivIcon {
+  const color = isSensor ? "#58a6ff" : "#f85149";
+  const html = `<span style="font:500 9px 'Inter',sans-serif;color:${color};white-space:nowrap;pointer-events:none;">${name}</span>`;
+  return L.divIcon({
+    html,
+    className: "",
+    iconSize: [80, 14],
+    iconAnchor: [40, -8],
+  });
+}
+
+// Map click handler for placement
+function MapPlacementClickHandler({
+  onMapClick,
+}: {
+  onMapClick: (lat: number, lng: number) => void;
+}) {
+  useMapEvents({
+    click: (e) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+// Set view on mount
+function MapViewController({
+  center,
+  zoom,
+}: {
+  center: [number, number];
+  zoom: number;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+// Generate FOV arc polygon points as lat/lng
+function generateFovArc(
+  centerX: number,
+  centerY: number,
+  rangeKm: number,
+  facingDeg: number,
+  fovDeg: number,
+  baseLat: number,
+  baseLng: number,
+  segments: number = 32,
+): [number, number][] {
+  const points: [number, number][] = [];
+  // Center point
+  points.push(gameXYToLatLng(centerX, centerY, baseLat, baseLng));
+
+  if (fovDeg >= 360) {
+    // Full circle
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * 2 * Math.PI;
+      const px = centerX + Math.cos(angle) * rangeKm;
+      const py = centerY + Math.sin(angle) * rangeKm;
+      points.push(gameXYToLatLng(px, py, baseLat, baseLng));
+    }
+  } else {
+    // Arc: facing_deg is compass bearing (0=N, 90=E)
+    // Convert to math angle: math_angle = 90 - compass_bearing
+    const facingRad = degToRad(90 - facingDeg);
+    const halfFov = degToRad(fovDeg / 2);
+    const startAngle = facingRad - halfFov;
+    const endAngle = facingRad + halfFov;
+
+    for (let i = 0; i <= segments; i++) {
+      const angle = startAngle + (i / segments) * (endAngle - startAngle);
+      const px = centerX + Math.cos(angle) * rangeKm;
+      const py = centerY + Math.sin(angle) * rangeKm;
+      points.push(gameXYToLatLng(px, py, baseLat, baseLng));
+    }
+  }
+
+  return points;
+}
+
 export default function PlacementScreen({
   baseTemplate,
   selectedSensors,
@@ -77,15 +261,22 @@ export default function PlacementScreen({
   onConfirm,
   onBack,
 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sizeRef = useRef({ w: 800, h: 600 });
-  const scaleRef = useRef(100); // px per km
-
   const [placedItems, setPlacedItems] = useState<PlacedItem[]>([]);
-  const [selectedPalette, setSelectedPalette] = useState<number | null>(null); // index into paletteItems
-  const [selectedPlaced, setSelectedPlaced] = useState<number | null>(null); // index into placedItems
+  const [selectedPalette, setSelectedPalette] = useState<number | null>(null);
+  const [selectedPlaced, setSelectedPlaced] = useState<number | null>(null);
   const [facingDeg, setFacingDeg] = useState(0);
+
+  const { lat: baseLat, lng: baseLng } = getBaseCenter(baseTemplate);
+  const baseCenter: [number, number] = [baseLat, baseLng];
+
+  // Compute zoom level based on placement bounds
+  const zoom = useMemo(() => {
+    const bounds = baseTemplate.placement_bounds_km;
+    if (bounds <= 0.4) return 16;
+    if (bounds <= 0.9) return 15;
+    if (bounds <= 1.5) return 14;
+    return 13;
+  }, [baseTemplate.placement_bounds_km]);
 
   // Build palette list
   const paletteItems: PaletteItem[] = [
@@ -103,11 +294,11 @@ export default function PlacementScreen({
 
   // Track which palette items are placed
   const placedSet = new Set(
-    placedItems.map((p) => `${p.kind}-${p.catalogIndex}`)
+    placedItems.map((p) => `${p.kind}-${p.catalogIndex}`),
   );
 
   const allPlaced = paletteItems.every((pi) =>
-    placedSet.has(`${pi.kind}-${pi.index}`)
+    placedSet.has(`${pi.kind}-${pi.index}`),
   );
 
   // When selecting a placed item, sync facing slider
@@ -129,35 +320,12 @@ export default function PlacementScreen({
                   ...item,
                   equipment: { ...item.equipment, facing_deg: newFacing },
                 }
-              : item
-          )
+              : item,
+          ),
         );
       }
     },
-    [selectedPlaced]
-  );
-
-  // Coordinate conversion helpers
-  const worldToCanvas = useCallback(
-    (wx: number, wy: number): [number, number] => {
-      const { w, h } = sizeRef.current;
-      const scale = scaleRef.current;
-      const cx = w / 2;
-      const cy = h / 2;
-      return [cx + wx * scale, cy - wy * scale];
-    },
-    []
-  );
-
-  const canvasToWorld = useCallback(
-    (px: number, py: number): [number, number] => {
-      const { w, h } = sizeRef.current;
-      const scale = scaleRef.current;
-      const cx = w / 2;
-      const cy = h / 2;
-      return [(px - cx) / scale, (cy - py) / scale];
-    },
-    []
+    [selectedPlaced],
   );
 
   // Get catalog data for a placed item
@@ -167,41 +335,21 @@ export default function PlacementScreen({
         ? selectedSensors[item.catalogIndex]
         : selectedEffectors[item.catalogIndex];
     },
-    [selectedSensors, selectedEffectors]
+    [selectedSensors, selectedEffectors],
   );
 
-  // Canvas click handler
-  const handleCanvasClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      const [wx, wy] = canvasToWorld(clickX, clickY);
-
-      // Check if clicking on an existing placed item
-      const scale = scaleRef.current;
-      for (let i = 0; i < placedItems.length; i++) {
-        const item = placedItems[i];
-        const [ix, iy] = worldToCanvas(item.equipment.x, item.equipment.y);
-        const dist = Math.sqrt((clickX - ix) ** 2 + (clickY - iy) ** 2);
-        if (dist < 16) {
-          setSelectedPlaced(i);
-          setSelectedPalette(null);
-          return;
-        }
-      }
+  // Map click handler — places equipment
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      const { x: wx, y: wy } = latLngToGameXY(lat, lng, baseLat, baseLng);
 
       // If a palette item is selected, place it
       if (selectedPalette !== null) {
         const pi = paletteItems[selectedPalette];
         const key = `${pi.kind}-${pi.index}`;
 
-        // If already placed, reposition
         const existingIdx = placedItems.findIndex(
-          (p) => `${p.kind}-${p.catalogIndex}` === key
+          (p) => `${p.kind}-${p.catalogIndex}` === key,
         );
 
         const newEquipment: PlacedEquipment = {
@@ -214,10 +362,8 @@ export default function PlacementScreen({
         if (existingIdx >= 0) {
           setPlacedItems((prev) =>
             prev.map((item, i) =>
-              i === existingIdx
-                ? { ...item, equipment: newEquipment }
-                : item
-            )
+              i === existingIdx ? { ...item, equipment: newEquipment } : item,
+            ),
           );
         } else {
           setPlacedItems((prev) => [
@@ -232,94 +378,11 @@ export default function PlacementScreen({
         setSelectedPalette(null);
         setSelectedPlaced(null);
       } else {
-        // Deselect
         setSelectedPlaced(null);
       }
     },
-    [
-      canvasToWorld,
-      worldToCanvas,
-      placedItems,
-      selectedPalette,
-      paletteItems,
-      facingDeg,
-    ]
+    [placedItems, selectedPalette, paletteItems, facingDeg, baseLat, baseLng],
   );
-
-  // Right-click / double-click to remove
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      for (let i = 0; i < placedItems.length; i++) {
-        const item = placedItems[i];
-        const [ix, iy] = worldToCanvas(item.equipment.x, item.equipment.y);
-        const dist = Math.sqrt((clickX - ix) ** 2 + (clickY - iy) ** 2);
-        if (dist < 16) {
-          setPlacedItems((prev) => prev.filter((_, idx) => idx !== i));
-          if (selectedPlaced === i) setSelectedPlaced(null);
-          else if (selectedPlaced !== null && selectedPlaced > i)
-            setSelectedPlaced(selectedPlaced - 1);
-          return;
-        }
-      }
-    },
-    [placedItems, worldToCanvas, selectedPlaced]
-  );
-
-  const handleDoubleClick = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      for (let i = 0; i < placedItems.length; i++) {
-        const item = placedItems[i];
-        const [ix, iy] = worldToCanvas(item.equipment.x, item.equipment.y);
-        const dist = Math.sqrt((clickX - ix) ** 2 + (clickY - iy) ** 2);
-        if (dist < 16) {
-          setPlacedItems((prev) => prev.filter((_, idx) => idx !== i));
-          if (selectedPlaced === i) setSelectedPlaced(null);
-          else if (selectedPlaced !== null && selectedPlaced > i)
-            setSelectedPlaced(selectedPlaced - 1);
-          return;
-        }
-      }
-    },
-    [placedItems, worldToCanvas, selectedPlaced]
-  );
-
-  // ResizeObserver for canvas
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        sizeRef.current = { w: width, h: height };
-        const canvas = canvasRef.current;
-        if (canvas) {
-          canvas.width = width * devicePixelRatio;
-          canvas.height = height * devicePixelRatio;
-          canvas.style.width = `${width}px`;
-          canvas.style.height = `${height}px`;
-        }
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
 
   // Coverage analysis for right sidebar
   const computeCoverage = useCallback(() => {
@@ -328,7 +391,6 @@ export default function PlacementScreen({
       const bearingRad = degToRad(corridor.bearing_deg);
       const halfWidth = degToRad(corridor.width_deg / 2);
 
-      // Check which placed sensors cover this corridor bearing
       const coveringSensors: string[] = [];
       for (const item of placedItems) {
         if (item.kind !== "sensor") continue;
@@ -336,17 +398,14 @@ export default function PlacementScreen({
         const eq = item.equipment;
 
         if (cat.fov_deg >= 360) {
-          // Omnidirectional — covers all corridors within range
           coveringSensors.push(cat.name);
           continue;
         }
 
-        // Check if the corridor bearing falls within this sensor's FOV arc
         const facingRad = degToRad(eq.facing_deg);
         const halfFov = degToRad(cat.fov_deg / 2);
 
         let angleDiff = bearingRad - facingRad;
-        // Normalize to [-PI, PI]
         while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
         while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
@@ -366,402 +425,11 @@ export default function PlacementScreen({
 
   const coverage = computeCoverage();
 
-  // Compute coverage percentage and weakest corridor
   const coveredCount = coverage.filter((c) => c.covered).length;
   const coveragePct =
     coverage.length > 0
       ? Math.round((coveredCount / coverage.length) * 100)
       : 0;
-
-  // Find weakest corridor (fewest covering sensors, among those with least coverage)
-  const weakestCorridor = (() => {
-    if (coverage.length === 0) return null;
-    let weakest = coverage[0];
-    for (const c of coverage) {
-      if (c.sensors.length < weakest.sensors.length) {
-        weakest = c;
-      }
-    }
-    // Only highlight if coverage is incomplete (at least one gap)
-    return weakest.sensors.length === 0 ? weakest : null;
-  })();
-
-  // Canvas render
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let running = true;
-
-    function draw() {
-      if (!running || !ctx || !canvas) return;
-
-      const dpr = devicePixelRatio;
-      const { w, h } = sizeRef.current;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const cx = w / 2;
-      const cy = h / 2;
-
-      // Compute scale from placement_bounds_km
-      const boundsKm = baseTemplate.placement_bounds_km;
-      const minDim = Math.min(w, h);
-      const scale = (minDim * 0.4) / boundsKm;
-      scaleRef.current = scale;
-
-      // --- Background ---
-      ctx.fillStyle = COLORS.bg;
-      ctx.fillRect(0, 0, w, h);
-
-      // --- Grid at 0.1km ---
-      const gridSpacingKm = 0.1;
-      const gridPx = gridSpacingKm * scale;
-      ctx.strokeStyle = COLORS.grid;
-      ctx.lineWidth = 0.5;
-      if (gridPx > 8) {
-        // Only draw if grid lines are reasonably spaced
-        for (let gx = cx % gridPx; gx < w; gx += gridPx) {
-          ctx.beginPath();
-          ctx.moveTo(gx, 0);
-          ctx.lineTo(gx, h);
-          ctx.stroke();
-        }
-        for (let gy = cy % gridPx; gy < h; gy += gridPx) {
-          ctx.beginPath();
-          ctx.moveTo(0, gy);
-          ctx.lineTo(w, gy);
-          ctx.stroke();
-        }
-      }
-
-      // --- Base boundary polygon (dashed white) ---
-      const boundary = baseTemplate.boundary;
-      if (boundary.length > 0) {
-        ctx.strokeStyle = "#ffffff88";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([8, 4]);
-        ctx.beginPath();
-        const [bx0, by0] = [
-          cx + boundary[0][0] * scale,
-          cy - boundary[0][1] * scale,
-        ];
-        ctx.moveTo(bx0, by0);
-        for (let i = 1; i < boundary.length; i++) {
-          ctx.lineTo(
-            cx + boundary[i][0] * scale,
-            cy - boundary[i][1] * scale
-          );
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      // --- Terrain features ---
-      for (const terrain of baseTemplate.terrain) {
-        const style = TERRAIN_STYLES[terrain.type] || TERRAIN_STYLES.building;
-        ctx.fillStyle = style.fill;
-        ctx.strokeStyle = style.stroke;
-        ctx.lineWidth = 1;
-
-        if (terrain.polygon.length > 0) {
-          ctx.beginPath();
-          ctx.moveTo(
-            cx + terrain.polygon[0][0] * scale,
-            cy - terrain.polygon[0][1] * scale
-          );
-          for (let i = 1; i < terrain.polygon.length; i++) {
-            ctx.lineTo(
-              cx + terrain.polygon[i][0] * scale,
-              cy - terrain.polygon[i][1] * scale
-            );
-          }
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          // Label
-          const centroid = polygonCentroid(terrain.polygon);
-          ctx.font = "400 9px 'Inter', sans-serif";
-          ctx.fillStyle = COLORS.muted;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(
-            terrain.name,
-            cx + centroid[0] * scale,
-            cy - centroid[1] * scale
-          );
-        }
-      }
-
-      // --- Protected assets ---
-      for (const asset of baseTemplate.protected_assets) {
-        const ax = cx + asset.x * scale;
-        const ay = cy - asset.y * scale;
-        const color = PRIORITY_COLORS[asset.priority] || COLORS.muted;
-
-        // Star marker
-        drawStar(ctx, ax, ay, 6, 3, color);
-
-        // Label
-        ctx.font = "500 9px 'Inter', sans-serif";
-        ctx.fillStyle = color;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(asset.name, ax, ay + 10);
-
-        // Priority badge
-        ctx.font = "600 7px 'JetBrains Mono', monospace";
-        ctx.fillStyle = COLORS.bg;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.beginPath();
-        ctx.arc(ax + 8, ay - 6, 5, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.fillStyle = COLORS.bg;
-        ctx.fillText(`${asset.priority}`, ax + 8, ay - 6);
-      }
-
-      // --- Approach corridors ---
-      for (const corridor of baseTemplate.approach_corridors) {
-        const bearingRad = degToRad(90 - corridor.bearing_deg); // convert to math angle (0=east, CCW)
-        const corridorLen = boundsKm * scale * 1.2;
-
-        ctx.strokeStyle = "#484f5866";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 6]);
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(
-          cx + Math.cos(bearingRad) * corridorLen,
-          cy - Math.sin(bearingRad) * corridorLen
-        );
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Label at edge
-        const labelDist = corridorLen * 0.85;
-        ctx.font = "500 9px 'Inter', sans-serif";
-        ctx.fillStyle = "#484f58";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(
-          corridor.name,
-          cx + Math.cos(bearingRad) * labelDist,
-          cy - Math.sin(bearingRad) * labelDist
-        );
-      }
-
-      // --- Coverage overlay ---
-      // Draw coverage arcs for placed sensors
-      for (const item of placedItems) {
-        if (item.kind !== "sensor") continue;
-        const cat = selectedSensors[item.catalogIndex];
-        const eq = item.equipment;
-        const ix = cx + eq.x * scale;
-        const iy = cy - eq.y * scale;
-        const rangeR = cat.range_km * scale;
-
-        ctx.fillStyle = COLORS.coverageOverlay;
-        ctx.beginPath();
-        if (cat.fov_deg >= 360) {
-          ctx.arc(ix, iy, rangeR, 0, Math.PI * 2);
-        } else {
-          const facingRad = degToRad(90 - eq.facing_deg);
-          const halfFov = degToRad(cat.fov_deg / 2);
-          ctx.moveTo(ix, iy);
-          ctx.arc(ix, iy, rangeR, -facingRad - halfFov, -facingRad + halfFov);
-          ctx.closePath();
-        }
-        ctx.fill();
-      }
-
-      // --- Placed items: range rings and icons ---
-      for (let pi = 0; pi < placedItems.length; pi++) {
-        const item = placedItems[pi];
-        const cat = getCatalog(item);
-        const eq = item.equipment;
-        const ix = cx + eq.x * scale;
-        const iy = cy - eq.y * scale;
-        const rangeR = cat.range_km * scale;
-        const isSelected = selectedPlaced === pi;
-        const isSensor = item.kind === "sensor";
-        const rangeColor = isSensor ? COLORS.sensorRange : COLORS.effectorRange;
-
-        // Range ring / arc
-        ctx.strokeStyle = rangeColor;
-        ctx.lineWidth = isSelected ? 2 : 1;
-        ctx.beginPath();
-        if (cat.fov_deg >= 360) {
-          ctx.arc(ix, iy, rangeR, 0, Math.PI * 2);
-        } else {
-          const facingRad = degToRad(90 - eq.facing_deg);
-          const halfFov = degToRad(cat.fov_deg / 2);
-          ctx.moveTo(ix, iy);
-          ctx.arc(ix, iy, rangeR, -facingRad - halfFov, -facingRad + halfFov);
-          ctx.closePath();
-        }
-        ctx.stroke();
-
-        // FOV cone fill for limited FOV
-        if (cat.fov_deg < 360) {
-          ctx.fillStyle = rangeColor;
-          ctx.beginPath();
-          const facingRad = degToRad(90 - eq.facing_deg);
-          const halfFov = degToRad(cat.fov_deg / 2);
-          ctx.moveTo(ix, iy);
-          ctx.arc(ix, iy, rangeR, -facingRad - halfFov, -facingRad + halfFov);
-          ctx.closePath();
-          ctx.fill();
-        }
-
-        // Selection highlight
-        if (isSelected) {
-          ctx.strokeStyle = "#ffffff88";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.arc(ix, iy, 18, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-
-        // Icon
-        const iconSize = 10;
-        if (isSensor) {
-          // Circle with type letter
-          ctx.fillStyle = isSelected ? "#58a6ff" : "#58a6ffbb";
-          ctx.strokeStyle = "#58a6ff";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(ix, iy, iconSize, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          const letter =
-            SENSOR_TYPE_LETTERS[(cat as CatalogSensor).type] || "?";
-          ctx.font = "700 10px 'JetBrains Mono', monospace";
-          ctx.fillStyle = COLORS.bg;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(letter, ix, iy);
-        } else {
-          // Diamond with first letter
-          ctx.fillStyle = isSelected ? "#f85149" : "#f85149bb";
-          ctx.strokeStyle = "#f85149";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(ix, iy - iconSize);
-          ctx.lineTo(ix + iconSize, iy);
-          ctx.lineTo(ix, iy + iconSize);
-          ctx.lineTo(ix - iconSize, iy);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          const letter = cat.name.charAt(0).toUpperCase();
-          ctx.font = "700 9px 'JetBrains Mono', monospace";
-          ctx.fillStyle = COLORS.bg;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(letter, ix, iy);
-        }
-
-        // Name label
-        ctx.font = "500 9px 'Inter', sans-serif";
-        ctx.fillStyle = isSensor ? "#58a6ff" : "#f85149";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(cat.name, ix, iy + iconSize + 4);
-      }
-
-      // --- Base center marker ---
-      ctx.fillStyle = COLORS.accent;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      // --- Scale bar ---
-      const scaleBarKm = boundsKm > 1 ? 1 : 0.5;
-      const scaleBarLen = scaleBarKm * scale;
-      ctx.strokeStyle = COLORS.muted;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(16, h - 24);
-      ctx.lineTo(16 + scaleBarLen, h - 24);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(16, h - 28);
-      ctx.lineTo(16, h - 20);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(16 + scaleBarLen, h - 28);
-      ctx.lineTo(16 + scaleBarLen, h - 20);
-      ctx.stroke();
-
-      ctx.font = "400 10px 'JetBrains Mono', monospace";
-      ctx.fillStyle = COLORS.muted;
-      ctx.textAlign = "center";
-      ctx.fillText(
-        scaleBarKm >= 1 ? `${scaleBarKm} km` : `${scaleBarKm * 1000} m`,
-        16 + scaleBarLen / 2,
-        h - 10
-      );
-
-      // --- Weakest sector pulsing arc ---
-      if (weakestCorridor) {
-        const pulse = (Math.sin(Date.now() / 400) + 1) / 2; // 0..1 pulsing
-        const alpha = 0.15 + pulse * 0.45;
-        const bearingRadW = degToRad(90 - weakestCorridor.bearing_deg);
-        const corridorW = baseTemplate.approach_corridors.find(
-          (c) => c.name === weakestCorridor.name
-        );
-        const halfW = corridorW
-          ? degToRad(corridorW.width_deg / 2)
-          : degToRad(15);
-        const arcRadius = boundsKm * scale * 0.9;
-
-        ctx.save();
-        ctx.strokeStyle = `rgba(248, 81, 73, ${alpha})`;
-        ctx.fillStyle = `rgba(248, 81, 73, ${alpha * 0.3})`;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(
-          cx,
-          cy,
-          arcRadius,
-          -bearingRadW - halfW,
-          -bearingRadW + halfW
-        );
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // --- Compass ---
-      ctx.font = "500 10px 'Inter', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#484f58";
-      ctx.fillText("N", cx, 14);
-      ctx.fillText("S", cx, h - 14);
-      ctx.fillText("E", w - 14, cy);
-      ctx.fillText("W", 14, cy);
-
-      requestAnimationFrame(draw);
-    }
-
-    const frameId = requestAnimationFrame(draw);
-    return () => {
-      running = false;
-      cancelAnimationFrame(frameId);
-    };
-  }, [baseTemplate, placedItems, selectedPlaced, selectedSensors, selectedEffectors, getCatalog, weakestCorridor]);
 
   // Build PlacementConfig and confirm
   const handleConfirm = useCallback(() => {
@@ -788,6 +456,43 @@ export default function PlacementScreen({
             catalog: getCatalog(placedItems[selectedPlaced]),
           }
         : null;
+
+  // Approach corridor lines
+  const corridorLines = useMemo(() => {
+    const boundsKm = baseTemplate.placement_bounds_km * 1.2;
+    return baseTemplate.approach_corridors.map((corridor) => {
+      const bearingRad = degToRad(90 - corridor.bearing_deg);
+      const endX = Math.cos(bearingRad) * boundsKm;
+      const endY = Math.sin(bearingRad) * boundsKm;
+      const end = gameXYToLatLng(endX, endY, baseLat, baseLng);
+      const labelDist = boundsKm * 0.85;
+      const labelX = Math.cos(bearingRad) * labelDist;
+      const labelY = Math.sin(bearingRad) * labelDist;
+      const labelPos = gameXYToLatLng(labelX, labelY, baseLat, baseLng);
+      return { corridor, end, labelPos };
+    });
+  }, [baseTemplate, baseLat, baseLng]);
+
+  // Terrain polygons as lat/lng
+  const terrainPolygons = useMemo(
+    () =>
+      baseTemplate.terrain.map((t) => ({
+        terrain: t,
+        positions: gamePolygonToLatLng(t.polygon, baseLat, baseLng),
+        centroid: gameXYToLatLng(
+          ...polygonCentroid(t.polygon),
+          baseLat,
+          baseLng,
+        ),
+      })),
+    [baseTemplate.terrain, baseLat, baseLng],
+  );
+
+  // Boundary polygon as lat/lng
+  const boundaryPositions = useMemo(
+    () => gamePolygonToLatLng(baseTemplate.boundary, baseLat, baseLng),
+    [baseTemplate.boundary, baseLat, baseLng],
+  );
 
   return (
     <div
@@ -1168,7 +873,6 @@ export default function PlacementScreen({
                 {facingDeg}°
               </span>
             </div>
-            {/* Rotation step buttons for directional sensors/effectors */}
             {activeItem !== null &&
               activeItem.catalog.fov_deg < 360 &&
               selectedPlaced !== null && (
@@ -1198,12 +902,14 @@ export default function PlacementScreen({
                       transition: "border-color 0.15s",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        COLORS.accent;
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.borderColor = COLORS.accent;
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        COLORS.border;
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.borderColor = COLORS.border;
                     }}
                   >
                     -15°
@@ -1224,12 +930,14 @@ export default function PlacementScreen({
                       transition: "border-color 0.15s",
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        COLORS.accent;
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.borderColor = COLORS.accent;
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        COLORS.border;
+                      (
+                        e.currentTarget as HTMLButtonElement
+                      ).style.borderColor = COLORS.border;
                     }}
                   >
                     +15°
@@ -1250,9 +958,8 @@ export default function PlacementScreen({
           </div>
         </div>
 
-        {/* Center: Canvas */}
+        {/* Center: Leaflet Map */}
         <div
-          ref={containerRef}
           style={{
             flex: 1,
             position: "relative",
@@ -1260,16 +967,248 @@ export default function PlacementScreen({
             background: COLORS.bg,
           }}
         >
-          <canvas
-            ref={canvasRef}
+          <MapContainer
+            center={baseCenter}
+            zoom={zoom}
+            zoomControl={false}
+            attributionControl={false}
             style={{
-              display: "block",
+              width: "100%",
+              height: "100%",
+              background: COLORS.bg,
               cursor: selectedPalette !== null ? "crosshair" : "default",
             }}
-            onClick={handleCanvasClick}
-            onContextMenu={handleContextMenu}
-            onDoubleClick={handleDoubleClick}
-          />
+          >
+            <MapViewController center={baseCenter} zoom={zoom} />
+            <MapPlacementClickHandler onMapClick={handleMapClick} />
+            <ScaleControl position="bottomleft" />
+
+            <LayersControl position="topright">
+              <LayersControl.BaseLayer name="Dark" checked>
+                <TileLayer
+                  url="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                  maxZoom={20}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Satellite">
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                  maxZoom={19}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Topo">
+                <TileLayer
+                  url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                  maxZoom={17}
+                />
+              </LayersControl.BaseLayer>
+            </LayersControl>
+
+            {/* Base boundary polygon */}
+            {boundaryPositions.length > 0 && (
+              <Polygon
+                positions={boundaryPositions}
+                pathOptions={{
+                  color: "#ffffff88",
+                  fillColor: "transparent",
+                  fillOpacity: 0,
+                  weight: 1.5,
+                  dashArray: "8,4",
+                }}
+              />
+            )}
+
+            {/* Terrain features */}
+            {terrainPolygons.map(({ terrain, positions, centroid }) => {
+              const style =
+                TERRAIN_STYLES[terrain.type] || TERRAIN_STYLES.building;
+              return (
+                <span key={terrain.id}>
+                  <Polygon
+                    positions={positions}
+                    pathOptions={{
+                      color: style.stroke,
+                      fillColor: style.fill,
+                      fillOpacity: 0.8,
+                      weight: 1,
+                    }}
+                  />
+                  <Marker
+                    position={centroid}
+                    icon={createTerrainLabel(terrain.name)}
+                    interactive={false}
+                  />
+                </span>
+              );
+            })}
+
+            {/* Protected assets */}
+            {baseTemplate.protected_assets.map((asset) => {
+              const pos = gameXYToLatLng(asset.x, asset.y, baseLat, baseLng);
+              return (
+                <Marker
+                  key={asset.id}
+                  position={pos}
+                  icon={createAssetIcon(asset.priority, asset.name)}
+                  interactive={false}
+                />
+              );
+            })}
+
+            {/* Approach corridors */}
+            {corridorLines.map(({ corridor, end, labelPos }) => (
+              <span key={corridor.name}>
+                <Polyline
+                  positions={[baseCenter, end]}
+                  pathOptions={{
+                    color: "#484f5866",
+                    weight: 1,
+                    dashArray: "6,6",
+                  }}
+                />
+                <Marker
+                  position={labelPos}
+                  icon={createTerrainLabel(corridor.name)}
+                  interactive={false}
+                />
+              </span>
+            ))}
+
+            {/* Coverage arcs for placed sensors */}
+            {placedItems.map((item, pi) => {
+              if (item.kind !== "sensor") return null;
+              const cat = selectedSensors[item.catalogIndex];
+              const eq = item.equipment;
+
+              const arcPositions = generateFovArc(
+                eq.x,
+                eq.y,
+                cat.range_km,
+                eq.facing_deg,
+                cat.fov_deg,
+                baseLat,
+                baseLng,
+              );
+
+              return (
+                <Polygon
+                  key={`coverage-${pi}`}
+                  positions={arcPositions}
+                  pathOptions={{
+                    color: "transparent",
+                    fillColor: "#58a6ff",
+                    fillOpacity: 0.04,
+                    weight: 0,
+                  }}
+                />
+              );
+            })}
+
+            {/* Placed items: range arcs and icons */}
+            {placedItems.map((item, pi) => {
+              const cat = getCatalog(item);
+              const eq = item.equipment;
+              const pos = gameXYToLatLng(eq.x, eq.y, baseLat, baseLng);
+              const isSelected = selectedPlaced === pi;
+              const isSensor = item.kind === "sensor";
+
+              // Range arc/circle
+              const rangeArcPositions = generateFovArc(
+                eq.x,
+                eq.y,
+                cat.range_km,
+                eq.facing_deg,
+                cat.fov_deg,
+                baseLat,
+                baseLng,
+              );
+
+              const rangeColor = isSensor ? "#58a6ff" : "#f85149";
+
+              return (
+                <span key={`item-${pi}`}>
+                  {/* Range arc/ring */}
+                  {cat.fov_deg >= 360 ? (
+                    <Circle
+                      center={pos}
+                      radius={cat.range_km * 1000}
+                      pathOptions={{
+                        color: rangeColor,
+                        fillColor: rangeColor,
+                        fillOpacity: isSensor ? 0.05 : 0.03,
+                        weight: isSelected ? 2 : 1,
+                        opacity: 0.4,
+                      }}
+                    />
+                  ) : (
+                    <Polygon
+                      positions={rangeArcPositions}
+                      pathOptions={{
+                        color: rangeColor,
+                        fillColor: rangeColor,
+                        fillOpacity: 0.1,
+                        weight: isSelected ? 2 : 1,
+                        opacity: 0.4,
+                      }}
+                    />
+                  )}
+
+                  {/* Icon marker */}
+                  <Marker
+                    position={pos}
+                    icon={
+                      isSensor
+                        ? createSensorIcon(
+                            (cat as CatalogSensor).type,
+                            isSelected,
+                          )
+                        : createEffectorIcon(cat.name, isSelected)
+                    }
+                    eventHandlers={{
+                      click: (e) => {
+                        L.DomEvent.stopPropagation(e.originalEvent);
+                        setSelectedPlaced(pi);
+                        setSelectedPalette(null);
+                      },
+                      contextmenu: (e) => {
+                        L.DomEvent.preventDefault(e.originalEvent);
+                        L.DomEvent.stopPropagation(e.originalEvent);
+                        setPlacedItems((prev) =>
+                          prev.filter((_, idx) => idx !== pi),
+                        );
+                        if (selectedPlaced === pi) setSelectedPlaced(null);
+                        else if (
+                          selectedPlaced !== null &&
+                          selectedPlaced > pi
+                        )
+                          setSelectedPlaced(selectedPlaced - 1);
+                      },
+                    }}
+                  />
+
+                  {/* Name label */}
+                  <Marker
+                    position={pos}
+                    icon={createItemLabel(cat.name, isSensor)}
+                    interactive={false}
+                  />
+                </span>
+              );
+            })}
+
+            {/* Base center marker */}
+            <Circle
+              center={baseCenter}
+              radius={5}
+              pathOptions={{
+                color: COLORS.accent,
+                fillColor: COLORS.accent,
+                fillOpacity: 1,
+                weight: 0,
+              }}
+            />
+          </MapContainer>
+
           {/* Instructions overlay */}
           {placedItems.length === 0 && selectedPalette === null && (
             <div
@@ -1281,6 +1220,7 @@ export default function PlacementScreen({
                 textAlign: "center",
                 color: COLORS.muted,
                 pointerEvents: "none",
+                zIndex: 1000,
               }}
             >
               <div
@@ -1447,7 +1387,9 @@ export default function PlacementScreen({
             >
               Summary
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
               <SummaryRow
                 label="Corridors covered"
                 value={`${coverage.filter((c) => c.covered).length}/${coverage.length}`}
@@ -1650,42 +1592,4 @@ function SummaryRow({
       </span>
     </div>
   );
-}
-
-// --- Canvas helper functions ---
-
-function drawStar(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  outerR: number,
-  innerR: number,
-  color: string
-) {
-  const points = 5;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 0; i < points * 2; i++) {
-    const r = i % 2 === 0 ? outerR : innerR;
-    const angle = (Math.PI / points) * i - Math.PI / 2;
-    const px = x + Math.cos(angle) * r;
-    const py = y + Math.sin(angle) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-function polygonCentroid(points: number[][]): [number, number] {
-  let cx = 0;
-  let cy = 0;
-  for (const p of points) {
-    cx += p[0];
-    cy += p[1];
-  }
-  return [cx / points.length, cy / points.length];
 }

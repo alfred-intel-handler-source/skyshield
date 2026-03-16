@@ -678,6 +678,9 @@ export default function App() {
           onSelectTrack={setSelectedTrackId}
           engagementZones={engagementZones}
           elapsed={elapsed}
+          baseLat={baseTemplate?.center_lat}
+          baseLng={baseTemplate?.center_lng}
+          defaultZoom={baseTemplate?.default_zoom}
         />
 
         {/* Tutorial overlay banner */}

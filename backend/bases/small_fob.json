@@ -3,6 +3,9 @@
   "name": "Small FOB",
   "description": "Compact forward operating base with tight perimeter. Limited entry points and short sight lines.",
   "size": "small",
+  "center_lat": 32.5,
+  "center_lng": 45.5,
+  "default_zoom": 15,
   "boundary": [
     [-0.3, -0.3], [-0.3, 0.3], [0.3, 0.3], [0.3, -0.3]
   ],

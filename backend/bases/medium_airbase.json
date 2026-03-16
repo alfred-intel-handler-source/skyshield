@@ -3,6 +3,9 @@
   "name": "Medium Airbase",
   "description": "Regional airbase with runway, hangars, and flight line. ATC tower is the primary protected asset.",
   "size": "medium",
+  "center_lat": 33.0,
+  "center_lng": 44.5,
+  "default_zoom": 14,
   "boundary": [
     [-0.8, -0.5], [-0.8, 0.5], [0.8, 0.5], [0.8, -0.5]
   ],

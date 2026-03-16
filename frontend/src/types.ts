@@ -165,6 +165,9 @@ export interface BaseTemplate {
   name: string;
   description: string;
   size: string;
+  center_lat?: number;
+  center_lng?: number;
+  default_zoom?: number;
   boundary: number[][];
   protected_assets: ProtectedAsset[];
   terrain: TerrainFeature[];
