@@ -2,6 +2,7 @@ import type { EffectorStatus } from "../types";
 
 interface Props {
   effectors: EffectorStatus[];
+  activeJammers?: Record<string, number>;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -9,9 +10,10 @@ const STATUS_COLORS: Record<string, string> = {
   recharging: "#d29922",
   offline: "#f85149",
   depleted: "#f85149",
+  radiating: "#58a6ff",
 };
 
-export default function EffectorPanel({ effectors }: Props) {
+export default function EffectorPanel({ effectors, activeJammers = {} }: Props) {
   return (
     <div style={{ padding: "12px 12px 8px" }}>
       <div
@@ -27,7 +29,8 @@ export default function EffectorPanel({ effectors }: Props) {
       </div>
       {effectors.map((eff) => {
         const isDepleted = eff.ammo_remaining != null && eff.ammo_remaining <= 0;
-        const effectiveStatus = isDepleted ? "depleted" : eff.status;
+        const isRadiating = eff.id in activeJammers;
+        const effectiveStatus = isDepleted ? "depleted" : isRadiating ? "radiating" : eff.status;
         const color = STATUS_COLORS[effectiveStatus] || "#484f58";
         const displayName = eff.name || eff.id.toUpperCase();
 
@@ -126,7 +129,7 @@ export default function EffectorPanel({ effectors }: Props) {
                 whiteSpace: "nowrap",
               }}
             >
-              {isDepleted ? "DEPLETED" : eff.status.toUpperCase()}
+              {isDepleted ? "DEPLETED" : isRadiating ? "RADIATING" : eff.status.toUpperCase()}
             </div>
           </div>
         );

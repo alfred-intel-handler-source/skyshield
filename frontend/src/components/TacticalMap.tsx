@@ -42,6 +42,7 @@ interface Props {
   trackBlinkStates?: Record<string, string>;
   newContactBanner?: string | null;
   baseAssets?: ProtectedAsset[];
+  activeJammers?: Record<string, number>;
 }
 
 interface WheelState {
@@ -323,6 +324,116 @@ function PulsingBaseCircle({
   );
 }
 
+// EW Radiate animation: expanding concentric rings from jammer position
+function EWRadiateOverlay({
+  center,
+  rangeKm,
+  baseLat,
+  baseLng,
+}: {
+  center: [number, number]; // game XY
+  rangeKm: number;
+  baseLat: number;
+  baseLng: number;
+}) {
+  const map = useMap();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animRef = useRef<number>(0);
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let canvas = canvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.style.position = "absolute";
+      canvas.style.top = "0";
+      canvas.style.left = "0";
+      canvas.style.pointerEvents = "none";
+      canvas.style.zIndex = "450";
+      container.appendChild(canvas);
+      canvasRef.current = canvas;
+    }
+
+    startRef.current = Date.now();
+
+    const draw = () => {
+      if (!canvas) return;
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const pos = gameXYToLatLng(center[0], center[1], baseLat, baseLng);
+      const screenPt = map.latLngToContainerPoint(L.latLng(pos[0], pos[1]));
+      const edgePt = map.latLngToContainerPoint(
+        L.latLng(...gameXYToLatLng(center[0] + rangeKm, center[1], baseLat, baseLng)),
+      );
+      const maxRadiusPx = Math.abs(edgePt.x - screenPt.x);
+
+      const elapsed = (Date.now() - startRef.current) / 1000;
+      const ringCount = 4;
+      const cycleDuration = 3; // seconds for a ring to reach max radius
+
+      for (let i = 0; i < ringCount; i++) {
+        const phase = ((elapsed + (i * cycleDuration) / ringCount) % cycleDuration) / cycleDuration;
+        const radius = phase * maxRadiusPx;
+        const opacity = Math.max(0, 0.6 * (1 - phase));
+
+        ctx.beginPath();
+        ctx.arc(screenPt.x, screenPt.y, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 200, 255, ${opacity})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Glow at center
+      const glowPhase = (Math.sin(elapsed * 4) + 1) / 2;
+      const glowRadius = 8 + glowPhase * 4;
+      const gradient = ctx.createRadialGradient(screenPt.x, screenPt.y, 0, screenPt.x, screenPt.y, glowRadius);
+      gradient.addColorStop(0, `rgba(0, 200, 255, ${0.6 + glowPhase * 0.3})`);
+      gradient.addColorStop(1, "rgba(0, 200, 255, 0)");
+      ctx.beginPath();
+      ctx.arc(screenPt.x, screenPt.y, glowRadius, 0, Math.PI * 2);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // "JAMMING" label
+      ctx.font = "bold 10px 'JetBrains Mono', monospace";
+      ctx.fillStyle = `rgba(0, 200, 255, ${0.7 + glowPhase * 0.3})`;
+      ctx.textAlign = "center";
+      ctx.fillText("JAMMING", screenPt.x, screenPt.y - 20);
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    animRef.current = requestAnimationFrame(draw);
+
+    // Redraw on map move/zoom
+    const redraw = () => {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = requestAnimationFrame(draw);
+    };
+    map.on("move", redraw);
+    map.on("zoom", redraw);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      map.off("move", redraw);
+      map.off("zoom", redraw);
+      if (canvas && canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+      canvasRef.current = null;
+    };
+  }, [map, center, rangeKm, baseLat, baseLng]);
+
+  return null;
+}
+
 const DTID_PHASE_LETTER: Record<string, string> = {
   detected: "D",
   tracked: "T",
@@ -435,6 +546,7 @@ export default function TacticalMap({
   trackBlinkStates = {},
   newContactBanner,
   baseAssets = [],
+  activeJammers = {},
 }: Props) {
   const baseCenter: [number, number] = [baseLat, baseLng];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
@@ -868,6 +980,21 @@ export default function TacticalMap({
                 interactive={false}
               />
             </span>
+          );
+        })}
+
+        {/* EW Radiate animation for active jammers */}
+        {Object.keys(activeJammers).map((jammerId) => {
+          const eff = effectors.find((e) => e.id === jammerId);
+          if (!eff || eff.x == null) return null;
+          return (
+            <EWRadiateOverlay
+              key={`ew-radiate-${jammerId}`}
+              center={[eff.x ?? 0, eff.y ?? 0]}
+              rangeKm={eff.range_km ?? 3}
+              baseLat={baseLat}
+              baseLng={baseLng}
+            />
           );
         })}
 

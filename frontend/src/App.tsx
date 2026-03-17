@@ -90,6 +90,9 @@ export default function App() {
   const [audioVolume, setAudioVolume] = useState(soundEngine.volume);
   const prevThreatLevelRef = useRef<ThreatLevel>("green");
 
+  // Active jamming state: maps effector id -> expiry timestamp
+  const [activeJammers, setActiveJammers] = useState<Record<string, number>>({});
+
   // Alert system state
   const [alertCount, setAlertCount] = useState(0);
   const [newContactBanner, setNewContactBanner] = useState<string | null>(null);
@@ -192,6 +195,22 @@ export default function App() {
             message: `ENGAGEMENT: ${msg.effector.toUpperCase()} → ${msg.target_id.toUpperCase()} — ${msg.effective ? "EFFECTIVE" : "INEFFECTIVE"} (${(msg.effectiveness * 100).toFixed(0)}%)`,
           },
         ]);
+        // Track active jammer state for EW radiate visual
+        const effLower = msg.effector.toLowerCase();
+        if (effLower.includes("jammer") || effLower.includes("rf")) {
+          // Mark jammer as radiating for its recharge duration
+          const rechargeMs = 10000; // 10s default jammer recharge
+          const expiry = Date.now() + rechargeMs;
+          setActiveJammers((prev) => ({ ...prev, [msg.effector]: expiry }));
+          setTimeout(() => {
+            setActiveJammers((prev) => {
+              const next = { ...prev };
+              delete next[msg.effector];
+              return next;
+            });
+          }, rechargeMs);
+        }
+
         // Play engagement sound based on effector type, then success/fail
         const eff = msg.effector.toLowerCase();
         if (eff.includes("kinetic") || eff.includes("interceptor")) {
@@ -904,7 +923,7 @@ export default function App() {
         }}
       >
         <SensorPanel sensors={sensors} />
-        <EffectorPanel effectors={effectors} />
+        <EffectorPanel effectors={effectors} activeJammers={activeJammers} />
       </div>
 
       {/* Center: Tactical Map */}
@@ -938,6 +957,7 @@ export default function App() {
           trackBlinkStates={trackBlinkStates}
           newContactBanner={newContactBanner}
           baseAssets={baseTemplate?.protected_assets}
+          activeJammers={activeJammers}
         />
 
         {/* Tutorial overlay banner */}
