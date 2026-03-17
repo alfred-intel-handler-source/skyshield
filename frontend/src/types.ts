@@ -24,6 +24,9 @@ export interface TrackData {
   is_ambient?: boolean;
   jammed?: boolean;
   jammed_behavior?: string | null;
+  is_interceptor?: boolean;
+  interceptor_target?: string | null;
+  intercept_phase?: string | null;
 }
 
 export interface SensorStatus {
