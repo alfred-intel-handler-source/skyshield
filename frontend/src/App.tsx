@@ -3,6 +3,7 @@ import HeaderBar from "./components/HeaderBar";
 import SensorPanel from "./components/SensorPanel";
 import EffectorPanel from "./components/EffectorPanel";
 import TacticalMap from "./components/TacticalMap";
+import type { InterceptAnimationData } from "./components/TacticalMap";
 import TrackDetailPanel from "./components/TrackDetailPanel";
 import EngagementPanel from "./components/EngagementPanel";
 import EventLog from "./components/EventLog";
@@ -92,6 +93,9 @@ export default function App() {
 
   // Active jamming state: maps effector id -> expiry timestamp
   const [activeJammers, setActiveJammers] = useState<Record<string, number>>({});
+
+  // Active Coyote intercept animations
+  const [activeIntercepts, setActiveIntercepts] = useState<InterceptAnimationData[]>([]);
 
   // Alert system state
   const [alertCount, setAlertCount] = useState(0);
@@ -195,8 +199,36 @@ export default function App() {
             message: `ENGAGEMENT: ${msg.effector.toUpperCase()} → ${msg.target_id.toUpperCase()} — ${msg.effective ? "EFFECTIVE" : "INEFFECTIVE"} (${(msg.effectiveness * 100).toFixed(0)}%)`,
           },
         ]);
-        // Track active jammer state for EW radiate visual
+        // Track Coyote intercept animation
         const effLower = msg.effector.toLowerCase();
+        if (effLower.includes("coyote") || effLower.includes("interceptor")) {
+          // Find effector and target positions
+          const effObj = effectors.find((e) => e.id === msg.effector) || effectorConfigs.find((e) => e.id === msg.effector);
+          const target = tracks.find((t) => t.id === msg.target_id);
+          if (effObj && target && effObj.x != null) {
+            const interceptId = `intercept-${Date.now()}`;
+            const duration = 4000; // 4 seconds
+            const newIntercept: InterceptAnimationData = {
+              id: interceptId,
+              effectorId: msg.effector,
+              targetId: msg.target_id,
+              startX: effObj.x ?? 0,
+              startY: effObj.y ?? 0,
+              targetX: target.x,
+              targetY: target.y,
+              effective: msg.effective,
+              startTime: Date.now(),
+              duration,
+            };
+            setActiveIntercepts((prev) => [...prev, newIntercept]);
+            // Remove after animation completes + explosion time
+            setTimeout(() => {
+              setActiveIntercepts((prev) => prev.filter((a) => a.id !== interceptId));
+            }, duration + 1500);
+          }
+        }
+
+        // Track active jammer state for EW radiate visual
         if (effLower.includes("jammer") || effLower.includes("rf")) {
           // Mark jammer as radiating for its recharge duration
           const rechargeMs = 10000; // 10s default jammer recharge
@@ -958,6 +990,7 @@ export default function App() {
           newContactBanner={newContactBanner}
           baseAssets={baseTemplate?.protected_assets}
           activeJammers={activeJammers}
+          activeIntercepts={activeIntercepts}
         />
 
         {/* Tutorial overlay banner */}

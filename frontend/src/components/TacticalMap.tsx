@@ -43,6 +43,20 @@ interface Props {
   newContactBanner?: string | null;
   baseAssets?: ProtectedAsset[];
   activeJammers?: Record<string, number>;
+  activeIntercepts?: InterceptAnimationData[];
+}
+
+export interface InterceptAnimationData {
+  id: string;
+  effectorId: string;
+  targetId: string;
+  startX: number;
+  startY: number;
+  targetX: number;
+  targetY: number;
+  effective: boolean;
+  startTime: number;
+  duration: number;
 }
 
 interface WheelState {
@@ -434,6 +448,187 @@ function EWRadiateOverlay({
   return null;
 }
 
+// Coyote intercept animation: triangle flying from effector to target
+function CoyoteInterceptOverlay({
+  startXY,
+  targetXY,
+  effective,
+  startTime,
+  duration,
+  baseLat,
+  baseLng,
+}: {
+  startXY: [number, number];
+  targetXY: [number, number];
+  effective: boolean;
+  startTime: number;
+  duration: number;
+  baseLat: number;
+  baseLng: number;
+}) {
+  const map = useMap();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animRef = useRef<number>(0);
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let canvas = canvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.style.position = "absolute";
+      canvas.style.top = "0";
+      canvas.style.left = "0";
+      canvas.style.pointerEvents = "none";
+      canvas.style.zIndex = "460";
+      container.appendChild(canvas);
+      canvasRef.current = canvas;
+    }
+
+    const draw = () => {
+      if (!canvas) return;
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1); // 0 to 1 = flight phase
+
+      const startLL = gameXYToLatLng(startXY[0], startXY[1], baseLat, baseLng);
+      const targetLL = gameXYToLatLng(targetXY[0], targetXY[1], baseLat, baseLng);
+      const sp = map.latLngToContainerPoint(L.latLng(startLL[0], startLL[1]));
+      const tp = map.latLngToContainerPoint(L.latLng(targetLL[0], targetLL[1]));
+
+      // Current position
+      const cx = sp.x + (tp.x - sp.x) * t;
+      const cy = sp.y + (tp.y - sp.y) * t;
+
+      if (t < 1) {
+        // Draw trail (red dashed line from start to current)
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = "rgba(248, 81, 73, 0.6)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y);
+        ctx.lineTo(cx, cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw interceptor triangle
+        const angle = Math.atan2(tp.y - sp.y, tp.x - sp.x);
+        const sz = 8;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.fillStyle = "#f85149";
+        ctx.beginPath();
+        ctx.moveTo(sz, 0);
+        ctx.lineTo(-sz * 0.6, -sz * 0.5);
+        ctx.lineTo(-sz * 0.6, sz * 0.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Glow behind interceptor
+        ctx.shadowColor = "#f85149";
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.restore();
+      } else {
+        // Explosion phase
+        const explosionElapsed = elapsed - duration;
+        const explosionDuration = 1200; // ms
+        const explosionT = Math.min(explosionElapsed / explosionDuration, 1);
+
+        if (explosionT < 1) {
+          if (effective) {
+            // Expanding orange circle that fades
+            const maxRadius = 30;
+            const radius = explosionT * maxRadius;
+            const opacity = 1 - explosionT;
+
+            // Outer ring
+            ctx.beginPath();
+            ctx.arc(tp.x, tp.y, radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(240, 136, 62, ${opacity})`;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Inner fill
+            ctx.beginPath();
+            ctx.arc(tp.x, tp.y, radius * 0.7, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(240, 136, 62, ${opacity * 0.4})`;
+            ctx.fill();
+
+            // Flash center
+            if (explosionT < 0.3) {
+              const flashOp = 1 - explosionT / 0.3;
+              ctx.beginPath();
+              ctx.arc(tp.x, tp.y, 6, 0, Math.PI * 2);
+              ctx.fillStyle = `rgba(255, 255, 200, ${flashOp})`;
+              ctx.fill();
+            }
+          } else {
+            // Failed: small flash at target then interceptor self-destructs
+            const flashRadius = 12 * (1 - explosionT);
+            const opacity = 1 - explosionT;
+            ctx.beginPath();
+            ctx.arc(tp.x, tp.y, flashRadius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(248, 81, 73, ${opacity * 0.5})`;
+            ctx.fill();
+
+            // Small sparks
+            if (explosionT < 0.5) {
+              for (let i = 0; i < 4; i++) {
+                const sa = (Math.PI * 2 * i) / 4 + explosionT * 3;
+                const sd = 8 + explosionT * 15;
+                ctx.beginPath();
+                ctx.arc(tp.x + Math.cos(sa) * sd, tp.y + Math.sin(sa) * sd, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(248, 81, 73, ${(1 - explosionT * 2) * 0.8})`;
+                ctx.fill();
+              }
+            }
+          }
+        }
+
+        // Still draw trail during explosion
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = `rgba(248, 81, 73, ${Math.max(0, 0.4 - explosionT * 0.4)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sp.x, sp.y);
+        ctx.lineTo(tp.x, tp.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    animRef.current = requestAnimationFrame(draw);
+
+    const redraw = () => {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = requestAnimationFrame(draw);
+    };
+    map.on("move", redraw);
+    map.on("zoom", redraw);
+
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      map.off("move", redraw);
+      map.off("zoom", redraw);
+      if (canvas && canvas.parentNode) {
+        canvas.parentNode.removeChild(canvas);
+      }
+      canvasRef.current = null;
+    };
+  }, [map, startXY, targetXY, effective, startTime, duration, baseLat, baseLng]);
+
+  return null;
+}
+
 const DTID_PHASE_LETTER: Record<string, string> = {
   detected: "D",
   tracked: "T",
@@ -547,6 +742,7 @@ export default function TacticalMap({
   newContactBanner,
   baseAssets = [],
   activeJammers = {},
+  activeIntercepts = [],
 }: Props) {
   const baseCenter: [number, number] = [baseLat, baseLng];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
@@ -997,6 +1193,20 @@ export default function TacticalMap({
             />
           );
         })}
+
+        {/* Coyote intercept animations */}
+        {activeIntercepts.map((intercept) => (
+          <CoyoteInterceptOverlay
+            key={intercept.id}
+            startXY={[intercept.startX, intercept.startY]}
+            targetXY={[intercept.targetX, intercept.targetY]}
+            effective={intercept.effective}
+            startTime={intercept.startTime}
+            duration={intercept.duration}
+            baseLat={baseLat}
+            baseLng={baseLng}
+          />
+        ))}
 
         {/* Base marker with pulsing circle */}
         <PulsingBaseCircle center={baseCenter} />
