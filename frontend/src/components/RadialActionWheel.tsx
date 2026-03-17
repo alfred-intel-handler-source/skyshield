@@ -19,7 +19,7 @@ interface Props {
   holdFire?: boolean;
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
-  onEngage: (trackId: string, effectorId: string) => void;
+  onEngage: (trackId: string, effectorId: string, shinobiCm?: string) => void;
   onSlewCamera: (trackId: string) => void;
   onHoldFire?: (trackId: string) => void;
   onReleaseHoldFire?: (trackId: string) => void;
@@ -43,9 +43,16 @@ const EFFECTOR_COLORS: Record<string, string> = {
   net_interceptor: "#3fb950",
   de_weapon: "#bc8cff",
   directed_energy: "#bc8cff",
+  shinobi_pm: "#a371f7",  // Purple for SHINOBI
 };
 
-type SubMenu = "none" | "identify" | "engage";
+const SHINOBI_CM_OPTIONS = [
+  { id: "shinobi_hold", label: "HOLD", icon: "\u23F8", color: "#a371f7", desc: "Freeze in place" },
+  { id: "shinobi_land_now", label: "LAND NOW", icon: "\u2B07", color: "#f0883e", desc: "Force descent" },
+  { id: "shinobi_deafen", label: "DEAFEN", icon: "\u{1F507}", color: "#f85149", desc: "Sever link" },
+];
+
+type SubMenu = "none" | "identify" | "engage" | "shinobi_cm";
 
 function getActionsForPhase(dtidPhase: DTIDPhase, holdFire?: boolean): WheelAction[] {
   switch (dtidPhase) {
@@ -219,6 +226,7 @@ export default function RadialActionWheel({
   const [subMenu, setSubMenu] = useState<SubMenu>("none");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [opacity, setOpacity] = useState(0);
+  const [selectedShinobiEffector, setSelectedShinobiEffector] = useState<string | null>(null);
 
   // Fade in
   useEffect(() => {
@@ -282,10 +290,27 @@ export default function RadialActionWheel({
 
   const handleEngage = useCallback(
     (effectorId: string) => {
+      // Check if this is a SHINOBI effector — show CM submenu
+      const eff = effectors.find((e) => e.id === effectorId);
+      if (eff && eff.type === "shinobi_pm") {
+        setSelectedShinobiEffector(effectorId);
+        setSubMenu("shinobi_cm");
+        return;
+      }
       onEngage(trackId, effectorId);
       onClose();
     },
-    [trackId, onEngage, onClose],
+    [trackId, effectors, onEngage, onClose],
+  );
+
+  const handleShinobiCM = useCallback(
+    (cmType: string) => {
+      if (selectedShinobiEffector) {
+        onEngage(trackId, selectedShinobiEffector, cmType);
+      }
+      onClose();
+    },
+    [trackId, selectedShinobiEffector, onEngage, onClose],
   );
 
   const actions = getActionsForPhase(dtidPhase, holdFire);
@@ -308,15 +333,24 @@ export default function RadialActionWheel({
     subActions = effectors.map((eff) => {
       const color = EFFECTOR_COLORS[eff.id] || EFFECTOR_COLORS[eff.type || ""] || "#58a6ff";
       const isReady = eff.status === "ready";
+      const isShinobi = eff.type === "shinobi_pm";
       return {
         id: eff.id,
         label: (eff.name || eff.id).toUpperCase().slice(0, 10),
-        icon: isReady ? "\u25C6" : "\u25C7",
+        icon: isShinobi ? "\u{1F977}" : isReady ? "\u25C6" : "\u25C7",
         color: isReady ? color : "#484f58",
         disabled: !isReady,
         statusText: eff.status.toUpperCase(),
       };
     });
+  } else if (subMenu === "shinobi_cm") {
+    subActions = SHINOBI_CM_OPTIONS.map((cm) => ({
+      id: cm.id,
+      label: cm.label,
+      icon: cm.icon,
+      color: cm.color,
+      statusText: cm.desc,
+    }));
   }
 
   const handleSubSelect = (id: string) => {
@@ -325,6 +359,8 @@ export default function RadialActionWheel({
       if (cls) handleClassify(cls);
     } else if (subMenu === "engage") {
       handleEngage(id);
+    } else if (subMenu === "shinobi_cm") {
+      handleShinobiCM(id);
     }
   };
 
@@ -493,7 +529,7 @@ export default function RadialActionWheel({
                 userSelect: "none",
               }}
             >
-              {subMenu === "identify" ? "CLASSIFY" : "SELECT EFFECTOR"}
+              {subMenu === "identify" ? "CLASSIFY" : subMenu === "shinobi_cm" ? "SHINOBI CM" : "SELECT EFFECTOR"}
             </text>
           )}
         </svg>

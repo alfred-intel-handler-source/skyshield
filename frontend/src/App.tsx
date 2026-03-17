@@ -16,6 +16,7 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import { soundEngine } from "./audio/SoundEngine";
 import type {
   BaseTemplate,
+  CatalogCombined,
   CatalogEffector,
   CatalogSensor,
   EffectorStatus,
@@ -137,6 +138,9 @@ export default function App() {
   const [selectedEffectors, setSelectedEffectors] = useState<CatalogEffector[]>(
     [],
   );
+  const [selectedCombined, setSelectedCombined] = useState<CatalogCombined[]>(
+    [],
+  );
   const [maxSensors, setMaxSensors] = useState(4);
   const [maxEffectors, setMaxEffectors] = useState(3);
 
@@ -188,7 +192,7 @@ export default function App() {
   // Active jamming state: maps effector id -> expiry timestamp
   const [activeJammers, setActiveJammers] = useState<Record<string, number>>({});
 
-  // Active Coyote intercept animations
+  // Active JACKAL intercept animations
   const [activeIntercepts, setActiveIntercepts] = useState<InterceptAnimationData[]>([]);
 
   // Alert system state
@@ -300,9 +304,9 @@ export default function App() {
             message: `ENGAGEMENT: ${msg.effector.toUpperCase()} → ${msg.target_id.toUpperCase()} — ${msg.effective ? "EFFECTIVE" : "INEFFECTIVE"} (${(msg.effectiveness * 100).toFixed(0)}%)`,
           },
         ]);
-        // Track Coyote intercept animation
+        // Track JACKAL intercept animation
         const effLower = msg.effector.toLowerCase();
-        if (effLower.includes("coyote") || effLower.includes("interceptor")) {
+        if (effLower.includes("jackal") || effLower.includes("interceptor")) {
           // Find effector and target positions
           const effObj = effectors.find((e) => e.id === msg.effector) || effectorConfigs.find((e) => e.id === msg.effector);
           const target = tracks.find((t) => t.id === msg.target_id);
@@ -631,9 +635,11 @@ export default function App() {
   const handleLoadoutConfirm = (
     sensors: CatalogSensor[],
     effectors: CatalogEffector[],
+    combined: CatalogCombined[] = [],
   ) => {
     setSelectedSensors(sensors);
     setSelectedEffectors(effectors);
+    setSelectedCombined(combined);
     setPhase("plan");
   };
 
@@ -712,13 +718,24 @@ export default function App() {
     });
   };
 
-  const engage = (trackId: string, effectorId: string) => {
-    send({
-      type: "action",
-      action: "engage",
-      target_id: trackId,
-      effector: effectorId,
-    });
+  const engage = (trackId: string, effectorId: string, shinobiCm?: string) => {
+    if (shinobiCm) {
+      // SHINOBI Protocol Manipulation — send specific CM action
+      send({
+        type: "action",
+        action: shinobiCm,
+        target_id: trackId,
+        effector: effectorId,
+        shinobi_cm: shinobiCm,
+      });
+    } else {
+      send({
+        type: "action",
+        action: "engage",
+        target_id: trackId,
+        effector: effectorId,
+      });
+    }
   };
 
   const handleSlewCamera = (trackId: string) => {
@@ -754,23 +771,24 @@ export default function App() {
       setBaseId(qsBaseId);
 
       // Pre-defined placement: spread equipment around base for coverage
-      // 1x TPQ-50 (center-ish, 360° coverage)
-      // 1x KURFS (facing north — primary threat axis)
-      // 2x Nighthawk (offset positions for cross-coverage)
-      // 2x Coyote Pallet (near KURFS for intercept)
+      // 1x AN/TPQ-51 (center-ish, 360° coverage)
+      // 1x KURZ FCS (facing north — primary threat axis)
+      // 2x EO/IR Camera (offset positions for cross-coverage)
+      // 2x JACKAL Pallet (near KURZ FCS for intercept)
       const quickPlacement: PlacementConfig = {
         base_id: qsBaseId,
         sensors: [
-          { catalog_id: "tpq50", x: 0.0, y: -0.1, facing_deg: 0 },
-          { catalog_id: "kurfs", x: 0.2, y: 0.1, facing_deg: 0 },
-          { catalog_id: "nighthawk", x: -0.3, y: 0.15, facing_deg: 0 },
-          { catalog_id: "nighthawk", x: 0.4, y: -0.2, facing_deg: 180 },
+          { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
+          { catalog_id: "kurz", x: 0.2, y: 0.1, facing_deg: 0 },
+          { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
+          { catalog_id: "eoir_camera", x: 0.4, y: -0.2, facing_deg: 180 },
         ],
         effectors: [
           { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
-          { catalog_id: "coyote_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
-          { catalog_id: "coyote_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
+          { catalog_id: "jackal_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
+          { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
         ],
+        combined: [],
       };
 
       // Reset running state
@@ -1023,6 +1041,7 @@ export default function App() {
         baseTemplate={baseTemplate}
         selectedSensors={selectedSensors}
         selectedEffectors={selectedEffectors}
+        selectedCombined={selectedCombined}
         onConfirm={handlePlacementConfirm}
         onBack={() => setPhase("equip")}
       />

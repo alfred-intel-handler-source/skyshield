@@ -111,7 +111,11 @@ class SensorSimulator:
     def detect_rf(
         self, drone: DroneState, sensor: SensorConfig
     ) -> dict | None:
-        """RF Detection: detects RF-emitting drones only. Provides bearing."""
+        """RF Detection: detects RF-emitting drones only. Provides bearing.
+
+        SHINOBI RF sensors additionally return frequency band, signal metrics,
+        and uplink/downlink detection flags.
+        """
         if not drone.rf_emitting:
             return None
 
@@ -129,10 +133,37 @@ class SensorSimulator:
             return None
 
         noise_factor = dist * 0.03
-        return {
+        result = {
             "sensor_id": sensor.id,
             "bearing_deg": round(bearing + random.gauss(0, noise_factor * 5), 1) % 360,
         }
+
+        # SHINOBI RF sensor provides extra protocol-level data
+        is_shinobi = "shinobi" in sensor.id.lower() or "shinobi" in sensor.name.lower()
+        if is_shinobi:
+            # Assign frequency band based on drone type
+            band_map = {
+                "commercial_quad": "2.4GHz",
+                "micro": "5.8GHz",
+                "fixed_wing": "900MHz",
+                "swarm": "2.4GHz",
+            }
+            freq = band_map.get(drone.drone_type.value, "2.4GHz")
+            # Downlink (drone → controller) always detected first
+            downlink = True
+            # Uplink (controller → drone) detected at closer range
+            uplink = ratio < 0.6
+            # Signal strength (RSSI) — stronger when closer
+            rssi_dbm = round(-30 - (ratio * 60) + random.gauss(0, 3))
+            result.update({
+                "frequency_band": freq,
+                "downlink_detected": downlink,
+                "uplink_detected": uplink,
+                "rssi_dbm": rssi_dbm,
+                "is_shinobi": True,
+            })
+
+        return result
 
     def detect_eoir(
         self, drone: DroneState, sensor: SensorConfig

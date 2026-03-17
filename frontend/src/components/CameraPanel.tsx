@@ -653,7 +653,7 @@ function drawExplosion(ctx: CanvasRenderingContext2D, w: number, h: number, elap
   }
 }
 
-function drawApproachingCoyote(
+function drawApproachingJackal(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
@@ -1040,7 +1040,7 @@ export default function CameraPanel({
   // Track lost state
   const [trackLost, setTrackLost] = useState(false);
 
-  // Explosion state for Coyote intercept
+  // Explosion state for JACKAL intercept
   const explosionRef = useRef<{ startTime: number; x: number; y: number } | null>(null);
   const prevNeutralizedRef = useRef(false);
 
@@ -1099,11 +1099,11 @@ export default function CameraPanel({
   useEffect(() => {
     if (track) {
       if (!prevNeutralizedRef.current && track.neutralized) {
-        // Target just got neutralized — check if a Coyote did it
-        const activeCoyote = allTracks.find(
+        // Target just got neutralized — check if a Jackal did it
+        const activeJackal = allTracks.find(
           (t) => t.is_interceptor && t.interceptor_target === track.id && t.neutralized
         );
-        if (activeCoyote) {
+        if (activeJackal) {
           explosionRef.current = { startTime: Date.now(), x: 0, y: 0 };
         }
       }
@@ -1325,20 +1325,20 @@ export default function CameraPanel({
       drawSilhouette(ctx, vt.classification, scale, mode, time);
       ctx.restore();
 
-      // Draw approaching Coyote as bright dot if one is targeting this track
-      const inboundCoyote = allTracks.find(
+      // Draw approaching JACKAL as bright dot if one is targeting this track
+      const inboundJackal = allTracks.find(
         (t) => t.is_interceptor && !t.neutralized && t.interceptor_target === vt.id
       );
-      if (inboundCoyote) {
-        const cBearing = calcBearing(inboundCoyote.x, inboundCoyote.y);
-        const cRange = calcRange(inboundCoyote.x, inboundCoyote.y);
-        const cElev = calcElevation(inboundCoyote.altitude_ft, cRange);
+      if (inboundJackal) {
+        const cBearing = calcBearing(inboundJackal.x, inboundJackal.y);
+        const cRange = calcRange(inboundJackal.x, inboundJackal.y);
+        const cElev = calcElevation(inboundJackal.altitude_ft, cRange);
         const dBearing = angleDiff(cBearing, cameraBearing);
         const dElev = angleDiff(cElev, cameraElevation);
         if (Math.abs(dBearing) <= fovH / 2 && Math.abs(dElev) <= fovV / 2) {
           const cpx = (dBearing / (fovH / 2)) * (w / 2);
           const cpy = -(dElev / (fovV / 2)) * (h / 2);
-          drawApproachingCoyote(ctx, w, h, cpx, cpy, mode, time);
+          drawApproachingJackal(ctx, w, h, cpx, cpy, mode, time);
         }
       }
 

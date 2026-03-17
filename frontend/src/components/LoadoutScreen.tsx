@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
-import type { CatalogSensor, CatalogEffector, EquipmentCatalog } from "../types";
+import type { CatalogSensor, CatalogEffector, CatalogCombined, EquipmentCatalog } from "../types";
 
 interface Props {
   maxSensors: number;
   maxEffectors: number;
-  onConfirm: (selectedSensors: CatalogSensor[], selectedEffectors: CatalogEffector[]) => void;
+  onConfirm: (selectedSensors: CatalogSensor[], selectedEffectors: CatalogEffector[], selectedCombined: CatalogCombined[]) => void;
   onBack: () => void;
 }
 
@@ -50,6 +50,7 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
   // Quantity maps: catalog_id -> count
   const [sensorQty, setSensorQty] = useState<Record<string, number>>({});
   const [effectorQty, setEffectorQty] = useState<Record<string, number>>({});
+  const [combinedQty, setCombinedQty] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${API_BASE}/equipment`)
@@ -79,8 +80,9 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
     });
   };
 
-  const totalSensors = Object.values(sensorQty).reduce((a, b) => a + b, 0);
-  const totalEffectors = Object.values(effectorQty).reduce((a, b) => a + b, 0);
+  const totalCombined = Object.values(combinedQty).reduce((a, b) => a + b, 0);
+  const totalSensors = Object.values(sensorQty).reduce((a, b) => a + b, 0) + totalCombined;
+  const totalEffectors = Object.values(effectorQty).reduce((a, b) => a + b, 0) + totalCombined;
 
   const handleConfirm = () => {
     if (!catalog) return;
@@ -95,7 +97,12 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
       const qty = effectorQty[e.catalog_id] || 0;
       for (let i = 0; i < qty; i++) effectors.push(e);
     }
-    onConfirm(sensors, effectors);
+    const combined: CatalogCombined[] = [];
+    for (const c of (catalog.combined || [])) {
+      const qty = combinedQty[c.catalog_id] || 0;
+      for (let i = 0; i < qty; i++) combined.push(c);
+    }
+    onConfirm(sensors, effectors, combined);
   };
 
   const canConfirm = totalSensors > 0 && totalEffectors > 0;
@@ -440,6 +447,88 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
             })}
           </div>
         </div>
+
+        {/* Combined Systems Section (e.g. SHINOBI) */}
+        {catalog.combined && catalog.combined.length > 0 && (
+          <div style={sectionStyle}>
+            <div style={sectionTitleStyle}>COMBINED SYSTEMS</div>
+            <div style={gridStyle}>
+              {catalog.combined.map((item) => {
+                const qty = combinedQty[item.catalog_id] || 0;
+                return (
+                  <div key={item.catalog_id} style={cardStyle(qty)}>
+                    <div style={nameStyle}>
+                      <span>{item.name}</span>
+                      <span style={tagStyle(COLORS.purple)}>DETECT + DEFEAT</span>
+                      <span style={{
+                        ...tagStyle(COLORS.green),
+                        fontSize: "9px",
+                      }}>
+                        {item.collateral_risk.replace("_", " ").toUpperCase()} COLLATERAL
+                      </span>
+                    </div>
+                    <div style={descStyle}>{item.description}</div>
+                    <div style={statsRowStyle}>
+                      <span style={statStyle}>
+                        Detect: <span style={statValueStyle}>{item.sensor_range_km} km</span>
+                      </span>
+                      <span style={statStyle}>
+                        Defeat: <span style={statValueStyle}>{item.effector_range_km} km</span>
+                      </span>
+                      <span style={statStyle}>
+                        FOV: <span style={statValueStyle}>{item.fov_deg}&deg;</span>
+                      </span>
+                      {item.recharge_seconds > 0 && (
+                        <span style={statStyle}>
+                          Recharge: <span style={statValueStyle}>{item.recharge_seconds}s</span>
+                        </span>
+                      )}
+                    </div>
+                    <div style={prosConsStyle}>
+                      {item.pros.length > 0 && (
+                        <ul style={listStyle}>
+                          {item.pros.map((p, i) => (
+                            <li key={i} style={{ color: COLORS.green }}>+ {p}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.cons.length > 0 && (
+                        <ul style={listStyle}>
+                          {item.cons.map((c, i) => (
+                            <li key={i} style={{ color: COLORS.red }}>- {c}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div style={qtyControlStyle}>
+                      <button
+                        style={qtyBtnStyle(qty <= 0)}
+                        onClick={() => adjustQty(setCombinedQty, item.catalog_id, -1)}
+                        disabled={qty <= 0}
+                      >-</button>
+                      <span style={{
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fontSize: 18, fontWeight: 700,
+                        color: qty > 0 ? COLORS.purple : COLORS.muted,
+                        minWidth: 32, textAlign: "center",
+                      }}>{qty}</span>
+                      <button
+                        style={qtyBtnStyle(false)}
+                        onClick={() => adjustQty(setCombinedQty, item.catalog_id, 1)}
+                      >+</button>
+                      {qty > 0 && (
+                        <span style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 11, color: COLORS.purple, marginLeft: 4,
+                        }}>{qty}x SELECTED</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Effectors Section */}
         <div style={sectionStyle}>

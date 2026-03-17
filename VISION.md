@@ -15,20 +15,20 @@ Free, browser-based C-UAS training simulator that any military member worldwide 
 ## Systems Modeled
 - **FAAD C2** — Primary C2 interface (hook bubbles, pie menus, track management, engagement workflow)
 - **Medusa** — Wheel of Death, AGE map, device management
-- **Sensors:** AN/TPQ-50, KURFS, Nighthawk EO/IR
-- **Effectors:** Coyote Block 2C, RF/PNT Jammer
+- **Sensors:** AN/TPQ-51, KURZ FCS, EO/IR Camera
+- **Effectors:** JACKAL, RF/PNT Jammer
 - **Network:** Joint Data Network (Link-16, SIAP)
 
 ## Key Features (Planned)
 
-### Coyote Intercept (Full Lifecycle)
-- Green COYOTE track appears on tactical map at launch
-- KURFS radar guides mid-course (waypoints to avoid friendly air tracks — ATA)
+### JACKAL Intercept (Full Lifecycle)
+- Green JACKAL track appears on tactical map at launch
+- KURZ FCS radar guides mid-course (waypoints to avoid friendly air tracks — ATA)
 - Terminal phase: seeker acquires target
 - Impact: explosion on camera feed + map
 - Failure: self-destruct at 100m+ altitude
-- Track management: Coyote shows as friendly track during flight
-- Hold Fire / Cease Fire commands work on in-flight Coyotes
+- Track management: Jackal shows as friendly track during flight
+- Hold Fire / Cease Fire commands work on in-flight Jackals
 - Reference: FAAD C2 Student Guide pp. 47-57
 
 ### Joint Data Network / SIAP

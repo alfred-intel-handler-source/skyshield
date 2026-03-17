@@ -1,8 +1,8 @@
 {
   "sensors": [
     {
-      "catalog_id": "tpq50",
-      "name": "AN/TPQ-50 Radar",
+      "catalog_id": "tpq51",
+      "name": "AN/TPQ-51 Radar",
       "type": "radar",
       "range_km": 10.0,
       "fov_deg": 360,
@@ -21,15 +21,15 @@
       "requires_los": false
     },
     {
-      "catalog_id": "kurfs",
-      "name": "KURFS Radar",
+      "catalog_id": "kurz_fcs",
+      "name": "KURZ FCS Radar",
       "type": "radar",
       "range_km": 8.0,
       "fov_deg": 360,
-      "description": "Ku-band Radio Frequency Sensor. Precision fire-control radar that guides Coyote interceptors to target. 360\u00b0 surveillance with high-accuracy track data for engagement.",
+      "description": "Ku-band Radio Frequency Sensor. Precision fire-control radar that guides JACKAL interceptors to target. 360\u00b0 surveillance with high-accuracy track data for engagement.",
       "pros": [
         "Fire-control quality tracks",
-        "Guides Coyote intercepts",
+        "Guides JACKAL intercepts",
         "High accuracy",
         "360\u00b0 coverage"
       ],
@@ -40,8 +40,8 @@
       "requires_los": true
     },
     {
-      "catalog_id": "nighthawk",
-      "name": "Nighthawk EO/IR Camera",
+      "catalog_id": "eoir_camera",
+      "name": "EO/IR Camera",
       "type": "eoir",
       "range_km": 8.0,
       "fov_deg": 360,
@@ -84,14 +84,14 @@
       "collateral_risk": "medium"
     },
     {
-      "catalog_id": "coyote_pallet",
-      "name": "Coyote Block 2C Pallet",
+      "catalog_id": "jackal_pallet",
+      "name": "JACKAL Pallet",
       "type": "kinetic",
       "range_km": 5.0,
       "fov_deg": 360,
       "recharge_seconds": 0,
       "single_use": true,
-      "description": "Tube-launched interceptor guided by KURFS radar. Proximity-fused warhead. 4 interceptors per pallet. Requires KURFS for mid-course guidance.",
+      "description": "Tube-launched interceptor guided by KURZ FCS radar. Proximity-fused warhead. 4 interceptors per pallet. Requires KURZ FCS for mid-course guidance.",
       "pros": [
         "High Pk against all UAS types",
         "Fire-and-forget after launch",
@@ -99,12 +99,42 @@
       ],
       "cons": [
         "Single-use (4 per pallet)",
-        "Requires KURFS radar",
+        "Requires KURZ FCS radar",
         "Self-destructs if intercept fails"
       ],
       "requires_los": false,
       "collateral_risk": "low",
       "ammo_count": 4
+    }
+  ],
+  "combined": [
+    {
+      "catalog_id": "shinobi",
+      "name": "SHINOBI",
+      "description": "Integrated RF detect-and-defeat system. Passive omnidirectional antennas scan 2.4GHz, 5.8GHz, 430MHz, and 900MHz bands for drone control links. Library-based — only detects drones with known RF signatures. Protocol Manipulation defeat sends targeted commands on the drone's own protocol: HOLD (freeze), LAND NOW (forced descent), DEAFEN (sever link). CM state progresses from 1/2 (downlink) to 2/2 (uplink acquired, full control).",
+      "sensor_type": "rf",
+      "sensor_range_km": 8.0,
+      "effector_type": "shinobi_pm",
+      "effector_range_km": 6.0,
+      "fov_deg": 360,
+      "recharge_seconds": 5,
+      "single_use": false,
+      "requires_los": false,
+      "collateral_risk": "none",
+      "pros": [
+        "Detect + defeat in one system",
+        "Passive detection (no emissions)",
+        "Multi-band RF coverage (4 bands)",
+        "Protocol-specific (surgical, no collateral)",
+        "Multiple countermeasure modes (HOLD/LAND NOW/DEAFEN)"
+      ],
+      "cons": [
+        "Library-dependent (unknown protocols invisible)",
+        "RF-emitting targets only",
+        "No altitude data",
+        "Defeat range (6km) shorter than detect range (8km)",
+        "Ineffective vs autonomous/non-RF targets"
+      ]
     }
   ]
 }

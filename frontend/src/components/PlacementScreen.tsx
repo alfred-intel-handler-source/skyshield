@@ -14,6 +14,7 @@ import {
 import L from "leaflet";
 import type {
   BaseTemplate,
+  CatalogCombined,
   CatalogSensor,
   CatalogEffector,
   PlacedEquipment,
@@ -32,20 +33,21 @@ interface Props {
   baseTemplate: BaseTemplate;
   selectedSensors: CatalogSensor[];
   selectedEffectors: CatalogEffector[];
+  selectedCombined?: CatalogCombined[];
   onConfirm: (placement: PlacementConfig) => void;
   onBack: () => void;
 }
 
 interface PlacedItem {
   equipment: PlacedEquipment;
-  kind: "sensor" | "effector";
+  kind: "sensor" | "effector" | "combined";
   catalogIndex: number;
 }
 
 type PaletteItem = {
-  kind: "sensor" | "effector";
+  kind: "sensor" | "effector" | "combined";
   index: number;
-  catalog: CatalogSensor | CatalogEffector;
+  catalog: CatalogSensor | CatalogEffector | CatalogCombined;
 };
 
 const SENSOR_TYPE_LETTERS: Record<string, string> = {
@@ -73,11 +75,12 @@ const COLORS = {
 
 // Per-system range ring styling keyed by catalog_id
 const RANGE_RING_STYLES: Record<string, { color: string; dashArray?: string }> = {
-  tpq50:         { color: "#58a6ff", dashArray: "8,4" },      // blue, dashed
-  kurfs:         { color: "#d29922" },                          // orange, solid (sector)
-  nighthawk:     { color: "#3fb950", dashArray: "2,4" },       // green, dotted
+  tpq51:         { color: "#58a6ff", dashArray: "8,4" },      // blue, dashed
+  kurz:          { color: "#d29922" },                          // orange, solid (sector)
+  eoir_camera:   { color: "#3fb950", dashArray: "2,4" },       // green, dotted
   rf_jammer:     { color: "#e3b341", dashArray: "8,4" },       // yellow, dashed
-  coyote_pallet: { color: "#f85149", dashArray: "8,4" },       // red, dashed
+  jackal_pallet: { color: "#f85149", dashArray: "8,4" },       // red, dashed
+  shinobi:       { color: "#a371f7", dashArray: "6,4" },       // purple, dashed (combined)
 };
 
 function getRingStyle(catalogId: string, isSensor: boolean): { color: string; dashArray?: string } {
@@ -160,6 +163,26 @@ function createEffectorIcon(
     className: "",
     iconSize: [24, 24],
     iconAnchor: [12, 12],
+  });
+}
+
+// Create combined system icon (purple hexagon with "N")
+function createCombinedIcon(
+  name: string,
+  isSelected: boolean,
+): L.DivIcon {
+  const letter = name.charAt(0).toUpperCase();
+  const color = isSelected ? "#a371f7" : "#a371f7bb";
+  const svg = `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="14,2 25,8 25,20 14,26 3,20 3,8" fill="${color}" stroke="#a371f7" stroke-width="1.5"/>
+    <text x="14" y="14" text-anchor="middle" dominant-baseline="central" fill="#0d1117" font-size="11" font-weight="700" font-family="monospace">${letter}</text>
+    ${isSelected ? `<circle cx="14" cy="14" r="16" fill="none" stroke="#ffffff88" stroke-width="2" stroke-dasharray="4,4"/>` : ""}
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 
@@ -401,6 +424,7 @@ export default function PlacementScreen({
   baseTemplate,
   selectedSensors,
   selectedEffectors,
+  selectedCombined = [],
   onConfirm,
   onBack,
 }: Props) {
@@ -434,9 +458,14 @@ export default function PlacementScreen({
       index: i,
       catalog: e,
     })),
+    ...selectedCombined.map((c, i) => ({
+      kind: "combined" as const,
+      index: i,
+      catalog: c,
+    })),
   ];
 
-  // Build instance labels for duplicate items (e.g., "Nighthawk #1", "Nighthawk #2")
+  // Build instance labels for duplicate items (e.g., "EO/IR Camera #1", "EO/IR Camera #2")
   const sensorInstanceLabels = useMemo(() => {
     const counts: Record<string, number> = {};
     selectedSensors.forEach((s) => { counts[s.catalog_id] = (counts[s.catalog_id] || 0) + 1; });
@@ -456,6 +485,16 @@ export default function PlacementScreen({
       return counts[e.catalog_id] > 1 ? `${e.name} #${seen[e.catalog_id]}` : e.name;
     });
   }, [selectedEffectors]);
+
+  const combinedInstanceLabels = useMemo(() => {
+    const counts: Record<string, number> = {};
+    selectedCombined.forEach((c) => { counts[c.catalog_id] = (counts[c.catalog_id] || 0) + 1; });
+    const seen: Record<string, number> = {};
+    return selectedCombined.map((c) => {
+      seen[c.catalog_id] = (seen[c.catalog_id] || 0) + 1;
+      return counts[c.catalog_id] > 1 ? `${c.name} #${seen[c.catalog_id]}` : c.name;
+    });
+  }, [selectedCombined]);
 
   // Track which palette items are placed
   const placedSet = new Set(
@@ -495,12 +534,12 @@ export default function PlacementScreen({
 
   // Get catalog data for a placed item
   const getCatalog = useCallback(
-    (item: PlacedItem): CatalogSensor | CatalogEffector => {
-      return item.kind === "sensor"
-        ? selectedSensors[item.catalogIndex]
-        : selectedEffectors[item.catalogIndex];
+    (item: PlacedItem): CatalogSensor | CatalogEffector | CatalogCombined => {
+      if (item.kind === "sensor") return selectedSensors[item.catalogIndex];
+      if (item.kind === "combined") return selectedCombined[item.catalogIndex];
+      return selectedEffectors[item.catalogIndex];
     },
-    [selectedSensors, selectedEffectors],
+    [selectedSensors, selectedEffectors, selectedCombined],
   );
 
   // Map click handler — places equipment
@@ -605,6 +644,9 @@ export default function PlacementScreen({
         .map((p) => p.equipment),
       effectors: placedItems
         .filter((p) => p.kind === "effector")
+        .map((p) => p.equipment),
+      combined: placedItems
+        .filter((p) => p.kind === "combined")
         .map((p) => p.equipment),
     };
     onConfirm(config);
@@ -984,6 +1026,120 @@ export default function PlacementScreen({
             </>
           )}
 
+          {/* Combined Systems */}
+          {selectedCombined.length > 0 && (
+            <>
+              <div
+                style={{
+                  padding: "12px 16px 4px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "#a371f7",
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
+                Combined
+              </div>
+              {selectedCombined.map((item, i) => {
+                const paletteIdx = selectedSensors.length + selectedEffectors.length + i;
+                const isPlaced = placedSet.has(`combined-${i}`);
+                const isActive = selectedPalette === paletteIdx;
+
+                return (
+                  <div
+                    key={`combined-${i}`}
+                    onClick={() => {
+                      setSelectedPalette(isActive ? null : paletteIdx);
+                      setSelectedPlaced(null);
+                    }}
+                    style={{
+                      padding: "8px 16px",
+                      cursor: "pointer",
+                      background: isActive ? "#a371f718" : "transparent",
+                      borderLeft: isActive
+                        ? "2px solid #a371f7"
+                        : "2px solid transparent",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive)
+                        (e.currentTarget as HTMLDivElement).style.background =
+                          "#ffffff08";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive)
+                        (e.currentTarget as HTMLDivElement).style.background =
+                          "transparent";
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: COLORS.text,
+                        }}
+                      >
+                        {combinedInstanceLabels[i]}
+                      </span>
+                      {isPlaced && (
+                        <span
+                          style={{
+                            color: COLORS.success,
+                            fontSize: 14,
+                            fontWeight: 700,
+                          }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginTop: 4,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          background: "#a371f722",
+                          color: "#a371f7",
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        DETECT+DEFEAT
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: COLORS.muted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}
+                      >
+                        {item.sensor_range_km}/{item.effector_range_km}km
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
           {/* Facing slider */}
           <div
             style={{
@@ -1277,33 +1433,33 @@ export default function PlacementScreen({
               const pos = gameXYToLatLng(eq.x, eq.y, baseLat, baseLng);
               const isSelected = selectedPlaced === pi;
               const isSensor = item.kind === "sensor";
-              const ringStyle = getRingStyle(eq.catalog_id, isSensor);
+              const isCombined = item.kind === "combined";
+              const ringStyle = getRingStyle(eq.catalog_id, isSensor || isCombined);
               const shouldShowRing = showRangeRings || isSelected;
+
+              // For combined systems, show two rings (detect + defeat)
+              const combCat = isCombined ? (cat as CatalogCombined) : null;
+              const primaryRange = isCombined ? combCat!.sensor_range_km : (cat as CatalogSensor | CatalogEffector).range_km;
+              const primaryFov = cat.fov_deg;
 
               // Range arc/circle
               const rangeArcPositions = generateFovArc(
-                eq.x,
-                eq.y,
-                cat.range_km,
-                eq.facing_deg,
-                cat.fov_deg,
-                baseLat,
-                baseLng,
+                eq.x, eq.y, primaryRange, eq.facing_deg, primaryFov, baseLat, baseLng,
               );
 
               // Ring label position: offset north of the ring edge
               const labelAngleRad = degToRad(90 - eq.facing_deg);
-              const labelX = eq.x + Math.cos(labelAngleRad) * cat.range_km;
-              const labelY = eq.y + Math.sin(labelAngleRad) * cat.range_km;
+              const labelX = eq.x + Math.cos(labelAngleRad) * primaryRange;
+              const labelY = eq.y + Math.sin(labelAngleRad) * primaryRange;
               const labelPos = gameXYToLatLng(labelX, labelY, baseLat, baseLng);
 
               return (
                 <span key={`item-${pi}`}>
-                  {/* Range arc/ring */}
-                  {shouldShowRing && (cat.fov_deg >= 360 ? (
+                  {/* Range arc/ring — primary (detect for combined, normal for others) */}
+                  {shouldShowRing && (primaryFov >= 360 ? (
                     <Circle
                       center={pos}
-                      radius={cat.range_km * 1000}
+                      radius={primaryRange * 1000}
                       pathOptions={{
                         color: ringStyle.color,
                         fillColor: ringStyle.color,
@@ -1327,25 +1483,60 @@ export default function PlacementScreen({
                     />
                   ))}
 
+                  {/* Combined systems: second ring for defeat range */}
+                  {shouldShowRing && isCombined && combCat && (
+                    <Circle
+                      center={pos}
+                      radius={combCat.effector_range_km * 1000}
+                      pathOptions={{
+                        color: "#d63bf8",
+                        fillColor: "#d63bf8",
+                        fillOpacity: isSelected ? 0.06 : 0.03,
+                        weight: isSelected ? 2 : 1.5,
+                        opacity: 0.6,
+                        dashArray: "4,4",
+                      }}
+                    />
+                  )}
+
                   {/* Ring label */}
                   {shouldShowRing && (
                     <Marker
                       position={labelPos}
-                      icon={createRingLabel(cat.name, cat.range_km, ringStyle.color)}
+                      icon={createRingLabel(
+                        isCombined ? `${cat.name} DETECT` : cat.name,
+                        primaryRange,
+                        ringStyle.color,
+                      )}
                       interactive={false}
                     />
                   )}
+                  {/* Combined defeat ring label */}
+                  {shouldShowRing && isCombined && combCat && (() => {
+                    const defLabelX = eq.x + Math.cos(labelAngleRad) * combCat.effector_range_km;
+                    const defLabelY = eq.y + Math.sin(labelAngleRad) * combCat.effector_range_km;
+                    const defLabelPos = gameXYToLatLng(defLabelX, defLabelY, baseLat, baseLng);
+                    return (
+                      <Marker
+                        position={defLabelPos}
+                        icon={createRingLabel(`${cat.name} DEFEAT`, combCat.effector_range_km, "#d63bf8")}
+                        interactive={false}
+                      />
+                    );
+                  })()}
 
                   {/* Icon marker */}
                   <Marker
                     position={pos}
                     icon={
-                      isSensor
-                        ? createSensorIcon(
-                            (cat as CatalogSensor).type,
-                            isSelected,
-                          )
-                        : createEffectorIcon(cat.name, isSelected)
+                      isCombined
+                        ? createCombinedIcon(cat.name, isSelected)
+                        : isSensor
+                          ? createSensorIcon(
+                              (cat as CatalogSensor).type,
+                              isSelected,
+                            )
+                          : createEffectorIcon(cat.name, isSelected)
                     }
                     eventHandlers={{
                       click: (e) => {
@@ -1372,7 +1563,7 @@ export default function PlacementScreen({
                   {/* Name label */}
                   <Marker
                     position={pos}
-                    icon={createItemLabel(cat.name, isSensor)}
+                    icon={createItemLabel(cat.name, isSensor || isCombined)}
                     interactive={false}
                   />
                 </span>

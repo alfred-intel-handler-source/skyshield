@@ -27,7 +27,7 @@ class DroneType(str, Enum):
     PASSENGER_AIRCRAFT = "passenger_aircraft"
     MILITARY_JET = "military_jet"
     WEATHER_BALLOON = "weather_balloon"
-    COYOTE = "coyote"
+    JACKAL = "jackal"
 
 
 class ThreatClassification(str, Enum):
@@ -38,7 +38,7 @@ class ThreatClassification(str, Enum):
     WEATHER_BALLOON = "weather_balloon"
     IMPROVISED = "improvised"
     PASSENGER_AIRCRAFT = "passenger_aircraft"
-    COYOTE = "coyote"
+    JACKAL = "jackal"
 
 
 class SensorType(str, Enum):
@@ -54,12 +54,27 @@ class EffectorType(str, Enum):
     KINETIC = "kinetic"
     NET_INTERCEPTOR = "net_interceptor"
     DIRECTED_ENERGY = "directed_energy"
+    SHINOBI_PM = "shinobi_pm"  # SHINOBI Protocol Manipulation
 
 
 class EffectorStatus(str, Enum):
     READY = "ready"
     RECHARGING = "recharging"
     OFFLINE = "offline"
+
+
+class ShinobiCMType(str, Enum):
+    """SHINOBI Protocol Manipulation countermeasure types."""
+    HOLD = "shinobi_hold"          # Freeze drone in place
+    LAND_NOW = "shinobi_land_now"  # Forced descent to ground
+    DEAFEN = "shinobi_deafen"      # Sever control link (failsafe behavior)
+
+
+class ShinobiCMState(str, Enum):
+    """SHINOBI countermeasure effect state progression."""
+    PENDING = "pending"      # CM command sent, waiting for effect
+    HALF = "1/2"             # Downlink acquired only
+    FULL = "2/2"             # Uplink active, full control
 
 
 class Countermeasure(str, Enum):
@@ -70,6 +85,9 @@ class Countermeasure(str, Enum):
     KINETIC = "kinetic"
     NET_INTERCEPTOR = "net_interceptor"
     DIRECTED_ENERGY = "directed_energy"
+    SHINOBI_HOLD = "shinobi_hold"
+    SHINOBI_LAND_NOW = "shinobi_land_now"
+    SHINOBI_DEAFEN = "shinobi_deafen"
     OBSERVE = "observe"
     NO_ACTION = "no_action"
 
@@ -115,11 +133,18 @@ class DroneState(BaseModel):
     jammed: bool = False
     jammed_behavior: str | None = None  # loss_of_control, rth, forced_landing, gps_spoof
     jammed_time_remaining: float = 0.0  # seconds until jam effect resolves
-    # Coyote interceptor fields
+    # JACKAL interceptor fields
     is_interceptor: bool = False
     interceptor_target: str | None = None
     intercept_phase: str | None = None  # launch, midcourse, terminal, self_destruct
     intercept_attempts: int = 0  # track retry count for terminal intercept
+    # SHINOBI RF track properties
+    frequency_band: str | None = None  # "2.4GHz", "5.8GHz", "430MHz", "900MHz"
+    uplink_detected: bool = False   # True when SHINOBI acquires uplink (enables full CM)
+    downlink_detected: bool = False  # True when SHINOBI acquires downlink
+    shinobi_cm_active: str | None = None  # Active SHINOBI countermeasure type
+    shinobi_cm_state: str | None = None  # "pending", "1/2", "2/2"
+    shinobi_cm_time_remaining: float = 0.0  # Seconds remaining in CM effect
 
 
 class SensorConfig(BaseModel):
@@ -150,7 +175,7 @@ class EffectorConfig(BaseModel):
     facing_deg: float = 0.0
     requires_los: bool = False
     single_use: bool = False
-    # Ammo management (e.g. Coyote pallets with 4 interceptors)
+    # Ammo management (e.g. JACKAL pallets with 4 interceptors)
     ammo_count: int | None = None
     ammo_remaining: int | None = None
 
@@ -306,9 +331,28 @@ class CatalogEffector(BaseModel):
     ammo_count: int | None = None
 
 
+class CatalogCombined(BaseModel):
+    """A combined sensor+effector system (e.g. SHINOBI)."""
+    catalog_id: str
+    name: str
+    description: str
+    sensor_type: str       # e.g. "rf"
+    sensor_range_km: float
+    effector_type: str     # e.g. "shinobi_pm"
+    effector_range_km: float
+    fov_deg: float
+    recharge_seconds: int = 0
+    single_use: bool = False
+    requires_los: bool = False
+    collateral_risk: str = "none"
+    pros: list[str] = []
+    cons: list[str] = []
+
+
 class EquipmentCatalog(BaseModel):
     sensors: list[CatalogSensor]
     effectors: list[CatalogEffector]
+    combined: list[CatalogCombined] = []
 
 
 class PlacedEquipment(BaseModel):
@@ -322,3 +366,4 @@ class PlacementConfig(BaseModel):
     base_id: str
     sensors: list[PlacedEquipment]
     effectors: list[PlacedEquipment]
+    combined: list[PlacedEquipment] = []

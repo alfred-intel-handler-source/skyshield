@@ -60,7 +60,7 @@ Store base templates in `backend/bases/` as JSON files. Store the player's place
 Before the placement phase, add a pre-mission equipment selection screen where the player builds their loadout. Categories:
 
 **SENSORS (pick 3-4 from available pool):**
-- AN/TPQ-50 Radar (long range, all-weather, 360° coverage)
+- AN/TPQ-51 Radar (long range, all-weather, 360° coverage)
 - RF-300 Direction Finder (medium range, RF-emitting targets only, 360°)
 - EO/IR Camera System (short range, visual ID capability, limited FOV cone)
 - Acoustic Array (very short range, passive detection, 360°)
@@ -69,7 +69,7 @@ Before the placement phase, add a pre-mission equipment selection screen where t
 **EFFECTORS (pick 2-3 from available pool):**
 - RF Jammer (electronic attack, rechargeable, effective vs commercial drones)
 - GPS Spoofer (electronic attack, redirects GPS-dependent UAS, collateral risk to friendly GPS)
-- Coyote Block 3 (kinetic interceptor missile, single-use, high effectiveness)
+- JACKAL (kinetic interceptor missile, single-use, high effectiveness)
 - MADIS Stinger (kinetic, shoulder-launched missile, single-use)
 - Drone Interceptor / Net Gun (net capture drone, single-use, low collateral)
 - HELWS / Directed Energy (high-energy laser, rechargeable, LOS only, short range)

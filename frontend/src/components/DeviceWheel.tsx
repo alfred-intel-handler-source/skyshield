@@ -92,7 +92,7 @@ function getSensorActions(sensor: SensorStatus): WheelAction[] {
 
 function getEffectorActions(effector: EffectorStatus): WheelAction[] {
   const isReady = effector.status === "ready";
-  const hasCoyoteAmmo = effector.ammo_remaining != null;
+  const hasJackalAmmo = effector.ammo_remaining != null;
 
   return [
     {
@@ -103,7 +103,7 @@ function getEffectorActions(effector: EffectorStatus): WheelAction[] {
       statusText: effector.status.toUpperCase(),
       disabled: true,
     },
-    ...(hasCoyoteAmmo ? [{
+    ...(hasJackalAmmo ? [{
       id: "ammo",
       label: "AMMO",
       icon: "\u2022\u2022\u2022",

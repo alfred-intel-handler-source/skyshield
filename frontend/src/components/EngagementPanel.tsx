@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { EffectorStatus, TrackData } from "../types";
 
 interface Props {
@@ -5,7 +6,7 @@ interface Props {
   effectors: EffectorStatus[];
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
-  onEngage: (trackId: string, effectorId: string) => void;
+  onEngage: (trackId: string, effectorId: string, shinobiCm?: string) => void;
   onSlewCamera?: (trackId: string) => void;
 }
 
@@ -29,6 +30,19 @@ const EFFECTOR_COLORS: Record<string, string> = {
   net_interceptor: "#3fb950",
   de_weapon: "#bc8cff",
   directed_energy: "#bc8cff",
+  shinobi_pm: "#a371f7",
+};
+
+const SHINOBI_CM_OPTIONS = [
+  { id: "shinobi_hold", label: "HOLD", desc: "Freeze in place", color: "#a371f7" },
+  { id: "shinobi_land_now", label: "LAND NOW", desc: "Forced descent", color: "#f0883e" },
+  { id: "shinobi_deafen", label: "DEAFEN", desc: "Sever control link", color: "#f85149" },
+];
+
+const CM_STATE_LABELS: Record<string, { label: string; color: string }> = {
+  pending: { label: "ACQUIRING...", color: "#d29922" },
+  "1/2": { label: "DOWNLINK 1/2", color: "#f0883e" },
+  "2/2": { label: "FULL CONTROL 2/2", color: "#3fb950" },
 };
 
 
@@ -40,6 +54,8 @@ export default function EngagementPanel({
   onEngage,
   onSlewCamera,
 }: Props) {
+  const [shinobiSubMenu, setShinobiSubMenu] = useState<string | null>(null);
+
   if (!track) {
     return (
       <div
@@ -104,7 +120,7 @@ export default function EngagementPanel({
             CONFIRM TRACK
           </button>
           <button
-            onClick={() => onSlewCamera(track.id)}
+            onClick={() => onSlewCamera?.(track.id)}
             style={{
               width: "100%",
               marginTop: 6,
@@ -236,70 +252,157 @@ export default function EngagementPanel({
               SLEW CAMERA
             </button>
           )}
-          <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
-            Select effector to engage
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {effectors.map((eff) => {
-              const color =
-                EFFECTOR_COLORS[eff.id] ||
-                EFFECTOR_COLORS[eff.type || ""] ||
-                "#58a6ff";
-              const name = eff.name || eff.id.toUpperCase();
-              const isDepleted = eff.ammo_remaining != null && eff.ammo_remaining <= 0;
-              const isReady = eff.status === "ready" && !isDepleted;
 
-              return (
-                <button
-                  key={eff.id}
-                  onClick={() => isReady && onEngage(track.id, eff.id)}
-                  disabled={!isReady}
-                  style={{
-                    width: "100%",
-                    padding: "9px 12px",
-                    background: isReady ? `${color}15` : "#161b22",
-                    border: `1px solid ${isReady ? `${color}44` : "#30363d"}`,
-                    borderRadius: 5,
-                    color: isReady ? color : "#484f58",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    fontFamily: "'Inter', sans-serif",
-                    letterSpacing: 0.5,
-                    cursor: isReady ? "pointer" : "not-allowed",
-                    textAlign: "left",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    transition: "all 0.15s",
-                    opacity: isReady ? 1 : 0.5,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isReady)
-                      (e.currentTarget as HTMLElement).style.background = `${color}28`;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isReady)
-                      (e.currentTarget as HTMLElement).style.background = `${color}15`;
-                  }}
-                >
-                  <span>{name}</span>
-                  <span
+          {/* SHINOBI CM submenu — selecting countermeasure type */}
+          {shinobiSubMenu && (() => {
+            const shinobiEff = effectors.find((e) => e.id === shinobiSubMenu);
+            const shinobiName = shinobiEff?.name || "SHINOBI";
+            return (
+              <div>
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginBottom: 8,
+                }}>
+                  <div style={{ fontSize: 11, color: "#a371f7", fontWeight: 600, letterSpacing: 0.5 }}>
+                    {shinobiName} — SELECT CM
+                  </div>
+                  <button
+                    onClick={() => setShinobiSubMenu(null)}
                     style={{
-                      fontSize: 9,
-                      fontWeight: 500,
-                      opacity: 0.7,
+                      background: "none", border: "1px solid #30363d", borderRadius: 4,
+                      color: "#8b949e", fontSize: 9, padding: "2px 8px", cursor: "pointer",
+                      fontFamily: "'Inter', sans-serif",
                     }}
                   >
-                    {isDepleted
-                      ? "DEPLETED"
-                      : eff.ammo_remaining != null
-                        ? `${eff.ammo_remaining}/${eff.ammo_count} — ${eff.status.toUpperCase()}`
-                        : eff.status.toUpperCase()}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    BACK
+                  </button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                  {SHINOBI_CM_OPTIONS.map((cm) => (
+                    <button
+                      key={cm.id}
+                      onClick={() => {
+                        onEngage(track.id, shinobiSubMenu, cm.id);
+                        setShinobiSubMenu(null);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        background: `${cm.color}12`,
+                        border: `1px solid ${cm.color}44`,
+                        borderRadius: 5,
+                        color: cm.color,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        letterSpacing: 1,
+                        cursor: "pointer",
+                        textAlign: "left",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = `${cm.color}28`;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = `${cm.color}12`;
+                      }}
+                    >
+                      <span>{cm.label}</span>
+                      <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.7, fontFamily: "'Inter', sans-serif" }}>
+                        {cm.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Main effector list (hidden when SHINOBI submenu is open) */}
+          {!shinobiSubMenu && (
+            <>
+              <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
+                Select effector to engage
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {effectors.map((eff) => {
+                  const isShinobi = eff.type === "shinobi_pm";
+                  const color =
+                    EFFECTOR_COLORS[eff.type || ""] ||
+                    EFFECTOR_COLORS[eff.id] ||
+                    "#58a6ff";
+                  const name = eff.name || eff.id.toUpperCase();
+                  const isDepleted = eff.ammo_remaining != null && eff.ammo_remaining <= 0;
+                  const isReady = eff.status === "ready" && !isDepleted;
+
+                  return (
+                    <button
+                      key={eff.id}
+                      onClick={() => {
+                        if (!isReady) return;
+                        if (isShinobi) {
+                          setShinobiSubMenu(eff.id);
+                        } else {
+                          onEngage(track.id, eff.id);
+                        }
+                      }}
+                      disabled={!isReady}
+                      style={{
+                        width: "100%",
+                        padding: "9px 12px",
+                        background: isReady ? `${color}15` : "#161b22",
+                        border: `1px solid ${isReady ? `${color}44` : "#30363d"}`,
+                        borderRadius: 5,
+                        color: isReady ? color : "#484f58",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        fontFamily: "'Inter', sans-serif",
+                        letterSpacing: 0.5,
+                        cursor: isReady ? "pointer" : "not-allowed",
+                        textAlign: "left",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        transition: "all 0.15s",
+                        opacity: isReady ? 1 : 0.5,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isReady)
+                          (e.currentTarget as HTMLElement).style.background = `${color}28`;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isReady)
+                          (e.currentTarget as HTMLElement).style.background = `${color}15`;
+                      }}
+                    >
+                      <span>
+                        {name}
+                        {isShinobi && isReady && (
+                          <span style={{ fontSize: 9, marginLeft: 6, opacity: 0.7 }}>▸ CM</span>
+                        )}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 500,
+                          opacity: 0.7,
+                        }}
+                      >
+                        {isDepleted
+                          ? "DEPLETED"
+                          : eff.ammo_remaining != null
+                            ? `${eff.ammo_remaining}/${eff.ammo_count} — ${eff.status.toUpperCase()}`
+                            : eff.status.toUpperCase()}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -310,7 +413,86 @@ export default function EngagementPanel({
             padding: "16px 0",
           }}
         >
-          {track.jammed && !track.neutralized ? (
+          {/* SHINOBI Protocol Manipulation active */}
+          {track.shinobi_cm_active && !track.neutralized ? (() => {
+            const cmLabel = track.shinobi_cm_active.replace("shinobi_", "").replace("_", " ").toUpperCase();
+            const stateInfo = CM_STATE_LABELS[track.shinobi_cm_state || "pending"] || CM_STATE_LABELS.pending;
+            return (
+              <>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: "#a371f7",
+                    letterSpacing: 1.5,
+                    marginBottom: 6,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  SHINOBI PROTOCOL MANIPULATION
+                </div>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "#a371f7",
+                    letterSpacing: 1,
+                    marginBottom: 8,
+                  }}
+                >
+                  {cmLabel}
+                </div>
+
+                {/* CM state progress bar */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  gap: 6, marginBottom: 10,
+                }}>
+                  <div style={{
+                    width: 100, height: 4, background: "#30363d", borderRadius: 2,
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      width: track.shinobi_cm_state === "2/2" ? "100%"
+                        : track.shinobi_cm_state === "1/2" ? "50%" : "15%",
+                      height: "100%",
+                      background: stateInfo.color,
+                      borderRadius: 2,
+                      transition: "width 0.5s ease",
+                    }} />
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: stateInfo.color,
+                    fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5,
+                    animation: track.shinobi_cm_state !== "2/2" ? "track-blink 1.5s ease-in-out infinite" : undefined,
+                  }}>
+                    {stateInfo.label}
+                  </span>
+                </div>
+
+                {/* Frequency band info */}
+                {track.frequency_band && (
+                  <div style={{ fontSize: 10, color: "#8b949e", marginBottom: 4 }}>
+                    RF: <span style={{ color: "#a371f7", fontWeight: 600 }}>{track.frequency_band}</span>
+                    {track.downlink_detected && (
+                      <span style={{ color: "#3fb950", marginLeft: 8 }}>DL</span>
+                    )}
+                    {track.uplink_detected && (
+                      <span style={{ color: "#3fb950", marginLeft: 4 }}>UL</span>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 10, color: "#8b949e", marginTop: 4 }}>
+                  {track.shinobi_cm_state === "2/2"
+                    ? "Full protocol control established"
+                    : track.shinobi_cm_state === "1/2"
+                      ? "Partial effect — acquiring uplink..."
+                      : "Initiating protocol manipulation..."}
+                </div>
+              </>
+            );
+          })() : track.jammed && !track.neutralized ? (
             <>
               <div
                 style={{

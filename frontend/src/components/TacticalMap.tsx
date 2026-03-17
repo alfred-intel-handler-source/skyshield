@@ -83,10 +83,12 @@ interface SelectionListState {
 function getRingStyleByName(name?: string, type?: string): { color: string; dashArray?: string } {
   const n = (name || "").toLowerCase();
   if (n.includes("tpq")) return { color: "#58a6ff", dashArray: "8,4" };
-  if (n.includes("kurfs")) return { color: "#d29922" };
-  if (n.includes("nighthawk") || type === "eoir") return { color: "#3fb950", dashArray: "2,4" };
+  if (n.includes("kurz")) return { color: "#d29922" };
+  if (n.includes("eoir") || n.includes("eo/ir") || type === "eoir") return { color: "#3fb950", dashArray: "2,4" };
+  if (n.includes("shinobi") || type === "shinobi_pm") return { color: "#a371f7", dashArray: "4,4" };  // Purple for SHINOBI
   if (n.includes("jammer") || type === "electronic") return { color: "#e3b341", dashArray: "8,4" };
-  if (n.includes("coyote") || type === "kinetic") return { color: "#f85149", dashArray: "8,4" };
+  if (n.includes("jackal") || type === "kinetic") return { color: "#f85149", dashArray: "8,4" };
+  if (type === "rf" && n.includes("shinobi")) return { color: "#a371f7", dashArray: "4,4" };
   if (type === "radar") return { color: "#58a6ff", dashArray: "6,4" };
   return { color: "#8b949e", dashArray: "6,4" };
 }
@@ -496,8 +498,8 @@ function EWRadiateOverlay({
   return null;
 }
 
-// Coyote intercept animation: triangle flying from effector to target
-function CoyoteInterceptOverlay({
+// Jackal intercept animation: triangle flying from effector to target
+function JackalInterceptOverlay({
   startXY,
   targetXY,
   effective,
@@ -722,6 +724,13 @@ function TrackDataBlock({
   const interceptPhaseLabel = isInterceptor && track.intercept_phase && !track.neutralized
     ? `<span style="color:#3fb950;font-size:7px;font-weight:700;margin-left:4px;">${track.intercept_phase.toUpperCase()}</span>`
     : "";
+  const isShinobiCM = !!track.shinobi_cm_active && !track.neutralized;
+  const shinobiLabel = isShinobiCM
+    ? `<span style="color:#a371f7;font-size:7px;font-weight:700;margin-left:4px;animation:track-blink 1s ease-in-out infinite;">${track.shinobi_cm_state || "PM"}</span>`
+    : "";
+  const freqLabel = track.frequency_band && !track.neutralized
+    ? `<span style="color:#a371f7;font-size:7px;opacity:0.7;margin-left:3px;">${track.frequency_band}</span>`
+    : "";
 
   // ETA to protected area
   const eta = track.eta_protected;
@@ -753,7 +762,7 @@ function TrackDataBlock({
       background:${isSelected ? color : "#30363d"};
     "></div>
     <div style="color:${color};font-size:${isSelected ? "10px" : "9px"};font-weight:600;letter-spacing:0.5px;">
-      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>${coastLabel}${hfLabel}${jamLabel}${interceptPhaseLabel}
+      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>${freqLabel}${coastLabel}${hfLabel}${jamLabel}${shinobiLabel}${interceptPhaseLabel}
     </div>
     ${!track.neutralized ? `
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
@@ -762,7 +771,8 @@ function TrackDataBlock({
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
       BRG:${Math.round(bearing)}\u00B0 | RNG:${range.toFixed(1)}km
     </div>
-    ${etaLabel}` : isJammed ? `
+    ${etaLabel}` : isShinobiCM ? `
+    <div style="color:#a371f7;font-size:8px;font-weight:600;">SHINOBI ${(track.shinobi_cm_active || "").replace("shinobi_", "").replace("_", " ").toUpperCase()} [${track.shinobi_cm_state || "?"}]</div>` : isJammed ? `
     <div style="color:#d29922;font-size:8px;font-weight:600;">EW EFFECT ACTIVE</div>` : `
     <div style="color:#484f58;font-size:8px;">NEUTRALIZED</div>`}
   </div>`;
@@ -1252,9 +1262,9 @@ export default function TacticalMap({
           );
         })}
 
-        {/* Coyote intercept animations */}
+        {/* JACKAL intercept animations */}
         {activeIntercepts.map((intercept) => (
-          <CoyoteInterceptOverlay
+          <JackalInterceptOverlay
             key={intercept.id}
             startXY={[intercept.startX, intercept.startY]}
             targetXY={[intercept.targetX, intercept.targetY]}
@@ -1415,7 +1425,7 @@ export default function TacticalMap({
 
           // Terminal phase blink for interceptors
           const blinkClass = isInterceptor && track.intercept_phase === "terminal"
-            ? "coyote-terminal-blink"
+            ? "jackal-terminal-blink"
             : trackBlinkStates[track.id];
 
           return (
@@ -1433,7 +1443,7 @@ export default function TacticalMap({
                 />
               )}
 
-              {/* Intercept vector line (Coyote to target) */}
+              {/* Intercept vector line (JACKAL to target) */}
               {interceptTarget && (
                 <Polyline
                   positions={[pos, trackPosition(interceptTarget)]}

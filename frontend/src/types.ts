@@ -27,6 +27,12 @@ export interface TrackData {
   is_interceptor?: boolean;
   interceptor_target?: string | null;
   intercept_phase?: string | null;
+  // SHINOBI RF track properties
+  frequency_band?: string | null;
+  uplink_detected?: boolean;
+  downlink_detected?: boolean;
+  shinobi_cm_active?: string | null;
+  shinobi_cm_state?: string | null;  // "pending", "1/2", "2/2"
 }
 
 export interface SensorStatus {
@@ -142,6 +148,8 @@ export interface EngagementResultMsg {
   effectiveness: number;
   jammed?: boolean;
   jammed_behavior?: string;
+  shinobi_cm?: string;
+  shinobi_cm_state?: string;
 }
 
 export interface DebriefMsg {
@@ -151,13 +159,20 @@ export interface DebriefMsg {
   waves_completed?: number;
 }
 
+export interface ErrorMsg {
+  type: "error";
+  code: string;
+  message: string;
+}
+
 export type ServerMessage =
   | GameStartMsg
   | StateMsg
   | EventMsg
   | EngagementResultMsg
   | DebriefMsg
-  | TutorialMsg;
+  | TutorialMsg
+  | ErrorMsg;
 
 // Phase 2: Base Defense Planner types
 
@@ -229,9 +244,27 @@ export interface CatalogEffector {
   ammo_count?: number;
 }
 
+export interface CatalogCombined {
+  catalog_id: string;
+  name: string;
+  description: string;
+  sensor_type: string;
+  sensor_range_km: number;
+  effector_type: string;
+  effector_range_km: number;
+  fov_deg: number;
+  recharge_seconds: number;
+  single_use: boolean;
+  requires_los: boolean;
+  collateral_risk: string;
+  pros: string[];
+  cons: string[];
+}
+
 export interface EquipmentCatalog {
   sensors: CatalogSensor[];
   effectors: CatalogEffector[];
+  combined: CatalogCombined[];
 }
 
 export interface ScenarioInfo {
@@ -261,4 +294,5 @@ export interface PlacementConfig {
   base_id: string;
   sensors: PlacedEquipment[];
   effectors: PlacedEquipment[];
+  combined: PlacedEquipment[];
 }

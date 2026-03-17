@@ -31,7 +31,7 @@
 - Hostile UAV: diamond with small "v" on top
 - Velocity indicator: no line=slow (<20m/s), short line=medium (20-160m/s), long line=fast (>160m/s)
 - Coasting/extrapolated tracks become faded and stippled
-- Coyote tracks disappear without stippling
+- Jackal tracks disappear without stippling
 
 ### Track States & Alerts
 - Track alerts: alarm sounds + track icon blinks on display + alert count visible
@@ -105,7 +105,7 @@
 - Engagement via WOD or menu system
 - System prioritizes effectors for operator
 
-## NINJA UI Patterns
+## SHINOBI UI Patterns
 - SDR Platform Manager interface
 - Dashboard-based UI
 - Emulator system available for training
@@ -135,6 +135,6 @@
 
 ### NICE TO HAVE
 17. **EW radiate visual** — Show jamming pattern emanating from EW device
-18. **Coyote intercept visualization** — Show interceptor track with waypoints
+18. **JACKAL intercept visualization** — Show interceptor track with waypoints
 19. **Track coasting timer** — 24-26 second extrapolation before track drops
 20. **Situational Awareness objects** — Player-created map annotations
