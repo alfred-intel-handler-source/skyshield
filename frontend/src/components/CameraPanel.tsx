@@ -604,6 +604,80 @@ function drawUnknownBlob(ctx: CanvasRenderingContext2D, s: number, time: number)
   ctx.fill();
 }
 
+function drawExplosion(ctx: CanvasRenderingContext2D, w: number, h: number, elapsed: number) {
+  const cx = w / 2;
+  const cy = h / 2;
+
+  if (elapsed < 0.1) {
+    // White flash (0-100ms)
+    const alpha = 1 - elapsed / 0.1;
+    ctx.fillStyle = `rgba(255,255,255,${alpha * 0.9})`;
+    ctx.fillRect(0, 0, w, h);
+    const r = 30 + elapsed * 600;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,240,${alpha})`;
+    ctx.fill();
+  } else if (elapsed < 0.4) {
+    // Orange fireball (100-400ms)
+    const t = (elapsed - 0.1) / 0.3;
+    const r = 40 + t * 30;
+    const alpha = 1 - t * 0.6;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(255,200,50,${alpha})`);
+    grad.addColorStop(0.4, `rgba(255,120,20,${alpha * 0.8})`);
+    grad.addColorStop(1, `rgba(200,60,10,0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (elapsed < 0.9) {
+    // Smoke/debris (400-900ms)
+    const t = (elapsed - 0.4) / 0.5;
+    const alpha = 0.4 * (1 - t);
+    // Smoke puffs
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + t * 0.5;
+      const dist = 20 + t * 50;
+      const px = cx + Math.cos(angle) * dist;
+      const py = cy + Math.sin(angle) * dist - t * 30; // drift upward
+      const sr = 8 + t * 12;
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, sr);
+      grad.addColorStop(0, `rgba(180,160,140,${alpha})`);
+      grad.addColorStop(1, `rgba(100,90,80,0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, sr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawApproachingCoyote(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  offsetX: number,
+  offsetY: number,
+  mode: CameraMode,
+  time: number,
+) {
+  // Bright fast-moving dot approaching center from the edge
+  const cx = w / 2 + offsetX;
+  const cy = h / 2 + offsetY;
+  const pulse = 0.7 + 0.3 * Math.sin(time * 20);
+  const dotColor = mode === "thermal" ? `rgba(255,255,240,${pulse})` : `rgba(200,220,255,${pulse})`;
+  ctx.fillStyle = dotColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+  ctx.fill();
+  // Glow
+  ctx.fillStyle = mode === "thermal" ? `rgba(255,240,200,${pulse * 0.3})` : `rgba(150,180,255,${pulse * 0.3})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function drawSilhouette(
   ctx: CanvasRenderingContext2D,
   classification: string | null,
@@ -966,6 +1040,10 @@ export default function CameraPanel({
   // Track lost state
   const [trackLost, setTrackLost] = useState(false);
 
+  // Explosion state for Coyote intercept
+  const explosionRef = useRef<{ startTime: number; x: number; y: number } | null>(null);
+  const prevNeutralizedRef = useRef(false);
+
   // Joystick refs for continuous panning
   const joystickActiveRef = useRef(false);
   const joystickDxRef = useRef(0);
@@ -1016,6 +1094,24 @@ export default function CameraPanel({
     setCameraElevation(trackElev);
     setTrackLost(false);
   }, [track, track?.x, track?.y, track?.altitude_ft, track?.neutralized, gimbalMode]);
+
+  // Detect when tracked target gets intercepted — trigger explosion
+  useEffect(() => {
+    if (track) {
+      if (!prevNeutralizedRef.current && track.neutralized) {
+        // Target just got neutralized — check if a Coyote did it
+        const activeCoyote = allTracks.find(
+          (t) => t.is_interceptor && t.interceptor_target === track.id && t.neutralized
+        );
+        if (activeCoyote) {
+          explosionRef.current = { startTime: Date.now(), x: 0, y: 0 };
+        }
+      }
+      prevNeutralizedRef.current = track.neutralized;
+    } else {
+      prevNeutralizedRef.current = false;
+    }
+  }, [track, track?.neutralized, allTracks]);
 
   // Auto-finish acquiring after 1.5s
   useEffect(() => {
@@ -1229,6 +1325,23 @@ export default function CameraPanel({
       drawSilhouette(ctx, vt.classification, scale, mode, time);
       ctx.restore();
 
+      // Draw approaching Coyote as bright dot if one is targeting this track
+      const inboundCoyote = allTracks.find(
+        (t) => t.is_interceptor && !t.neutralized && t.interceptor_target === vt.id
+      );
+      if (inboundCoyote) {
+        const cBearing = calcBearing(inboundCoyote.x, inboundCoyote.y);
+        const cRange = calcRange(inboundCoyote.x, inboundCoyote.y);
+        const cElev = calcElevation(inboundCoyote.altitude_ft, cRange);
+        const dBearing = angleDiff(cBearing, cameraBearing);
+        const dElev = angleDiff(cElev, cameraElevation);
+        if (Math.abs(dBearing) <= fovH / 2 && Math.abs(dElev) <= fovV / 2) {
+          const cpx = (dBearing / (fovH / 2)) * (w / 2);
+          const cpy = -(dElev / (fovV / 2)) * (h / 2);
+          drawApproachingCoyote(ctx, w, h, cpx, cpy, mode, time);
+        }
+      }
+
       drawNoise(ctx, w, h, noise, mode);
       drawReticle(ctx, w, h, hudColor);
     } else {
@@ -1238,8 +1351,18 @@ export default function CameraPanel({
       drawReticle(ctx, w, h, hudColor);
     }
 
+    // Draw explosion overlay (on top of everything)
+    if (explosionRef.current) {
+      const expElapsed = (Date.now() - explosionRef.current.startTime) / 1000;
+      if (expElapsed < 0.9) {
+        drawExplosion(ctx, w, h, expElapsed);
+      } else {
+        explosionRef.current = null;
+      }
+    }
+
     rafRef.current = requestAnimationFrame(draw);
-  }, [track, mode, acquiring, hudColor, degraded, getVisibleTrack, isDegraded, gimbalMode, trackLost, zoom]);
+  }, [track, allTracks, mode, acquiring, hudColor, degraded, getVisibleTrack, isDegraded, gimbalMode, trackLost, zoom, cameraBearing, cameraElevation, fovH, fovV]);
 
   useEffect(() => {
     rafRef.current = requestAnimationFrame(draw);
