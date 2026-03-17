@@ -110,23 +110,14 @@ def _effector_effectiveness(effector_type: str, drone_type: str) -> float:
 
 
 def _check_kurfs_tracking(sensor_configs: list[SensorConfig], drone: "DroneState") -> bool:
-    """Check if any KURFS radar has the drone in its sector."""
+    """Check if any KURFS radar has the drone in range."""
     for s in sensor_configs:
-        if s.type != SensorType.RADAR:
-            continue
-        # KURFS has limited FOV (< 360)
-        if s.fov_deg >= 360:
+        # Match KURFS by name (it's a 360° fire-control radar)
+        if "kurfs" not in s.id.lower() and "kurfs" not in s.name.lower():
             continue
         # Check range
         dist = math.sqrt((drone.x - s.x) ** 2 + (drone.y - s.y) ** 2)
-        if dist > s.range_km:
-            continue
-        # Check FOV
-        dx = drone.x - s.x
-        dy = drone.y - s.y
-        bearing = math.degrees(math.atan2(dx, dy)) % 360
-        diff = abs(((bearing - s.facing_deg) + 180) % 360 - 180)
-        if diff <= s.fov_deg / 2:
+        if dist <= s.range_km:
             return True
     return False
 

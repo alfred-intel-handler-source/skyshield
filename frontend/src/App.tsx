@@ -749,6 +749,7 @@ export default function App() {
           { catalog_id: "nighthawk", x: 0.4, y: -0.2, facing_deg: 180 },
         ],
         effectors: [
+          { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
           { catalog_id: "coyote_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
           { catalog_id: "coyote_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
         ],
