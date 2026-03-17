@@ -744,7 +744,7 @@ export default function TacticalMap({
   activeJammers = {},
   activeIntercepts = [],
 }: Props) {
-  const baseCenter: [number, number] = [baseLat, baseLng];
+  const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
   const [deviceWheelState, setDeviceWheelState] = useState<DeviceWheelState | null>(null);
   const [showRangeRings, setShowRangeRings] = useState(true);
