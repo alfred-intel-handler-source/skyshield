@@ -937,6 +937,7 @@ export default function App() {
           protectedArea={protectedArea}
           trackBlinkStates={trackBlinkStates}
           newContactBanner={newContactBanner}
+          baseAssets={baseTemplate?.protected_assets}
         />
 
         {/* Tutorial overlay banner */}

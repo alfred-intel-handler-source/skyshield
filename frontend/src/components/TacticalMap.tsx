@@ -11,7 +11,7 @@ import {
   LayersControl,
 } from "react-leaflet";
 import L from "leaflet";
-import type { Affiliation, EffectorStatus, EngagementZones, ProtectedAreaInfo, SensorStatus, TrackData } from "../types";
+import type { Affiliation, EffectorStatus, EngagementZones, ProtectedAreaInfo, ProtectedAsset, SensorStatus, TrackData } from "../types";
 import { gameXYToLatLng } from "../utils/coordinates";
 import RadialActionWheel from "./RadialActionWheel";
 import DeviceWheel from "./DeviceWheel";
@@ -41,6 +41,7 @@ interface Props {
   protectedArea?: ProtectedAreaInfo | null;
   trackBlinkStates?: Record<string, string>;
   newContactBanner?: string | null;
+  baseAssets?: ProtectedAsset[];
 }
 
 interface WheelState {
@@ -433,6 +434,7 @@ export default function TacticalMap({
   protectedArea,
   trackBlinkStates = {},
   newContactBanner,
+  baseAssets = [],
 }: Props) {
   const baseCenter: [number, number] = [baseLat, baseLng];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
@@ -441,6 +443,27 @@ export default function TacticalMap({
   const [hiddenRings, setHiddenRings] = useState<Set<string>>(new Set());
   const [selectionList, setSelectionList] = useState<SelectionListState | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+
+  // Saved locations state
+  interface SavedLocation {
+    label: string;
+    center: [number, number];
+    zoom: number;
+  }
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>(() => {
+    // Pre-populate with base center and protected assets
+    const locs: SavedLocation[] = [
+      { label: "BASE CENTER", center: [baseLat, baseLng], zoom: zoom },
+    ];
+    for (const asset of baseAssets) {
+      const pos = gameXYToLatLng(asset.x, asset.y, baseLat, baseLng);
+      locs.push({ label: asset.name.toUpperCase(), center: pos, zoom: Math.max(zoom, 14) });
+    }
+    return locs;
+  });
+  const [showSavedLocs, setShowSavedLocs] = useState(false);
+  const [savingNewLoc, setSavingNewLoc] = useState(false);
+  const [newLocLabel, setNewLocLabel] = useState("");
 
   // Compute zoom from engagement zones to fit detection range
   const zoom = useMemo(() => {
@@ -1095,6 +1118,128 @@ export default function TacticalMap({
       >
         RANGE RINGS {showRangeRings ? "ON" : "OFF"}
       </button>
+
+      {/* Saved locations button + dropdown */}
+      <div style={{ position: "absolute", top: 10, left: 160, zIndex: 1000 }}>
+        <button
+          onClick={() => { setShowSavedLocs((v) => !v); setSavingNewLoc(false); }}
+          style={{
+            padding: "5px 10px",
+            background: showSavedLocs ? "rgba(88, 166, 255, 0.15)" : "rgba(13, 17, 23, 0.8)",
+            border: `1px solid ${showSavedLocs ? "#58a6ff55" : "#30363d"}`,
+            borderRadius: 4,
+            color: showSavedLocs ? "#58a6ff" : "#8b949e",
+            fontSize: 10,
+            fontWeight: 600,
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: 1,
+            cursor: "pointer",
+            transition: "all 0.15s",
+          }}
+        >
+          SAVED LOC
+        </button>
+        {showSavedLocs && (
+          <div
+            style={{
+              position: "absolute",
+              top: 32,
+              left: 0,
+              background: "rgba(22, 27, 34, 0.96)",
+              border: "1px solid #30363d",
+              borderRadius: 6,
+              padding: "4px 0",
+              minWidth: 200,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            {savedLocations.map((loc, i) => (
+              <div
+                key={i}
+                onClick={() => {
+                  const map = mapRef.current;
+                  if (map) map.setView(loc.center, loc.zoom, { animate: true, duration: 0.5 });
+                  setShowSavedLocs(false);
+                }}
+                style={{
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  fontSize: 10,
+                  color: "#e6edf3",
+                  fontWeight: 500,
+                  letterSpacing: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(88,166,255,0.1)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                <span style={{ color: "#58a6ff", fontSize: 10 }}>{"\u25C9"}</span>
+                {loc.label}
+              </div>
+            ))}
+            <div style={{ height: 1, background: "#30363d", margin: "4px 8px" }} />
+            {savingNewLoc ? (
+              <div style={{ padding: "6px 12px", display: "flex", gap: 6 }}>
+                <input
+                  autoFocus
+                  value={newLocLabel}
+                  onChange={(e) => setNewLocLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newLocLabel.trim()) {
+                      const map = mapRef.current;
+                      if (map) {
+                        const c = map.getCenter();
+                        const z = map.getZoom();
+                        setSavedLocations((prev) => [...prev, {
+                          label: newLocLabel.trim().toUpperCase(),
+                          center: [c.lat, c.lng],
+                          zoom: z,
+                        }]);
+                      }
+                      setNewLocLabel("");
+                      setSavingNewLoc(false);
+                    } else if (e.key === "Escape") {
+                      setSavingNewLoc(false);
+                      setNewLocLabel("");
+                    }
+                  }}
+                  placeholder="Label..."
+                  style={{
+                    flex: 1,
+                    background: "#0d1117",
+                    border: "1px solid #30363d",
+                    borderRadius: 3,
+                    color: "#e6edf3",
+                    fontSize: 10,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    padding: "3px 6px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            ) : (
+              <div
+                onClick={() => setSavingNewLoc(true)}
+                style={{
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                  fontSize: 10,
+                  color: "#3fb950",
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(63,185,80,0.1)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+              >
+                + SAVE CURRENT VIEW
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* NEW CONTACT banner */}
       {newContactBanner && (
