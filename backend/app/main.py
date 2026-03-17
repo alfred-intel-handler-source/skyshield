@@ -29,6 +29,7 @@ from app.models import (
     PlayerAction,
     SensorConfig,
     SensorType,
+    ThreatClassification,
 )
 from app.scenario import list_scenarios, load_scenario
 from app.scoring import calculate_score, calculate_score_multi
@@ -661,7 +662,7 @@ async def game_websocket(ws: WebSocket):
                         "speed_kts": round(drone.speed),
                         "heading_deg": round(drone.heading, 1),
                         "confidence": drone.confidence,
-                        "classification": drone.classification.value if drone.classification else None,
+                        "classification": (drone.classification.value if hasattr(drone.classification, 'value') else drone.classification) if drone.classification else None,
                         "trail": drone.trail,
                         "sensors_detecting": drone.sensors_detecting,
                         "neutralized": drone.neutralized,
@@ -771,9 +772,13 @@ async def game_websocket(ws: WebSocket):
                         for j, d in enumerate(drones):
                             if d.id == target_id and d.dtid_phase == DTIDPhase.TRACKED:
                                 new_affil = Affiliation(affiliation)
+                                try:
+                                    cls_enum = ThreatClassification(classification)
+                                except (ValueError, KeyError):
+                                    cls_enum = classification
                                 drones[j] = d.model_copy(update={
                                     "dtid_phase": DTIDPhase.IDENTIFIED,
-                                    "classification": classification,
+                                    "classification": cls_enum,
                                     "classified": True,
                                     "affiliation": new_affil,
                                 })
