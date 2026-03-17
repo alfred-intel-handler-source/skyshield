@@ -784,6 +784,180 @@ async def game_websocket(ws: WebSocket):
             # Update drones and run sensors
             for i, drone in enumerate(drones):
                 if not drone.neutralized:
+                    # --- Coyote interceptor movement ---
+                    if drone.is_interceptor:
+                        target_drone = None
+                        for td in drones:
+                            if td.id == drone.interceptor_target:
+                                target_drone = td
+                                break
+
+                        phase = drone.intercept_phase
+
+                        # Self-destruct phase: climb then neutralize
+                        if phase == "self_destruct":
+                            if drone.altitude < 328:
+                                new_alt = min(328, drone.altitude + 200 * tick_rate)
+                                trail = list(drone.trail)
+                                trail.append([round(drone.x, 3), round(drone.y, 3)])
+                                if len(trail) > 20:
+                                    trail = trail[-20:]
+                                drones[i] = drone.model_copy(update={
+                                    "altitude": new_alt, "trail": trail,
+                                })
+                            else:
+                                drones[i] = drone.model_copy(update={"neutralized": True})
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"{drone.id.upper()} SELF-DESTRUCT AT {round(drone.altitude)}ft",
+                                })
+                            continue
+
+                        # Target gone or neutralized -> self-destruct
+                        if target_drone is None or target_drone.neutralized:
+                            drones[i] = drone.model_copy(update={"intercept_phase": "self_destruct"})
+                            events.append({
+                                "type": "event",
+                                "timestamp": round(elapsed, 1),
+                                "message": f"{drone.id.upper()} — TARGET LOST, ENTERING SELF-DESTRUCT",
+                            })
+                            continue
+
+                        # Calculate distance to target
+                        dx = target_drone.x - drone.x
+                        dy = target_drone.y - drone.y
+                        dist_to_target = math.sqrt(dx * dx + dy * dy)
+                        heading_to_target = math.degrees(math.atan2(dx, dy)) % 360
+
+                        if phase == "launch":
+                            # Launch phase: first 1 second, rapid climb
+                            new_alt = min(300, drone.altitude + 250 * tick_rate)
+                            new_speed = min(150, drone.speed + 50 * tick_rate)
+                            speed_kms = new_speed * 0.000514
+                            heading_rad = math.radians(heading_to_target)
+                            new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
+                            new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+                            next_phase = "midcourse" if new_alt >= 300 else "launch"
+                            drones[i] = drone.model_copy(update={
+                                "x": new_x, "y": new_y, "altitude": new_alt,
+                                "speed": new_speed, "heading": heading_to_target,
+                                "trail": trail, "intercept_phase": next_phase,
+                            })
+                            continue
+
+                        if phase == "midcourse":
+                            speed = 150.0
+                            speed_kms = speed * 0.000514
+                            heading_rad = math.radians(heading_to_target)
+                            new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
+                            new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+
+                            # Periodic guidance events (every ~2 seconds)
+                            if int(elapsed * 10) % 20 == 0:
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"KURFS GUIDING {drone.id.upper()} — RANGE: {dist_to_target:.1f}km",
+                                })
+
+                            next_phase = "terminal" if dist_to_target < 0.3 else "midcourse"
+                            updates = {
+                                "x": new_x, "y": new_y, "speed": speed,
+                                "heading": heading_to_target, "trail": trail,
+                                "intercept_phase": next_phase,
+                            }
+                            if next_phase == "terminal":
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"{drone.id.upper()} TERMINAL — SEEKER ACQUIRED",
+                                })
+                            drones[i] = drone.model_copy(update=updates)
+                            continue
+
+                        if phase == "terminal":
+                            speed = 200.0
+                            speed_kms = speed * 0.000514
+                            heading_rad = math.radians(heading_to_target)
+                            new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
+                            new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+                            drones[i] = drone.model_copy(update={
+                                "x": new_x, "y": new_y, "speed": speed,
+                                "heading": heading_to_target, "trail": trail,
+                            })
+
+                            # Check intercept (within 0.05km)
+                            # Recalculate distance after movement
+                            dx2 = target_drone.x - new_x
+                            dy2 = target_drone.y - new_y
+                            dist_after = math.sqrt(dx2 * dx2 + dy2 * dy2)
+                            if dist_after < 0.05:
+                                attempts = drone.intercept_attempts + 1
+                                if random.random() < 0.85:
+                                    # Success
+                                    for tj, td in enumerate(drones):
+                                        if td.id == drone.interceptor_target:
+                                            drones[tj] = td.model_copy(update={
+                                                "neutralized": True,
+                                                "dtid_phase": DTIDPhase.DEFEATED,
+                                            })
+                                            break
+                                    drones[i] = drones[i].model_copy(update={
+                                        "neutralized": True,
+                                        "intercept_attempts": attempts,
+                                    })
+                                    events.append({
+                                        "type": "event",
+                                        "timestamp": round(elapsed, 1),
+                                        "message": f"{drone.id.upper()} INTERCEPT SUCCESSFUL — TARGET DESTROYED",
+                                    })
+                                    # Send engagement result for the target
+                                    await ws.send_json({
+                                        "type": "engagement_result",
+                                        "target_id": drone.interceptor_target,
+                                        "effector": drone.id,
+                                        "effective": True,
+                                        "effectiveness": 1.0,
+                                    })
+                                else:
+                                    # Miss
+                                    if attempts >= 2:
+                                        drones[i] = drones[i].model_copy(update={
+                                            "intercept_phase": "self_destruct",
+                                            "intercept_attempts": attempts,
+                                        })
+                                        events.append({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"{drone.id.upper()} MISSED — MAX ATTEMPTS, SELF-DESTRUCT",
+                                        })
+                                    else:
+                                        drones[i] = drones[i].model_copy(update={
+                                            "intercept_phase": "midcourse",
+                                            "intercept_attempts": attempts,
+                                        })
+                                        events.append({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"{drone.id.upper()} MISSED — RE-ENGAGING",
+                                        })
+                            continue
+
+                        continue  # Skip normal movement for interceptors
+
                     # --- EW Jamming behavior update ---
                     if drone.jammed:
                         drones[i] = drones[i].model_copy(update={
@@ -904,8 +1078,8 @@ async def game_websocket(ws: WebSocket):
                         if dist > 12.0:
                             drones[i] = drones[i].model_copy(update={"neutralized": True})
 
-                # Run sensors for this drone
-                if not drones[i].neutralized:
+                # Run sensors for this drone (skip interceptors — they're auto-detected)
+                if not drones[i].neutralized and not drones[i].is_interceptor:
                     detecting_ids, _ = update_sensors(
                         drones[i], sensor_configs, terrain=terrain
                     )
@@ -1085,6 +1259,9 @@ async def game_websocket(ws: WebSocket):
                         "is_ambient": drone.is_ambient,
                         "jammed": drone.jammed,
                         "jammed_behavior": drone.jammed_behavior,
+                        "is_interceptor": drone.is_interceptor,
+                        "interceptor_target": drone.interceptor_target,
+                        "intercept_phase": drone.intercept_phase,
                     })
 
             state_msg = {
@@ -1225,6 +1402,15 @@ async def game_websocket(ws: WebSocket):
                                     "timestamp": round(elapsed, 1),
                                     "message": f"OPERATOR: HOLD FIRE on {target_id.upper()}",
                                 })
+                                # Self-destruct any active Coyotes targeting this track
+                                for ci, cd in enumerate(drones):
+                                    if cd.is_interceptor and not cd.neutralized and cd.interceptor_target == target_id and cd.intercept_phase != "self_destruct":
+                                        drones[ci] = cd.model_copy(update={"intercept_phase": "self_destruct"})
+                                        await ws.send_json({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"HOLD FIRE \u2014 {cd.id.upper()} ENTERING SELF-DESTRUCT",
+                                        })
                                 break
 
                     elif action_name == "release_hold_fire":
@@ -1264,6 +1450,15 @@ async def game_websocket(ws: WebSocket):
                               else:
                                for j, d in enumerate(drones):
                                 if d.id == target_id:
+                                    # Block engaging interceptor tracks
+                                    if d.is_interceptor:
+                                        await ws.send_json({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"ENGAGEMENT: BLOCKED — {d.id.upper()} is a friendly interceptor",
+                                        })
+                                        break
+
                                     is_jammer = eff_state["type"] in ("rf_jam", "electronic")
 
                                     # Check range — jammers can activate regardless (they radiate omnidirectionally)
@@ -1349,8 +1544,52 @@ async def game_websocket(ws: WebSocket):
                                                 "jammed": True,
                                                 "jammed_behavior": jam_behavior,
                                             })
+                                    elif eff_state.get("ammo_count") is not None and eff_state["type"] == "kinetic":
+                                        # --- Coyote pallet: launch interceptor drone ---
+                                        coyote_count = sum(1 for dd in drones if dd.is_interceptor)
+                                        coyote_id = f"CYTE-{coyote_count + 1:02d}"
+                                        eff_x = eff_state.get("x", 0.0)
+                                        eff_y = eff_state.get("y", 0.0)
+                                        dx_tgt = d.x - eff_x
+                                        dy_tgt = d.y - eff_y
+                                        heading_to = math.degrees(math.atan2(dx_tgt, dy_tgt)) % 360
+
+                                        coyote_drone = DroneState(
+                                            id=coyote_id,
+                                            drone_type=DroneType.COYOTE,
+                                            x=eff_x,
+                                            y=eff_y,
+                                            altitude=50,
+                                            speed=80,
+                                            heading=heading_to,
+                                            detected=True,
+                                            classified=True,
+                                            classification=ThreatClassification.COYOTE,
+                                            dtid_phase=DTIDPhase.IDENTIFIED,
+                                            affiliation=Affiliation.FRIENDLY,
+                                            confidence=1.0,
+                                            is_interceptor=True,
+                                            interceptor_target=target_id,
+                                            intercept_phase="launch",
+                                        )
+                                        drones.append(coyote_drone)
+
+                                        engage_times[target_id] = elapsed
+                                        effector_used[target_id] = eff_state["type"]
+                                        actions.append(PlayerAction(
+                                            action="engage",
+                                            target_id=target_id,
+                                            effector=effector_id,
+                                            timestamp=elapsed,
+                                        ))
+
+                                        await ws.send_json({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"COYOTE LAUNCHED \u2014 {coyote_id} EN ROUTE TO {target_id.upper()}",
+                                        })
                                     else:
-                                        # Non-jammer effectors: instant effect (kinetic, directed energy, etc.)
+                                        # Non-jammer effectors: instant effect (directed energy, etc.)
                                         neutralized = effectiveness > 0.5
                                         drones[j] = d.model_copy(update={
                                             "dtid_phase": DTIDPhase.DEFEATED,
