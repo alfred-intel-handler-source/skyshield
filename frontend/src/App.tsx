@@ -181,6 +181,10 @@ export default function App() {
   const [audioVolume, setAudioVolume] = useState(soundEngine.volume);
   const prevThreatLevelRef = useRef<ThreatLevel>("green");
 
+  // Wave system
+  const [waveNumber, setWaveNumber] = useState(1);
+  const [wavesCompleted, setWavesCompleted] = useState(1);
+
   // Active jamming state: maps effector id -> expiry timestamp
   const [activeJammers, setActiveJammers] = useState<Record<string, number>>({});
 
@@ -246,6 +250,7 @@ export default function App() {
         setElapsed(msg.elapsed);
         setTimeRemaining(msg.time_remaining);
         setThreatLevel(msg.threat_level);
+        if (msg.wave_number != null) setWaveNumber(msg.wave_number);
         setSensors((prev) => {
           const configs = prev.length ? prev : [];
           return msg.sensors.map((s) => {
@@ -370,6 +375,7 @@ export default function App() {
       case "debrief":
         setScore(msg.score);
         setDroneReachedBase(msg.drone_reached_base);
+        setWavesCompleted(msg.waves_completed ?? 1);
         setPhase("debrief");
         if (msg.drone_reached_base) {
           soundEngine.play("mission_fail");
@@ -547,6 +553,12 @@ export default function App() {
           handleToggleMute();
           break;
         }
+        case "Escape": {
+          if (phaseRef.current === "running") {
+            send({ type: "action", action: "end_mission", target_id: "" });
+          }
+          break;
+        }
         case "Tab": {
           e.preventDefault();
           // Cycle through tracks
@@ -646,6 +658,7 @@ export default function App() {
     setTutorialMessage(null);
     setIsTutorial(false);
     setPaused(false);
+    setWaveNumber(1);
 
     // Connect with placement data
     connect({
@@ -678,6 +691,7 @@ export default function App() {
     setTutorialMessage(null);
     setIsTutorial(false);
     setPaused(false);
+    setWaveNumber(1);
   };
 
   const confirmTrack = (trackId: string) => {
@@ -719,6 +733,10 @@ export default function App() {
 
   const handleReleaseHoldFire = (trackId: string) => {
     send({ type: "action", action: "release_hold_fire", target_id: trackId });
+  };
+
+  const handleEndMission = () => {
+    send({ type: "action", action: "end_mission", target_id: "" });
   };
 
   // --- Quick Start handler ---
@@ -775,6 +793,7 @@ export default function App() {
       setIsTutorial(false);
       setPaused(false);
       setPlacementConfig(quickPlacement);
+      setWaveNumber(1);
 
       // Connect directly — skip scenario select, loadout, placement
       connect({
@@ -1038,6 +1057,8 @@ export default function App() {
         onToggleMute={handleToggleMute}
         onVolumeChange={handleVolumeChange}
         alertCount={alertCount}
+        waveNumber={waveNumber}
+        onEndMission={handleEndMission}
       />
 
       {/* Left sidebar */}
@@ -1226,7 +1247,7 @@ export default function App() {
             letterSpacing: 0.5,
           }}
         >
-          SPACE:Pause TAB:Cycle 1:Confirm 2:Slew 4:Unslew M:Mute
+          SPACE:Pause TAB:Cycle 1:Confirm 2:Slew 4:Unslew M:Mute ESC:End Mission
         </div>
       )}
 
@@ -1237,6 +1258,7 @@ export default function App() {
           droneReachedBase={droneReachedBase}
           scenarioName={scenarioName}
           onRestart={handleRestart}
+          wavesCompleted={wavesCompleted}
         />
       )}
     </div>

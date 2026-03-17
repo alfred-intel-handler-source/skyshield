@@ -167,6 +167,50 @@ export default function TrackDetailPanel({ track }: Props) {
         )}
       </div>
 
+      {/* Jammed indicator */}
+      {track.jammed && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 8,
+            padding: "4px 8px",
+            background: "rgba(210, 153, 34, 0.15)",
+            border: "1px solid rgba(210, 153, 34, 0.4)",
+            borderRadius: 4,
+          }}
+        >
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#d29922", letterSpacing: 1 }}>
+            JAMMED
+          </span>
+          {track.jammed_behavior && (
+            <span style={{ fontSize: 9, color: "#d29922", opacity: 0.8 }}>
+              {track.jammed_behavior.replace(/_/g, " ").toUpperCase()}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Ambient indicator */}
+      {track.is_ambient && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: "2px 8px",
+            background: "rgba(139, 148, 158, 0.1)",
+            border: "1px solid rgba(139, 148, 158, 0.3)",
+            borderRadius: 3,
+            fontSize: 9,
+            color: "#8b949e",
+            letterSpacing: 1,
+            fontWeight: 600,
+          }}
+        >
+          AMBIENT TRAFFIC
+        </div>
+      )}
+
       {/* Data grid */}
       <div style={{ marginTop: 10 }}>
         <DataRow label="RANGE" value={`${range.toFixed(2)} km`} />

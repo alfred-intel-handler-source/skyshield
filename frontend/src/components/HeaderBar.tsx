@@ -10,6 +10,8 @@ interface Props {
   onToggleMute: () => void;
   onVolumeChange: (v: number) => void;
   alertCount?: number;
+  waveNumber?: number;
+  onEndMission?: () => void;
 }
 
 const THREAT_COLORS: Record<ThreatLevel, string> = {
@@ -29,6 +31,8 @@ export default function HeaderBar({
   onToggleMute,
   onVolumeChange,
   alertCount = 0,
+  waveNumber = 1,
+  onEndMission,
 }: Props) {
   const threatColor = THREAT_COLORS[threatLevel];
   const mins = Math.floor(timeRemaining / 60);
@@ -72,7 +76,7 @@ export default function HeaderBar({
         </span>
       </div>
 
-      {/* Center: Mission clock */}
+      {/* Center: Mission clock + wave */}
       <div style={{ display: "flex", alignItems: "center", gap: 24, flex: 1, justifyContent: "center" }}>
         <span
           style={{
@@ -83,6 +87,21 @@ export default function HeaderBar({
           }}
         >
           {scenarioName}
+        </span>
+        <span
+          style={{
+            padding: "2px 10px",
+            borderRadius: 10,
+            background: "rgba(88, 166, 255, 0.15)",
+            border: "1px solid rgba(88, 166, 255, 0.4)",
+            color: "#58a6ff",
+            fontSize: 11,
+            fontWeight: 700,
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: 1,
+          }}
+        >
+          WAVE {waveNumber}
         </span>
         <span
           style={{
@@ -184,18 +203,46 @@ export default function HeaderBar({
 
         {/* Time Remaining */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10, color: "#8b949e", letterSpacing: 1 }}>REMAINING</span>
+          <span style={{ fontSize: 10, color: "#8b949e", letterSpacing: 1 }}>MISSION</span>
           <span
             style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 14,
               fontWeight: 600,
-              color: timeRemaining < 30 ? "#f85149" : "#e6edf3",
+              color: "#e6edf3",
             }}
           >
             {mins}:{secs.toString().padStart(2, "0")}
           </span>
         </div>
+
+        {/* END MISSION button */}
+        {onEndMission && (
+          <button
+            onClick={onEndMission}
+            style={{
+              padding: "4px 12px",
+              background: "rgba(248, 81, 73, 0.15)",
+              border: "1px solid rgba(248, 81, 73, 0.4)",
+              borderRadius: 4,
+              color: "#f85149",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(248, 81, 73, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = "rgba(248, 81, 73, 0.15)";
+            }}
+          >
+            END MISSION
+          </button>
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import random
 import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -17,6 +18,7 @@ from app.models import (
     CatalogEffector,
     CatalogSensor,
     DroneStartConfig,
+    DroneType,
     DTIDPhase,
     Affiliation,
     DroneState,
@@ -123,10 +125,10 @@ def _check_kurfs_tracking(sensor_configs: list[SensorConfig], drone: "DroneState
 
 
 def _threat_level(drones: list[DroneState]) -> str:
-    """Calculate threat level based on closest non-neutralized track range."""
+    """Calculate threat level based on closest non-neutralized hostile track range."""
     min_range = float("inf")
     for drone in drones:
-        if not drone.neutralized and drone.detected:
+        if not drone.neutralized and drone.detected and not drone.is_ambient:
             dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
             min_range = min(min_range, dist)
 
@@ -204,6 +206,222 @@ def _build_effectors_from_placement(
             ammo_remaining=cat.ammo_count,
         ))
     return effectors
+
+
+# --- Wave generation ---
+
+_WAVE_DRONE_TEMPLATES: list[dict] = [
+    {"drone_type": "commercial_quad", "altitude": 150, "speed": 35, "behavior": "direct_approach", "rf_emitting": True,
+     "correct_classification": "commercial_quad", "correct_affiliation": "hostile",
+     "optimal_effectors": ["electronic"], "acceptable_effectors": ["electronic", "kinetic"], "roe_violations": []},
+    {"drone_type": "commercial_quad", "altitude": 120, "speed": 40, "behavior": "evasive", "rf_emitting": True,
+     "correct_classification": "commercial_quad", "correct_affiliation": "hostile",
+     "optimal_effectors": ["electronic"], "acceptable_effectors": ["electronic", "kinetic"], "roe_violations": []},
+    {"drone_type": "fixed_wing", "altitude": 300, "speed": 60, "behavior": "direct_approach", "rf_emitting": False,
+     "correct_classification": "fixed_wing", "correct_affiliation": "hostile",
+     "optimal_effectors": ["kinetic"], "acceptable_effectors": ["kinetic", "electronic"], "roe_violations": []},
+    {"drone_type": "micro", "altitude": 80, "speed": 25, "behavior": "evasive", "rf_emitting": True,
+     "correct_classification": "micro", "correct_affiliation": "hostile",
+     "optimal_effectors": ["electronic", "kinetic"], "acceptable_effectors": ["electronic", "kinetic"], "roe_violations": []},
+]
+
+
+def _generate_wave_drones(wave_number: int, wave_drone_counter: int) -> tuple[list[DroneStartConfig], int]:
+    """Generate drones for a wave. Returns (configs, updated_counter)."""
+    if wave_number == 1:
+        return [], wave_drone_counter  # Wave 1 uses scenario drones
+
+    if wave_number == 2:
+        count = random.randint(2, 3)
+    else:
+        count = random.randint(4, 5)
+
+    configs = []
+    for i in range(count):
+        wave_drone_counter += 1
+        template = random.choice(_WAVE_DRONE_TEMPLATES)
+        # Random spawn position on map edge (3-5 km from base)
+        angle = random.uniform(0, 2 * math.pi)
+        dist = random.uniform(3.5, 5.0)
+        start_x = dist * math.cos(angle)
+        start_y = dist * math.sin(angle)
+        heading = math.degrees(math.atan2(-start_y, -start_x)) % 360
+
+        cfg = DroneStartConfig(
+            id=f"wave{wave_number}-{wave_drone_counter}",
+            drone_type=DroneType(template["drone_type"]),
+            start_x=round(start_x, 2),
+            start_y=round(start_y, 2),
+            altitude=template["altitude"] + random.randint(-30, 30),
+            speed=template["speed"] + random.randint(-5, 5),
+            heading=heading,
+            behavior=template["behavior"],
+            rf_emitting=template["rf_emitting"],
+            spawn_delay=i * random.uniform(2.0, 5.0),  # Stagger spawns
+            correct_classification=template["correct_classification"],
+            correct_affiliation=template["correct_affiliation"],
+            optimal_effectors=template["optimal_effectors"],
+            acceptable_effectors=template["acceptable_effectors"],
+            roe_violations=template["roe_violations"],
+            should_engage=True,
+        )
+        configs.append(cfg)
+
+    return configs, wave_drone_counter
+
+
+# --- Ambient air traffic ---
+
+_COMMERCIAL_CALLSIGNS = [
+    "QR-412", "EK-771", "BA-209", "LH-442", "AF-381", "SQ-026",
+    "UA-857", "DL-134", "AA-291", "JL-006", "CX-888", "TK-517",
+]
+_MILITARY_CALLSIGNS = [
+    "VIPER-01", "RAPTOR-22", "EAGLE-11", "FALCON-03", "HAWK-07",
+    "COBRA-14", "THUNDER-05", "SHADOW-09", "STORM-16", "GHOST-21",
+]
+
+
+def _generate_ambient_object(
+    ambient_counter: int,
+    obj_type: str,
+    elapsed: float,
+) -> tuple[DroneStartConfig, int]:
+    """Generate a single ambient air traffic object."""
+    ambient_counter += 1
+    amb_id = f"AMB-{ambient_counter:03d}"
+
+    if obj_type == "commercial_aircraft":
+        callsign = random.choice(_COMMERCIAL_CALLSIGNS)
+        amb_id = callsign
+        # High altitude, fast, straight line across map
+        angle = random.uniform(0, 2 * math.pi)
+        start_x = 8.0 * math.cos(angle)
+        start_y = 8.0 * math.sin(angle)
+        # Fly across to the other side
+        exit_angle = angle + math.pi + random.uniform(-0.3, 0.3)
+        exit_x = 8.0 * math.cos(exit_angle)
+        exit_y = 8.0 * math.sin(exit_angle)
+        heading = math.degrees(math.atan2(exit_y - start_y, exit_x - start_x)) % 360
+
+        cfg = DroneStartConfig(
+            id=amb_id,
+            drone_type=DroneType.PASSENGER_AIRCRAFT,
+            start_x=round(start_x, 2),
+            start_y=round(start_y, 2),
+            altitude=random.randint(15000, 35000),
+            speed=random.randint(400, 500),
+            heading=heading,
+            behavior="waypoint_path",
+            rf_emitting=True,
+            spawn_delay=0.0,
+            waypoints=[[round(exit_x, 2), round(exit_y, 2)]],
+            correct_classification="passenger_aircraft",
+            correct_affiliation="friendly",
+            optimal_effectors=[],
+            acceptable_effectors=[],
+            roe_violations=["electronic", "kinetic", "rf_jam", "directed_energy", "net_interceptor"],
+            should_engage=False,
+        )
+    elif obj_type == "military_jet":
+        callsign = random.choice(_MILITARY_CALLSIGNS)
+        amb_id = callsign
+        angle = random.uniform(0, 2 * math.pi)
+        orbit_dist = random.uniform(3.0, 6.0)
+        start_x = 7.0 * math.cos(angle)
+        start_y = 7.0 * math.sin(angle)
+        heading = math.degrees(math.atan2(-start_y, -start_x)) % 360
+
+        cfg = DroneStartConfig(
+            id=amb_id,
+            drone_type=DroneType.MILITARY_JET,
+            start_x=round(start_x, 2),
+            start_y=round(start_y, 2),
+            altitude=random.randint(5000, 15000),
+            speed=random.randint(500, 600),
+            heading=heading,
+            behavior="orbit",
+            rf_emitting=True,
+            spawn_delay=0.0,
+            orbit_center=[round(orbit_dist * math.cos(angle + 0.5), 2),
+                          round(orbit_dist * math.sin(angle + 0.5), 2)],
+            orbit_radius=random.uniform(2.0, 4.0),
+            correct_classification="fixed_wing",
+            correct_affiliation="friendly",
+            optimal_effectors=[],
+            acceptable_effectors=[],
+            roe_violations=["electronic", "kinetic", "rf_jam", "directed_energy", "net_interceptor"],
+            should_engage=False,
+        )
+    elif obj_type == "bird":
+        amb_id = f"AMB-{ambient_counter:03d}"
+        angle = random.uniform(0, 2 * math.pi)
+        start_dist = random.uniform(2.0, 5.0)
+        start_x = start_dist * math.cos(angle)
+        start_y = start_dist * math.sin(angle)
+        heading = random.uniform(0, 360)
+
+        cfg = DroneStartConfig(
+            id=amb_id,
+            drone_type=DroneType.BIRD,
+            start_x=round(start_x, 2),
+            start_y=round(start_y, 2),
+            altitude=random.randint(50, 500),
+            speed=random.randint(20, 40),
+            heading=heading,
+            behavior="evasive",
+            rf_emitting=False,
+            spawn_delay=0.0,
+            correct_classification="bird",
+            correct_affiliation="neutral",
+            optimal_effectors=[],
+            acceptable_effectors=[],
+            roe_violations=["electronic", "kinetic", "rf_jam", "directed_energy", "net_interceptor"],
+            should_engage=False,
+        )
+    elif obj_type == "weather_balloon":
+        amb_id = f"AMB-{ambient_counter:03d}"
+        angle = random.uniform(0, 2 * math.pi)
+        start_dist = random.uniform(1.5, 4.0)
+        start_x = start_dist * math.cos(angle)
+        start_y = start_dist * math.sin(angle)
+
+        cfg = DroneStartConfig(
+            id=amb_id,
+            drone_type=DroneType.WEATHER_BALLOON,
+            start_x=round(start_x, 2),
+            start_y=round(start_y, 2),
+            altitude=random.randint(500, 2000),
+            speed=random.randint(0, 5),
+            heading=random.uniform(0, 360),
+            behavior="waypoint_path",
+            rf_emitting=False,
+            spawn_delay=0.0,
+            waypoints=[[round(start_x + random.uniform(-0.5, 0.5), 2),
+                        round(start_y + random.uniform(-0.5, 0.5), 2)]],
+            correct_classification="weather_balloon",
+            correct_affiliation="neutral",
+            optimal_effectors=[],
+            acceptable_effectors=[],
+            roe_violations=["electronic", "kinetic", "rf_jam", "directed_energy", "net_interceptor"],
+            should_engage=False,
+        )
+    else:
+        raise ValueError(f"Unknown ambient type: {obj_type}")
+
+    return cfg, ambient_counter
+
+
+# --- EW Jamming behavior ---
+
+def _pick_jam_behavior(drone_type: DroneType) -> str | None:
+    """Pick a jammed behavior for the drone. Returns None if jam fails (autonomous nav)."""
+    # Fixed-wing UAS with autonomous nav may resist (30% chance jam fails)
+    if drone_type == DroneType.FIXED_WING:
+        if random.random() < 0.3:
+            return None  # Jam fails
+
+    return random.choice(["loss_of_control", "rth", "forced_landing", "gps_spoof"])
 
 
 def _check_effector_in_range(eff_state: dict, drone: DroneState) -> bool:
@@ -316,6 +534,29 @@ async def game_websocket(ws: WebSocket):
         start_time = time.time()
         drone_reached_base = False
         tick_rate = 0.1  # 10Hz
+        MAX_DURATION = 1800  # 30 minutes max
+
+        # Wave system
+        current_wave = 1
+        wave_drone_counter = 0
+        wave_all_neutralized_time: float | None = None  # when all threats in wave were neutralized
+        WAVE_PAUSE_SECONDS = random.uniform(30.0, 60.0)
+
+        # Ambient traffic system
+        ambient_counter = 0
+        next_ambient_times: dict[str, float] = {
+            "commercial_aircraft": elapsed if (elapsed := 0) == 0 else random.uniform(60.0, 90.0),
+            "military_jet": random.uniform(120.0, 180.0),
+            "bird": random.uniform(45.0, 60.0),
+            "weather_balloon": random.uniform(180.0, 300.0),
+        }
+        # Reset — elapsed is computed in loop
+        next_ambient_times = {
+            "commercial_aircraft": random.uniform(60.0, 90.0),
+            "military_jet": random.uniform(120.0, 180.0),
+            "bird": random.uniform(45.0, 60.0),
+            "weather_balloon": random.uniform(180.0, 300.0),
+        }
 
         # DTID tracking timestamps per drone
         detection_times: dict[str, float] = {}
@@ -432,7 +673,7 @@ async def game_websocket(ws: WebSocket):
 
         while phase == GamePhase.RUNNING:
             elapsed = time.time() - start_time
-            time_remaining = max(0, scenario.duration_seconds - elapsed)
+            time_remaining = max(0, MAX_DURATION - elapsed)
 
             events: list[dict] = []
 
@@ -440,7 +681,10 @@ async def game_websocket(ws: WebSocket):
             newly_spawned = []
             for cfg in pending_spawns:
                 if elapsed >= cfg.spawn_delay:
-                    drones.append(create_drone(cfg))
+                    new_drone = create_drone(cfg)
+                    # Tag with wave number
+                    new_drone = new_drone.model_copy(update={"wave_number": current_wave})
+                    drones.append(new_drone)
                     behaviors[cfg.id] = cfg.behavior
                     newly_spawned.append(cfg)
                     events.append({
@@ -450,6 +694,79 @@ async def game_websocket(ws: WebSocket):
                     })
             for cfg in newly_spawned:
                 pending_spawns.remove(cfg)
+
+            # --- Ambient traffic spawning ---
+            for amb_type, next_time in list(next_ambient_times.items()):
+                if elapsed >= next_time:
+                    amb_cfg, ambient_counter = _generate_ambient_object(
+                        ambient_counter, amb_type, elapsed
+                    )
+                    # Avoid ID collisions
+                    while amb_cfg.id in drone_configs:
+                        ambient_counter += 1
+                        amb_cfg, ambient_counter = _generate_ambient_object(
+                            ambient_counter, amb_type, elapsed
+                        )
+                    drone_configs[amb_cfg.id] = amb_cfg
+                    amb_drone = create_drone(amb_cfg)
+                    amb_drone = amb_drone.model_copy(update={
+                        "is_ambient": True,
+                        "wave_number": 0,
+                    })
+                    # Pre-identify friendlies (commercial aircraft, military jets)
+                    if amb_type in ("commercial_aircraft", "military_jet"):
+                        amb_drone = amb_drone.model_copy(update={
+                            "affiliation": Affiliation.FRIENDLY,
+                            "classified": True,
+                            "dtid_phase": DTIDPhase.IDENTIFIED,
+                            "classification": ThreatClassification.PASSENGER_AIRCRAFT if amb_type == "commercial_aircraft" else ThreatClassification.FIXED_WING,
+                        })
+                    drones.append(amb_drone)
+                    behaviors[amb_cfg.id] = amb_cfg.behavior
+
+                    # Schedule next spawn
+                    if amb_type == "commercial_aircraft":
+                        next_ambient_times[amb_type] = elapsed + random.uniform(60.0, 90.0)
+                    elif amb_type == "military_jet":
+                        next_ambient_times[amb_type] = elapsed + random.uniform(120.0, 180.0)
+                    elif amb_type == "bird":
+                        next_ambient_times[amb_type] = elapsed + random.uniform(45.0, 60.0)
+                    elif amb_type == "weather_balloon":
+                        next_ambient_times[amb_type] = elapsed + random.uniform(180.0, 300.0)
+
+            # --- Wave system: check if all threat drones neutralized ---
+            threat_drones = [d for d in drones if not d.is_ambient]
+            if (not pending_spawns and threat_drones
+                    and all(d.neutralized for d in threat_drones)):
+                if wave_all_neutralized_time is None:
+                    wave_all_neutralized_time = elapsed
+                    events.append({
+                        "type": "event",
+                        "timestamp": round(elapsed, 1),
+                        "message": "ALL THREATS NEUTRALIZED — MAINTAINING WATCH",
+                    })
+                elif elapsed - wave_all_neutralized_time >= WAVE_PAUSE_SECONDS:
+                    # Spawn next wave
+                    current_wave += 1
+                    wave_all_neutralized_time = None
+                    WAVE_PAUSE_SECONDS = random.uniform(30.0, 60.0)
+                    new_wave_cfgs, wave_drone_counter = _generate_wave_drones(
+                        current_wave, wave_drone_counter
+                    )
+                    for wcfg in new_wave_cfgs:
+                        drone_configs[wcfg.id] = wcfg
+                        # Adjust spawn_delay relative to current elapsed
+                        adjusted_cfg = wcfg.model_copy(update={
+                            "spawn_delay": elapsed + wcfg.spawn_delay,
+                        })
+                        pending_spawns.append(adjusted_cfg)
+                    events.append({
+                        "type": "event",
+                        "timestamp": round(elapsed, 1),
+                        "message": f"WARNING: WAVE {current_wave} — NEW CONTACTS INBOUND",
+                    })
+            else:
+                wave_all_neutralized_time = None
 
             # Update effector recharge timers
             for eff_state in effector_states:
@@ -467,6 +784,105 @@ async def game_websocket(ws: WebSocket):
             # Update drones and run sensors
             for i, drone in enumerate(drones):
                 if not drone.neutralized:
+                    # --- EW Jamming behavior update ---
+                    if drone.jammed:
+                        drones[i] = drones[i].model_copy(update={
+                            "jammed_time_remaining": drone.jammed_time_remaining - tick_rate,
+                        })
+                        jb = drone.jammed_behavior
+                        if jb == "loss_of_control":
+                            # Drift in last heading, slowly descend
+                            speed_kms = drone.speed * 0.000514 * 0.5  # Half speed drift
+                            heading_rad = math.radians(drone.heading)
+                            new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
+                            new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
+                            new_alt = max(0, drone.altitude - 15 * tick_rate)  # Descend ~15 ft/s
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+                            drones[i] = drones[i].model_copy(update={
+                                "x": new_x, "y": new_y, "altitude": new_alt,
+                                "speed": drone.speed * 0.95,  # Slow down
+                                "trail": trail,
+                            })
+                            if new_alt <= 0 or drones[i].jammed_time_remaining <= 0:
+                                drones[i] = drones[i].model_copy(update={
+                                    "neutralized": True, "jammed_time_remaining": 0,
+                                    "altitude": 0,
+                                })
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"TRACK: {drone.id.upper()} — CRASHED (loss of control)",
+                                })
+                        elif jb == "rth":
+                            # Turn around and fly away
+                            away_angle = math.atan2(drone.y, drone.x)
+                            speed_kms = drone.speed * 0.000514
+                            new_x = drone.x + math.cos(away_angle) * speed_kms * tick_rate
+                            new_y = drone.y + math.sin(away_angle) * speed_kms * tick_rate
+                            heading_deg = math.degrees(away_angle) % 360
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+                            drones[i] = drones[i].model_copy(update={
+                                "x": new_x, "y": new_y, "heading": heading_deg,
+                                "trail": trail,
+                            })
+                            # Leaves map = defeated
+                            if math.sqrt(new_x**2 + new_y**2) > 10.0:
+                                drones[i] = drones[i].model_copy(update={
+                                    "neutralized": True, "jammed_time_remaining": 0,
+                                })
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"TRACK: {drone.id.upper()} — RTH (left area)",
+                                })
+                        elif jb == "forced_landing":
+                            # Descend straight down
+                            new_alt = max(0, drone.altitude - 50 * tick_rate)  # ~50 ft/s
+                            drones[i] = drones[i].model_copy(update={
+                                "altitude": new_alt, "speed": max(0, drone.speed - 5 * tick_rate),
+                            })
+                            if new_alt <= 0:
+                                drones[i] = drones[i].model_copy(update={
+                                    "neutralized": True, "jammed_time_remaining": 0,
+                                    "altitude": 0, "speed": 0,
+                                })
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"TRACK: {drone.id.upper()} — FORCED LANDING (grounded)",
+                                })
+                        elif jb == "gps_spoof":
+                            # Veer off course dramatically
+                            spoof_heading = (drone.heading + random.uniform(90, 180) * random.choice([-1, 1])) % 360
+                            heading_rad = math.radians(spoof_heading)
+                            speed_kms = drone.speed * 0.000514
+                            new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
+                            new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
+                            trail = list(drone.trail)
+                            trail.append([round(new_x, 3), round(new_y, 3)])
+                            if len(trail) > 20:
+                                trail = trail[-20:]
+                            drones[i] = drones[i].model_copy(update={
+                                "x": new_x, "y": new_y, "heading": spoof_heading,
+                                "trail": trail,
+                            })
+                            if math.sqrt(new_x**2 + new_y**2) > 10.0:
+                                drones[i] = drones[i].model_copy(update={
+                                    "neutralized": True, "jammed_time_remaining": 0,
+                                })
+                                events.append({
+                                    "type": "event",
+                                    "timestamp": round(elapsed, 1),
+                                    "message": f"TRACK: {drone.id.upper()} — GPS SPOOFED (left area)",
+                                })
+                        continue  # Skip normal movement for jammed drones
+
                     cfg = drone_configs[drone.id]
                     drones[i] = update_drone(
                         drone,
@@ -478,10 +894,15 @@ async def game_websocket(ws: WebSocket):
                         detected_by_player=drone.detected,
                     )
 
-                    # Check if drone reached base
-                    if distance_to_base(drones[i]) < scenario.base_radius_km:
+                    # Check if drone reached base (only for non-ambient threats)
+                    if not drones[i].is_ambient and distance_to_base(drones[i]) < scenario.base_radius_km:
                         drone_reached_base = True
-                        phase = GamePhase.DEBRIEF
+
+                    # Remove ambient objects that leave the map
+                    if drones[i].is_ambient:
+                        dist = math.sqrt(drones[i].x**2 + drones[i].y**2)
+                        if dist > 12.0:
+                            drones[i] = drones[i].model_copy(update={"neutralized": True})
 
                 # Run sensors for this drone
                 if not drones[i].neutralized:
@@ -660,6 +1081,10 @@ async def game_websocket(ws: WebSocket):
                         "coasting": drone.coasting,
                         "hold_fire": drone.id in hold_fire_tracks,
                         "eta_protected": round(eta_seconds, 1) if eta_seconds is not None else None,
+                        "wave_number": drone.wave_number,
+                        "is_ambient": drone.is_ambient,
+                        "jammed": drone.jammed,
+                        "jammed_behavior": drone.jammed_behavior,
                     })
 
             state_msg = {
@@ -667,6 +1092,7 @@ async def game_websocket(ws: WebSocket):
                 "elapsed": round(elapsed, 1),
                 "time_remaining": round(time_remaining, 1),
                 "threat_level": _threat_level(drones),
+                "wave_number": current_wave,
                 "tracks": tracks,
                 "sensors": [
                     {
@@ -719,13 +1145,8 @@ async def game_websocket(ws: WebSocket):
                         })
                         tutorial_prompts_sent.add(trigger)
 
-            # Check timeout
+            # Check timeout (30 min max)
             if time_remaining <= 0:
-                phase = GamePhase.DEBRIEF
-                break
-
-            # Check all drones defeated (only if no more pending spawns)
-            if not pending_spawns and drones and all(d.neutralized for d in drones):
                 phase = GamePhase.DEBRIEF
                 break
 
@@ -865,26 +1286,93 @@ async def game_websocket(ws: WebSocket):
                                     effectiveness = _effector_effectiveness(
                                         eff_state["type"], d.drone_type.value
                                     )
-                                    neutralized = effectiveness > 0.5
-                                    drones[j] = d.model_copy(update={
-                                        "dtid_phase": DTIDPhase.DEFEATED,
-                                        "neutralized": neutralized,
-                                    })
-                                    engage_times[target_id] = elapsed
-                                    effector_used[target_id] = eff_state["type"]
-                                    actions.append(PlayerAction(
-                                        action="engage",
-                                        target_id=target_id,
-                                        effector=effector_id,
-                                        timestamp=elapsed,
-                                    ))
 
-                                    # Decrement ammo if applicable
+                                    # --- EW Jamming: RF jammers don't instantly defeat ---
+                                    is_jammer = eff_state["type"] in ("rf_jam", "electronic")
+                                    if is_jammer:
+                                        jam_behavior = _pick_jam_behavior(d.drone_type)
+                                        if jam_behavior is None:
+                                            # Jam failed — autonomous navigation
+                                            await ws.send_json({
+                                                "type": "event",
+                                                "timestamp": round(elapsed, 1),
+                                                "message": f"JAM INEFFECTIVE — AUTONOMOUS NAVIGATION ({d.id.upper()})",
+                                            })
+                                            await ws.send_json({
+                                                "type": "engagement_result",
+                                                "target_id": target_id,
+                                                "effector": effector_id,
+                                                "effective": False,
+                                                "effectiveness": 0.0,
+                                            })
+                                        else:
+                                            # Jam takes effect — drone enters jammed state
+                                            jam_duration = random.uniform(5.0, 10.0)
+                                            drones[j] = d.model_copy(update={
+                                                "dtid_phase": DTIDPhase.DEFEATED,
+                                                "jammed": True,
+                                                "jammed_behavior": jam_behavior,
+                                                "jammed_time_remaining": jam_duration,
+                                            })
+                                            engage_times[target_id] = elapsed
+                                            effector_used[target_id] = eff_state["type"]
+                                            actions.append(PlayerAction(
+                                                action="engage",
+                                                target_id=target_id,
+                                                effector=effector_id,
+                                                timestamp=elapsed,
+                                            ))
+                                            behavior_label = jam_behavior.replace("_", " ").upper()
+                                            await ws.send_json({
+                                                "type": "event",
+                                                "timestamp": round(elapsed, 1),
+                                                "message": f"EW: {d.id.upper()} JAMMED — {behavior_label}",
+                                            })
+                                            await ws.send_json({
+                                                "type": "engagement_result",
+                                                "target_id": target_id,
+                                                "effector": effector_id,
+                                                "effective": True,
+                                                "effectiveness": round(effectiveness, 2),
+                                                "jammed": True,
+                                                "jammed_behavior": jam_behavior,
+                                            })
+                                    else:
+                                        # Non-jammer effectors: instant effect (kinetic, directed energy, etc.)
+                                        neutralized = effectiveness > 0.5
+                                        drones[j] = d.model_copy(update={
+                                            "dtid_phase": DTIDPhase.DEFEATED,
+                                            "neutralized": neutralized,
+                                        })
+                                        engage_times[target_id] = elapsed
+                                        effector_used[target_id] = eff_state["type"]
+                                        actions.append(PlayerAction(
+                                            action="engage",
+                                            target_id=target_id,
+                                            effector=effector_id,
+                                            timestamp=elapsed,
+                                        ))
+
+                                        await ws.send_json({
+                                            "type": "engagement_result",
+                                            "target_id": target_id,
+                                            "effector": effector_id,
+                                            "effective": neutralized,
+                                            "effectiveness": round(effectiveness, 2),
+                                        })
+
+                                        result_str = "NEUTRALIZED" if neutralized else "INEFFECTIVE"
+                                        await ws.send_json({
+                                            "type": "event",
+                                            "timestamp": round(elapsed, 1),
+                                            "message": f"ENGAGEMENT: {eff_state['name']} vs {target_id.upper()} \u2014 {result_str}",
+                                        })
+
+                                    # Handle effector status (recharge/ammo) for all types
                                     if eff_state.get("ammo_remaining") is not None:
                                         eff_state["ammo_remaining"] -= 1
                                         if eff_state["ammo_remaining"] <= 0:
                                             eff_state["status"] = "depleted"
-                                    # Handle effector recharge/single-use (non-ammo)
                                     elif eff_state.get("single_use") or eff_state["recharge_seconds"] == 0:
                                         eff_state["status"] = "offline"
                                     elif eff_state["recharge_seconds"] > 0:
@@ -892,22 +1380,10 @@ async def game_websocket(ws: WebSocket):
                                         eff_state["recharge_remaining"] = float(
                                             eff_state["recharge_seconds"]
                                         )
-
-                                    await ws.send_json({
-                                        "type": "engagement_result",
-                                        "target_id": target_id,
-                                        "effector": effector_id,
-                                        "effective": neutralized,
-                                        "effectiveness": round(effectiveness, 2),
-                                    })
-
-                                    result_str = "NEUTRALIZED" if neutralized else "INEFFECTIVE"
-                                    await ws.send_json({
-                                        "type": "event",
-                                        "timestamp": round(elapsed, 1),
-                                        "message": f"ENGAGEMENT: {eff_state['name']} vs {target_id.upper()} \u2014 {result_str}",
-                                    })
                                     break
+
+                    elif action_name == "end_mission":
+                        phase = GamePhase.DEBRIEF
 
                 elif msg_type == "restart":
                     break
@@ -916,9 +1392,27 @@ async def game_websocket(ws: WebSocket):
                 pass
 
         # -- Debrief --
-        if len(drones) <= 1:
+        # Filter out ambient drones from scoring
+        threat_drone_cfgs = [cfg for cfg in drone_configs.values()
+                             if cfg.drone_type not in (DroneType.PASSENGER_AIRCRAFT, DroneType.MILITARY_JET, DroneType.WEATHER_BALLOON)
+                             and not (cfg.drone_type == DroneType.BIRD and cfg.correct_affiliation == "neutral")]
+        # Include ambient birds/balloons that were engaged (ROE violations)
+        ambient_ids_engaged = set()
+        for a in actions:
+            if a.action == "engage":
+                cfg = drone_configs.get(a.target_id)
+                if cfg and not cfg.should_engage:
+                    ambient_ids_engaged.add(a.target_id)
+                    if cfg not in threat_drone_cfgs:
+                        threat_drone_cfgs.append(cfg)
+
+        # If no threat drones at all (shouldn't happen), use all
+        scorable_cfgs = threat_drone_cfgs if threat_drone_cfgs else list(drone_configs.values())
+
+        if len(scorable_cfgs) <= 1:
             # Single-drone: use legacy scoring path
-            primary_drone_id = drones[0].id if drones else ""
+            primary_cfg = scorable_cfgs[0] if scorable_cfgs else None
+            primary_drone_id = primary_cfg.id if primary_cfg else ""
             score = calculate_score(
                 scenario=scenario,
                 actions=actions,
@@ -936,10 +1430,10 @@ async def game_websocket(ws: WebSocket):
             )
         else:
             # Multi-drone: score each independently and average
-            drones_reached = {d.id for d in drones if distance_to_base(d) < scenario.base_radius_km}
+            drones_reached = {d.id for d in drones if not d.is_ambient and distance_to_base(d) < scenario.base_radius_km}
             score = calculate_score_multi(
                 scenario=scenario,
-                drone_configs=list(drone_configs.values()),
+                drone_configs=scorable_cfgs,
                 actions=actions,
                 detection_times=detection_times,
                 confirm_times=confirm_times,
@@ -958,6 +1452,7 @@ async def game_websocket(ws: WebSocket):
             "type": "debrief",
             "score": score.model_dump(),
             "drone_reached_base": drone_reached_base,
+            "waves_completed": current_wave,
         })
 
         # Keep connection open for client to read debrief or restart

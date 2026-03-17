@@ -5,6 +5,7 @@ interface Props {
   droneReachedBase: boolean;
   scenarioName: string;
   onRestart: () => void;
+  wavesCompleted?: number;
 }
 
 const GRADE_COLORS: Record<string, string> = {
@@ -87,6 +88,7 @@ export default function DebriefScreen({
   droneReachedBase,
   scenarioName,
   onRestart,
+  wavesCompleted,
 }: Props) {
   const gradeColor = GRADE_COLORS[score.grade] || "#8b949e";
   const hasPlacement =
@@ -139,6 +141,11 @@ export default function DebriefScreen({
             }}
           >
             {scenarioName}
+            {wavesCompleted != null && wavesCompleted > 1 && (
+              <span style={{ marginLeft: 8, color: "#58a6ff", fontSize: 11 }}>
+                ({wavesCompleted} WAVES)
+              </span>
+            )}
           </div>
 
           {droneReachedBase && (

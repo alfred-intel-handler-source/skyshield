@@ -24,6 +24,9 @@ class DroneType(str, Enum):
     MICRO = "micro"
     SWARM = "swarm"
     BIRD = "bird"
+    PASSENGER_AIRCRAFT = "passenger_aircraft"
+    MILITARY_JET = "military_jet"
+    WEATHER_BALLOON = "weather_balloon"
 
 
 class ThreatClassification(str, Enum):
@@ -103,6 +106,13 @@ class DroneState(BaseModel):
     last_known_speed: float = 0.0  # speed at time of sensor loss
     # Hold fire
     hold_fire: bool = False
+    # Wave system
+    wave_number: int = 1
+    is_ambient: bool = False
+    # EW jamming state
+    jammed: bool = False
+    jammed_behavior: str | None = None  # loss_of_control, rth, forced_landing, gps_spoof
+    jammed_time_remaining: float = 0.0  # seconds until jam effect resolves
 
 
 class SensorConfig(BaseModel):

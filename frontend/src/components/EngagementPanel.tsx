@@ -14,6 +14,8 @@ const CLASSIFICATIONS = [
   { value: "fixed_wing", label: "FIXED-WING UAS", affiliation: "hostile" },
   { value: "micro", label: "MICRO UAS", affiliation: "hostile" },
   { value: "improvised", label: "IMPROVISED UAS", affiliation: "hostile" },
+  { value: "passenger_aircraft", label: "PASSENGER AIRCRAFT (FRIENDLY)", affiliation: "friendly" },
+  { value: "fixed_wing", label: "MILITARY JET (FRIENDLY)", affiliation: "friendly" },
   { value: "bird", label: "BIRD (FALSE ALARM)", affiliation: "neutral" },
   { value: "weather_balloon", label: "WEATHER BALLOON (FALSE ALARM)", affiliation: "neutral" },
 ];
@@ -140,39 +142,39 @@ export default function EngagementPanel({
             Classify the contact
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {CLASSIFICATIONS.map((cls) => (
-              <button
-                key={cls.value}
-                onClick={() => onIdentify(track.id, cls.value, cls.affiliation)}
-                style={{
-                  width: "100%",
-                  padding: "7px 12px",
-                  background:
-                    cls.affiliation === "hostile" ? "#f8514911" : "#3fb95011",
-                  border: `1px solid ${cls.affiliation === "hostile" ? "#f8514933" : "#3fb95033"}`,
-                  borderRadius: 4,
-                  color:
-                    cls.affiliation === "hostile" ? "#f85149" : "#3fb950",
-                  fontSize: 10,
-                  fontWeight: 500,
-                  fontFamily: "'Inter', sans-serif",
-                  letterSpacing: 0.5,
-                  cursor: "pointer",
-                  textAlign: "left",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
-                    cls.affiliation === "hostile" ? "#f8514925" : "#3fb95025";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background =
-                    cls.affiliation === "hostile" ? "#f8514911" : "#3fb95011";
-                }}
-              >
-                {cls.label}
-              </button>
-            ))}
+            {CLASSIFICATIONS.map((cls, idx) => {
+              const clsColor = cls.affiliation === "hostile" ? "#f85149"
+                : cls.affiliation === "friendly" ? "#58a6ff" : "#3fb950";
+              return (
+                <button
+                  key={`${cls.value}-${cls.affiliation}-${idx}`}
+                  onClick={() => onIdentify(track.id, cls.value, cls.affiliation)}
+                  style={{
+                    width: "100%",
+                    padding: "7px 12px",
+                    background: `${clsColor}11`,
+                    border: `1px solid ${clsColor}33`,
+                    borderRadius: 4,
+                    color: clsColor,
+                    fontSize: 10,
+                    fontWeight: 500,
+                    fontFamily: "'Inter', sans-serif",
+                    letterSpacing: 0.5,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = `${clsColor}25`;
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = `${clsColor}11`;
+                  }}
+                >
+                  {cls.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -282,22 +284,44 @@ export default function EngagementPanel({
             padding: "16px 0",
           }}
         >
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: track.neutralized ? "#3fb950" : "#f85149",
-              letterSpacing: 1,
-              marginBottom: 4,
-            }}
-          >
-            {track.neutralized ? "NEUTRALIZED" : "MISSED"}
-          </div>
-          <div style={{ fontSize: 11, color: "#8b949e" }}>
-            {track.neutralized
-              ? "Target has been neutralized"
-              : "Engagement was not effective"}
-          </div>
+          {track.jammed && !track.neutralized ? (
+            <>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "#d29922",
+                  letterSpacing: 1,
+                  marginBottom: 4,
+                  animation: "track-blink 1.5s ease-in-out infinite",
+                }}
+              >
+                JAMMED
+              </div>
+              <div style={{ fontSize: 11, color: "#d29922", opacity: 0.8 }}>
+                {track.jammed_behavior?.replace(/_/g, " ").toUpperCase() || "EW EFFECT ACTIVE"}
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: track.neutralized ? "#3fb950" : "#f85149",
+                  letterSpacing: 1,
+                  marginBottom: 4,
+                }}
+              >
+                {track.neutralized ? "NEUTRALIZED" : "MISSED"}
+              </div>
+              <div style={{ fontSize: 11, color: "#8b949e" }}>
+                {track.neutralized
+                  ? "Target has been neutralized"
+                  : "Engagement was not effective"}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

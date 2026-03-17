@@ -20,6 +20,10 @@ export interface TrackData {
   coasting?: boolean;
   hold_fire?: boolean;
   eta_protected?: number | null;
+  wave_number?: number;
+  is_ambient?: boolean;
+  jammed?: boolean;
+  jammed_behavior?: string | null;
 }
 
 export interface SensorStatus {
@@ -115,6 +119,7 @@ export interface StateMsg {
   elapsed: number;
   time_remaining: number;
   threat_level: ThreatLevel;
+  wave_number?: number;
   tracks: TrackData[];
   sensors: SensorStatus[];
   effectors: EffectorStatus[];
@@ -132,12 +137,15 @@ export interface EngagementResultMsg {
   effector: string;
   effective: boolean;
   effectiveness: number;
+  jammed?: boolean;
+  jammed_behavior?: string;
 }
 
 export interface DebriefMsg {
   type: "debrief";
   score: ScoreBreakdown;
   drone_reached_base: boolean;
+  waves_completed?: number;
 }
 
 export type ServerMessage =

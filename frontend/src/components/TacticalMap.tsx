@@ -659,12 +659,16 @@ function TrackDataBlock({
   const yOff = offsetIndex * 18;
 
   const isCoasting = track.coasting;
+  const isJammed = track.jammed && !track.neutralized;
   const blockOpacity = isCoasting ? 0.5 : 1.0;
   const coastLabel = isCoasting
     ? `<span style="color:#d29922;font-size:7px;font-weight:700;margin-left:4px;">COAST</span>`
     : "";
   const hfLabel = track.hold_fire
     ? `<span style="color:#f85149;font-size:7px;font-weight:700;margin-left:4px;">HF</span>`
+    : "";
+  const jamLabel = isJammed
+    ? `<span style="color:#d29922;font-size:7px;font-weight:700;margin-left:4px;animation:track-blink 1s ease-in-out infinite;">JAMMED</span>`
     : "";
 
   // ETA to protected area
@@ -697,7 +701,7 @@ function TrackDataBlock({
       background:${isSelected ? color : "#30363d"};
     "></div>
     <div style="color:${color};font-size:${isSelected ? "10px" : "9px"};font-weight:600;letter-spacing:0.5px;">
-      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>${coastLabel}${hfLabel}
+      ${track.id.toUpperCase()} <span style="opacity:0.6;font-weight:400;">${phaseChar}</span>${coastLabel}${hfLabel}${jamLabel}
     </div>
     ${!track.neutralized ? `
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
@@ -706,7 +710,8 @@ function TrackDataBlock({
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
       BRG:${Math.round(bearing)}\u00B0 | RNG:${range.toFixed(1)}km
     </div>
-    ${etaLabel}` : `
+    ${etaLabel}` : isJammed ? `
+    <div style="color:#d29922;font-size:8px;font-weight:600;">EW EFFECT ACTIVE</div>` : `
     <div style="color:#484f58;font-size:8px;">NEUTRALIZED</div>`}
   </div>`;
 
