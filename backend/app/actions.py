@@ -265,6 +265,32 @@ def handle_jammer_toggle(
     return msgs
 
 
+def handle_jam_all(gs: GameState, elapsed: float) -> list[dict]:
+    """Activate all jammer effectors at once."""
+    msgs: list[dict] = []
+    activated = 0
+    for eff_state in gs.effector_states:
+        if eff_state.get("type") in ("rf_jam", "electronic"):
+            if not eff_state.get("jammer_active", False):
+                eff_state["jammer_active"] = True
+                activated += 1
+    if activated > 0:
+        msgs.append(_event(elapsed, "RF JAMMERS: ALL SYSTEMS ACTIVE"))
+    else:
+        msgs.append(_event(elapsed, "RF JAMMERS: All systems already active"))
+    return msgs
+
+
+def handle_clear_airspace(gs: GameState, elapsed: float) -> list[dict]:
+    """Remove all ambient traffic and suppress new spawns for 120s."""
+    msgs: list[dict] = []
+    gs.drones = [d for d in gs.drones if not d.is_ambient or d.neutralized]
+    gs.ambient_suppressed_until = elapsed + 120.0
+    msgs.append(_event(elapsed,
+        "AIRSPACE: CLEARED \u2014 ATC notified, ambient traffic removed"))
+    return msgs
+
+
 def handle_end_mission(gs: GameState) -> list[dict]:
     """Signal the game loop to transition to debrief."""
     gs.phase = GamePhase.DEBRIEF
@@ -489,6 +515,9 @@ def _engage_shinobi(
 
 def _update_effector_status(eff_state: dict) -> None:
     """Update the effector's runtime status after firing."""
+    # Jammers run indefinitely — no recharge
+    if eff_state.get("type") in ("rf_jam", "electronic"):
+        return
     if eff_state.get("ammo_remaining") is not None:
         eff_state["ammo_remaining"] -= 1
         if eff_state["ammo_remaining"] <= 0:

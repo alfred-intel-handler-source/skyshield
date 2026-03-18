@@ -21,11 +21,13 @@ from app.security import (
     connection_tracker,
 )
 from app.actions import (
+    handle_clear_airspace,
     handle_confirm_track,
     handle_end_mission,
     handle_engage,
     handle_hold_fire,
     handle_identify,
+    handle_jam_all,
     handle_jammer_toggle,
     handle_release_hold_fire,
 )
@@ -70,7 +72,7 @@ VALID_ACTION_NAMES = {
     "confirm_track", "identify", "engage", "hold_fire",
     "release_hold_fire", "end_mission", "slew_camera",
     "shinobi_hold", "shinobi_land_now", "shinobi_deafen",
-    "jammer_toggle",
+    "jammer_toggle", "jam_all", "clear_airspace",
 }
 VALID_MSG_TYPES = {"action", "restart"}
 
@@ -318,7 +320,9 @@ def _tick_spawns(gs: GameState, elapsed: float) -> list[dict]:
     for cfg in newly_spawned:
         gs.pending_spawns.remove(cfg)
 
-    # Ambient traffic
+    # Ambient traffic (suppressed after CLEAR AIRSPACE)
+    if elapsed < gs.ambient_suppressed_until:
+        return events
     for amb_type, next_time in list(gs.next_ambient_times.items()):
         if elapsed >= next_time:
             amb_cfg, gs.ambient_counter = generate_ambient_object(
@@ -389,6 +393,9 @@ def _tick_effector_recharge(gs: GameState, elapsed: float) -> list[dict]:
     """Advance effector recharge timers. Returns events."""
     events: list[dict] = []
     for eff_state in gs.effector_states:
+        # Jammers run indefinitely — skip recharge
+        if eff_state.get("type") in ("rf_jam", "electronic"):
+            continue
         if eff_state["status"] == "recharging":
             eff_state["recharge_remaining"] -= gs.tick_rate
             if eff_state["recharge_remaining"] <= 0:
@@ -713,13 +720,15 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
         ],
         "effectors": [
             {
-                "id": es["id"], "status": es["status"],
+                "id": es["id"], "name": es.get("name", ""), "type": es.get("type", ""),
+                "status": es["status"],
                 **({"ammo_count": es["ammo_count"]} if es.get("ammo_count") is not None else {}),
                 **({"ammo_remaining": es["ammo_remaining"]} if es.get("ammo_remaining") is not None else {}),
                 **({"jammer_active": es["jammer_active"]} if "jammer_active" in es else {}),
             }
             for es in gs.effector_states
         ],
+        "ambient_suppressed_until": round(gs.ambient_suppressed_until, 1),
     }
 
 
@@ -1015,6 +1024,10 @@ async def game_websocket(ws: WebSocket):
                         await _send_msgs(ws, handle_jammer_toggle(
                             gs, msg.get("effector_id", ""), elapsed,
                         ))
+                    elif action_name == "jam_all":
+                        await _send_msgs(ws, handle_jam_all(gs, elapsed))
+                    elif action_name == "clear_airspace":
+                        await _send_msgs(ws, handle_clear_airspace(gs, elapsed))
                     elif action_name == "end_mission":
                         handle_end_mission(gs)
 
