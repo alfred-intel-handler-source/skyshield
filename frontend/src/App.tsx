@@ -1065,7 +1065,7 @@ export default function App() {
         height: "100vh",
         display: "grid",
         gridTemplateRows: "48px 1fr 120px",
-        gridTemplateColumns: "220px 1fr 280px",
+        gridTemplateColumns: "220px 1fr 360px",
         background: "#0d1117",
       }}
     >

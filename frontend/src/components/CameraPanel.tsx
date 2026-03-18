@@ -8,8 +8,8 @@ interface Props {
   degraded?: boolean;
 }
 
-const CANVAS_W = 480;
-const CANVAS_H = 300;
+const CANVAS_W = 640;
+const CANVAS_H = 400;
 const HUD_COLOR_THERMAL = "#3fb950";
 const HUD_COLOR_DAYLIGHT = "#58a6ff";
 
