@@ -785,6 +785,16 @@ function drawReticle(ctx: CanvasRenderingContext2D, w: number, h: number, hudCol
 // Noise
 // ---------------------------------------------------------------------------
 
+// Noise cache: pre-rendered offscreen canvases, regenerated every ~200ms
+const noiseCache: {
+  thermal: OffscreenCanvas | null;
+  daylight: OffscreenCanvas | null;
+  density: number;
+  timestamp: number;
+  w: number;
+  h: number;
+} = { thermal: null, daylight: null, density: -1, timestamp: 0, w: 0, h: 0 };
+
 function drawNoise(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -792,30 +802,61 @@ function drawNoise(
   density: number,
   mode: CameraMode,
 ) {
-  const count = Math.floor(w * h * density * 0.003);
-  ctx.fillStyle = mode === "thermal"
-    ? "rgba(180,200,180,0.12)"
-    : "rgba(100,100,120,0.1)";
-  for (let i = 0; i < count; i++) {
-    const px = Math.random() * w;
-    const py = Math.random() * h;
-    const sz = Math.random() < 0.3 ? 2 : 1;
-    ctx.fillRect(px, py, sz, sz);
+  const now = Date.now();
+  const densityBucket = Math.round(density * 10) / 10; // quantize to avoid thrashing
+  const needsRegen =
+    noiseCache.w !== w ||
+    noiseCache.h !== h ||
+    noiseCache.density !== densityBucket ||
+    now - noiseCache.timestamp > 200;
+
+  if (needsRegen) {
+    // Regenerate both thermal and daylight noise canvases
+    for (const m of ["thermal", "daylight"] as const) {
+      let offscreen = noiseCache[m];
+      if (!offscreen || offscreen.width !== w || offscreen.height !== h) {
+        offscreen = new OffscreenCanvas(w, h);
+        noiseCache[m] = offscreen;
+      }
+      const offCtx = offscreen.getContext("2d")!;
+      offCtx.clearRect(0, 0, w, h);
+
+      const count = Math.floor(w * h * densityBucket * 0.003);
+      offCtx.fillStyle = m === "thermal"
+        ? "rgba(180,200,180,0.12)"
+        : "rgba(100,100,120,0.1)";
+      for (let i = 0; i < count; i++) {
+        const px = Math.random() * w;
+        const py = Math.random() * h;
+        const sz = Math.random() < 0.3 ? 2 : 1;
+        offCtx.fillRect(px, py, sz, sz);
+      }
+
+      if (densityBucket > 0.2) {
+        const lineCount = Math.floor(densityBucket * 8);
+        offCtx.strokeStyle = m === "thermal"
+          ? `rgba(160,200,160,${0.03 * densityBucket})`
+          : `rgba(120,130,160,${0.03 * densityBucket})`;
+        offCtx.lineWidth = 1;
+        for (let i = 0; i < lineCount; i++) {
+          const ly = Math.random() * h;
+          offCtx.beginPath();
+          offCtx.moveTo(0, ly);
+          offCtx.lineTo(w, ly);
+          offCtx.stroke();
+        }
+      }
+    }
+    noiseCache.density = densityBucket;
+    noiseCache.timestamp = now;
+    noiseCache.w = w;
+    noiseCache.h = h;
   }
 
-  if (density > 0.2) {
-    const lineCount = Math.floor(density * 8);
-    ctx.strokeStyle = mode === "thermal"
-      ? `rgba(160,200,160,${0.03 * density})`
-      : `rgba(120,130,160,${0.03 * density})`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < lineCount; i++) {
-      const ly = Math.random() * h;
-      ctx.beginPath();
-      ctx.moveTo(0, ly);
-      ctx.lineTo(w, ly);
-      ctx.stroke();
-    }
+  // Blit cached noise
+  const cached = noiseCache[mode];
+  if (cached) {
+    ctx.drawImage(cached, 0, 0);
   }
 }
 
@@ -1304,22 +1345,41 @@ export default function CameraPanel({
       const baseScale = silhouetteScale(rangeKm);
       const scale = baseScale * Math.sqrt(zoom); // Zoom magnifies the silhouette
       const amp = shakeAmplitude(rangeKm) * (1 + (zoom - 1) * 0.3); // More shake at higher zoom
-      const jx = (Math.random() - 0.5) * amp;
-      const jy = (Math.random() - 0.5) * amp;
+      // Smooth gimbal sway using multi-frequency sinusoids instead of random jitter
+      const jx = (Math.sin(time * 1.3 + 0.7) + 0.3 * Math.sin(time * 3.7 + 2.1) + 0.15 * Math.sin(time * 7.3)) * amp * 0.35;
+      const jy = (Math.sin(time * 1.1 + 1.4) + 0.3 * Math.sin(time * 4.1 + 0.3) + 0.15 * Math.sin(time * 6.1)) * amp * 0.35;
+
+      // Thermal heat shimmer: subtle vertical displacement in thermal mode
+      const shimmerY = mode === "thermal"
+        ? Math.sin(time * 5.3 + pixelOffsetX * 0.1) * 1.5 * Math.min(1, rangeKm / 0.5)
+        : 0;
 
       ctx.save();
-      ctx.translate(w / 2 + pixelOffsetX + jx, h / 2 + pixelOffsetY + jy);
+      ctx.translate(w / 2 + pixelOffsetX + jx, h / 2 + pixelOffsetY + jy + shimmerY);
 
-      if (rangeKm > 0.8) {
+      // Shadow blur: crisp at close range, blurry at long range
+      if (rangeKm > 1.5) {
         ctx.shadowColor = mode === "thermal"
           ? "rgba(200,210,200,0.5)"
           : "rgba(40,40,60,0.5)";
         ctx.shadowBlur = 12;
+      } else if (rangeKm > 0.8) {
+        ctx.shadowColor = mode === "thermal"
+          ? "rgba(200,210,200,0.4)"
+          : "rgba(40,40,60,0.4)";
+        ctx.shadowBlur = 7;
       } else if (rangeKm > 0.3) {
         ctx.shadowColor = mode === "thermal"
-          ? "rgba(200,210,200,0.3)"
-          : "rgba(40,40,60,0.3)";
-        ctx.shadowBlur = 5;
+          ? "rgba(200,210,200,0.2)"
+          : "rgba(40,40,60,0.2)";
+        ctx.shadowBlur = 3;
+      } else {
+        // Close range: crisp edges, slight thermal glow only
+        if (mode === "thermal") {
+          ctx.shadowColor = "rgba(230,240,230,0.15)";
+          ctx.shadowBlur = 1;
+        }
+        // Daylight: no shadow blur at all
       }
 
       drawSilhouette(ctx, vt.classification, scale, mode, time);
