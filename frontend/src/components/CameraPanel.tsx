@@ -1439,7 +1439,9 @@ export default function CameraPanel({
         // Daylight: no shadow blur at all
       }
 
-      drawSilhouette(ctx, vt.classification, scale, mode, time);
+      // Use drone_type for silhouette (always available) — camera shows what it sees.
+      // classification only matters for scoring; visuals use ground truth type.
+      drawSilhouette(ctx, vt.drone_type ?? vt.classification, scale, mode, time);
       ctx.restore();
 
       // Draw approaching JACKAL as bright dot if one is targeting this track

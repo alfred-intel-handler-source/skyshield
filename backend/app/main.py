@@ -696,6 +696,7 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
                 "downlink_detected": drone.downlink_detected,
                 "shinobi_cm_active": drone.shinobi_cm_active,
                 "shinobi_cm_state": drone.shinobi_cm_state,
+                "drone_type": drone.drone_type.value if hasattr(drone.drone_type, "value") else drone.drone_type,
             })
 
     return {
