@@ -14,6 +14,7 @@ export interface TrackData {
   heading_deg: number;
   confidence: number;
   classification: string | null;
+  drone_type: string | null;
   trail: [number, number][];
   sensors_detecting: string[];
   neutralized: boolean;
