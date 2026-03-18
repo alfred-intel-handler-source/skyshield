@@ -135,6 +135,7 @@ export interface StateMsg {
   tracks: TrackData[];
   sensors: SensorStatus[];
   effectors: EffectorStatus[];
+  ambient_suppressed_until?: number;
 }
 
 export interface EventMsg {

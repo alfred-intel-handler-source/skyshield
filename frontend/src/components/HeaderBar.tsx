@@ -1,4 +1,4 @@
-import type { ThreatLevel } from "../types";
+import type { EffectorStatus, ThreatLevel } from "../types";
 
 interface Props {
   elapsed: number;
@@ -12,6 +12,10 @@ interface Props {
   alertCount?: number;
   waveNumber?: number;
   onEndMission?: () => void;
+  onJamAll?: () => void;
+  onClearAirspace?: () => void;
+  effectors?: EffectorStatus[];
+  ambientSuppressedUntil?: number;
 }
 
 const THREAT_COLORS: Record<ThreatLevel, string> = {
@@ -33,8 +37,18 @@ export default function HeaderBar({
   alertCount = 0,
   waveNumber = 1,
   onEndMission,
+  onJamAll,
+  onClearAirspace,
+  effectors = [],
+  ambientSuppressedUntil = 0,
 }: Props) {
   const threatColor = THREAT_COLORS[threatLevel];
+  const allJammersActive = effectors.filter(
+    (e) => e.type === "rf_jam" || e.type === "electronic"
+  ).length > 0 && effectors.filter(
+    (e) => (e.type === "rf_jam" || e.type === "electronic") && !e.jammer_active
+  ).length === 0;
+  const airspaceClear = elapsed < ambientSuppressedUntil;
   const mins = Math.floor(timeRemaining / 60);
   const secs = Math.floor(timeRemaining % 60);
 
@@ -215,6 +229,74 @@ export default function HeaderBar({
             {mins}:{secs.toString().padStart(2, "0")}
           </span>
         </div>
+
+        {/* JAM ALL button */}
+        {onJamAll && (
+          <button
+            onClick={onJamAll}
+            disabled={allJammersActive}
+            style={{
+              padding: "4px 12px",
+              background: allJammersActive
+                ? "rgba(210, 153, 34, 0.08)"
+                : "rgba(210, 153, 34, 0.15)",
+              border: `1px solid rgba(210, 153, 34, ${allJammersActive ? "0.2" : "0.4"})`,
+              borderRadius: 4,
+              color: allJammersActive ? "#8b7a3a" : "#d29922",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1,
+              cursor: allJammersActive ? "default" : "pointer",
+              transition: "all 0.15s",
+              opacity: allJammersActive ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!allJammersActive)
+                (e.currentTarget as HTMLElement).style.background = "rgba(210, 153, 34, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              if (!allJammersActive)
+                (e.currentTarget as HTMLElement).style.background = "rgba(210, 153, 34, 0.15)";
+            }}
+          >
+            {allJammersActive ? "JAMMERS ACTIVE" : "JAM ALL"}
+          </button>
+        )}
+
+        {/* CLEAR AIRSPACE button */}
+        {onClearAirspace && (
+          <button
+            onClick={onClearAirspace}
+            disabled={airspaceClear}
+            style={{
+              padding: "4px 12px",
+              background: airspaceClear
+                ? "rgba(88, 166, 255, 0.08)"
+                : "rgba(88, 166, 255, 0.15)",
+              border: `1px solid rgba(88, 166, 255, ${airspaceClear ? "0.2" : "0.4"})`,
+              borderRadius: 4,
+              color: airspaceClear ? "#3a6a9e" : "#58a6ff",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1,
+              cursor: airspaceClear ? "default" : "pointer",
+              transition: "all 0.15s",
+              opacity: airspaceClear ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!airspaceClear)
+                (e.currentTarget as HTMLElement).style.background = "rgba(88, 166, 255, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              if (!airspaceClear)
+                (e.currentTarget as HTMLElement).style.background = "rgba(88, 166, 255, 0.15)";
+            }}
+          >
+            {airspaceClear ? "AIRSPACE CLEAR" : "CLEAR AIRSPACE"}
+          </button>
+        )}
 
         {/* END MISSION button */}
         {onEndMission && (

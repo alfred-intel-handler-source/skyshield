@@ -96,5 +96,8 @@ class GameState:
     # Passive jamming — track which drones have already had resist notification
     jam_resist_notified: set[str] = field(default_factory=set)
 
+    # Ambient suppression (CLEAR AIRSPACE)
+    ambient_suppressed_until: float = 0.0
+
     # Tutorial
     tutorial_prompts_sent: set[str] = field(default_factory=set)

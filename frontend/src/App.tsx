@@ -188,6 +188,7 @@ export default function App() {
   // Wave system
   const [waveNumber, setWaveNumber] = useState(1);
   const [wavesCompleted, setWavesCompleted] = useState(1);
+  const [ambientSuppressedUntil, setAmbientSuppressedUntil] = useState(0);
 
   // Active jamming state: maps effector id -> expiry timestamp
   const [activeJammers, setActiveJammers] = useState<Record<string, number>>({});
@@ -255,6 +256,7 @@ export default function App() {
         setTimeRemaining(msg.time_remaining);
         setThreatLevel(msg.threat_level);
         if (msg.wave_number != null) setWaveNumber(msg.wave_number);
+        if (msg.ambient_suppressed_until != null) setAmbientSuppressedUntil(msg.ambient_suppressed_until);
         setSensors((prev) => {
           const configs = prev.length ? prev : [];
           return msg.sensors.map((s) => {
@@ -756,6 +758,14 @@ export default function App() {
     send({ type: "action", action: "jammer_toggle", effector_id: effectorId });
   };
 
+  const handleJamAll = () => {
+    send({ type: "action", action: "jam_all" });
+  };
+
+  const handleClearAirspace = () => {
+    send({ type: "action", action: "clear_airspace" });
+  };
+
   const handleEndMission = () => {
     send({ type: "action", action: "end_mission", target_id: "" });
   };
@@ -1082,6 +1092,10 @@ export default function App() {
         alertCount={alertCount}
         waveNumber={waveNumber}
         onEndMission={handleEndMission}
+        onJamAll={handleJamAll}
+        onClearAirspace={handleClearAirspace}
+        effectors={effectors}
+        ambientSuppressedUntil={ambientSuppressedUntil}
       />
 
       {/* Left sidebar */}
