@@ -748,7 +748,9 @@ function TrackDataBlock({
     ? `<span style="display:inline-block;background:#1f6feb33;border:1px solid #1f6feb88;border-radius:2px;padding:0 3px;margin-left:4px;color:#58a6ff;font-size:7px;font-weight:700;animation:track-blink 1s ease-in-out infinite;">JAM</span>`
     : "";
   const interceptPhaseLabel = isInterceptor && track.intercept_phase && !track.neutralized
-    ? `<span style="color:#3fb950;font-size:7px;font-weight:700;margin-left:4px;">${track.intercept_phase.toUpperCase()}</span>`
+    ? track.intercept_phase === "spinup"
+      ? `<span style="color:#d29922;font-size:7px;font-weight:700;margin-left:4px;">SPINUP T-${Math.ceil(track.spinup_remaining ?? 0)}s</span>`
+      : `<span style="color:#3fb950;font-size:7px;font-weight:700;margin-left:4px;">${track.intercept_phase.toUpperCase()}</span>`
     : "";
   const isShinobiCM = !!track.shinobi_cm_active && !track.neutralized;
   const shinobiLabel = isShinobiCM

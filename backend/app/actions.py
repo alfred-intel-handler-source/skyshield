@@ -351,14 +351,16 @@ def _engage_jackal(
     dy_tgt = d.y - eff_y
     heading_to = math.degrees(math.atan2(dx_tgt, dy_tgt)) % 360
 
+    spinup_duration = random.uniform(10.0, 15.0)
     jackal_drone = DroneState(
         id=jackal_id, drone_type=DroneType.JACKAL,
-        x=eff_x, y=eff_y, altitude=50, speed=80,
+        x=eff_x, y=eff_y, altitude=50, speed=0,
         heading=heading_to, detected=True, classified=True,
         classification=ThreatClassification.JACKAL,
         dtid_phase=DTIDPhase.IDENTIFIED, affiliation=Affiliation.FRIENDLY,
         confidence=1.0, is_interceptor=True,
-        interceptor_target=target_id, intercept_phase="launch",
+        interceptor_target=target_id, intercept_phase="spinup",
+        spinup_remaining=spinup_duration,
     )
     gs.drones.append(jackal_drone)
     gs.engage_times[target_id] = elapsed
@@ -368,7 +370,7 @@ def _engage_jackal(
         effector=effector_id, timestamp=elapsed,
     ))
     msgs.append(_event(elapsed,
-        f"JACKAL LAUNCHED \u2014 {jackal_id} EN ROUTE TO {target_id.upper()}"))
+        f"JACKAL ENGAGE \u2014 {jackal_id} SPINUP INITIATED ({round(spinup_duration)}s TO LAUNCH)"))
     return msgs
 
 
