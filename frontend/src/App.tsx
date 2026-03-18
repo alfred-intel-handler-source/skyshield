@@ -752,6 +752,10 @@ export default function App() {
     send({ type: "action", action: "release_hold_fire", target_id: trackId });
   };
 
+  const handleJammerToggle = (effectorId: string) => {
+    send({ type: "action", action: "jammer_toggle", effector_id: effectorId });
+  };
+
   const handleEndMission = () => {
     send({ type: "action", action: "end_mission", target_id: "" });
   };
@@ -1129,6 +1133,7 @@ export default function App() {
           baseAssets={baseTemplate?.protected_assets}
           activeJammers={activeJammers}
           activeIntercepts={activeIntercepts}
+          onJammerToggle={handleJammerToggle}
         />
 
         {/* Tutorial overlay banner */}

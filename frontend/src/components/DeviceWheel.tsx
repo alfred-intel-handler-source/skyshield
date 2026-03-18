@@ -18,6 +18,7 @@ interface Props {
   onToggleRangeRing?: (deviceId: string) => void;
   onSlewTo?: (deviceId: string) => void;
   onEngageNearest?: (effectorId: string) => void;
+  onJammerToggle?: (effectorId: string) => void;
   onClose: () => void;
 }
 
@@ -93,6 +94,8 @@ function getSensorActions(sensor: SensorStatus): WheelAction[] {
 function getEffectorActions(effector: EffectorStatus): WheelAction[] {
   const isReady = effector.status === "ready";
   const hasJackalAmmo = effector.ammo_remaining != null;
+  const isJammer = effector.type === "rf_jam" || effector.type === "electronic";
+  const jammerActive = effector.jammer_active === true;
 
   return [
     {
@@ -110,6 +113,13 @@ function getEffectorActions(effector: EffectorStatus): WheelAction[] {
       color: (effector.ammo_remaining ?? 0) > 0 ? "#3fb950" : "#f85149",
       statusText: `${effector.ammo_remaining}/${effector.ammo_count}`,
       disabled: true,
+    }] : []),
+    ...(isJammer ? [{
+      id: "jammer_toggle",
+      label: jammerActive ? "DEACTIVATE" : "ACTIVATE",
+      icon: jammerActive ? "\u23F9" : "\u25B6",
+      color: jammerActive ? "#f85149" : "#3fb950",
+      statusText: jammerActive ? "JAM ACTIVE" : "JAM OFF",
     }] : []),
     {
       id: "engage_nearest",
@@ -145,6 +155,7 @@ export default function DeviceWheel({
   onToggleRangeRing,
   onSlewTo,
   onEngageNearest,
+  onJammerToggle,
   onClose,
 }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -181,11 +192,15 @@ export default function DeviceWheel({
           onEngageNearest?.(device.id);
           onClose();
           break;
+        case "jammer_toggle":
+          onJammerToggle?.(device.id);
+          onClose();
+          break;
         default:
           break;
       }
     },
-    [device.id, onToggleRangeRing, onSlewTo, onEngageNearest, onClose],
+    [device.id, onToggleRangeRing, onSlewTo, onEngageNearest, onJammerToggle, onClose],
   );
 
   const size = WHEEL_RADIUS * 2;

@@ -28,6 +28,7 @@ class DroneType(str, Enum):
     MILITARY_JET = "military_jet"
     WEATHER_BALLOON = "weather_balloon"
     JACKAL = "jackal"
+    SHAHED = "shahed"
 
 
 class ThreatClassification(str, Enum):
@@ -39,6 +40,7 @@ class ThreatClassification(str, Enum):
     IMPROVISED = "improvised"
     PASSENGER_AIRCRAFT = "passenger_aircraft"
     JACKAL = "jackal"
+    SHAHED = "shahed"
 
 
 class SensorType(str, Enum):

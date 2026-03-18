@@ -239,6 +239,32 @@ def handle_engage(
     return msgs
 
 
+def handle_jammer_toggle(
+    gs: GameState,
+    effector_id: str,
+    elapsed: float,
+) -> list[dict]:
+    """Toggle a jammer effector between active and inactive."""
+    msgs: list[dict] = []
+    for eff_state in gs.effector_states:
+        if eff_state["id"] != effector_id:
+            continue
+        if eff_state.get("type") not in ("rf_jam", "electronic"):
+            msgs.append(_event(elapsed,
+                f"JAMMER: {eff_state['name']} is not a jammer effector"))
+            break
+        currently_active = eff_state.get("jammer_active", False)
+        eff_state["jammer_active"] = not currently_active
+        if eff_state["jammer_active"]:
+            msgs.append(_event(elapsed,
+                f"RF JAMMER: {eff_state['name']} ACTIVATED — area suppression active"))
+        else:
+            msgs.append(_event(elapsed,
+                f"RF JAMMER: {eff_state['name']} DEACTIVATED"))
+        break
+    return msgs
+
+
 def handle_end_mission(gs: GameState) -> list[dict]:
     """Signal the game loop to transition to debrief."""
     gs.phase = GamePhase.DEBRIEF

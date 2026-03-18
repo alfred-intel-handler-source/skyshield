@@ -61,6 +61,7 @@ export interface EffectorStatus {
   facing_deg?: number;
   ammo_count?: number;
   ammo_remaining?: number;
+  jammer_active?: boolean;
 }
 
 export interface EngagementZones {

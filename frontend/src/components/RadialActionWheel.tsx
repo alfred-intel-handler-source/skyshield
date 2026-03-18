@@ -31,6 +31,7 @@ const CLASSIFICATIONS = [
   { value: "fixed_wing", label: "FIXED WING", icon: "\u2708", affiliation: "hostile", color: "#f85149" },
   { value: "micro", label: "MICRO UAS", icon: "\u25C7", affiliation: "hostile", color: "#f85149" },
   { value: "improvised", label: "IMPROVISED", icon: "\u26A0", affiliation: "hostile", color: "#f85149" },
+  { value: "shahed", label: "SHAHED", icon: "\u2622", affiliation: "hostile", color: "#f85149" },
   { value: "bird", label: "BIRD", icon: "\u{1F426}", affiliation: "neutral", color: "#3fb950" },
   { value: "weather_balloon", label: "BALLOON", icon: "\u25CB", affiliation: "neutral", color: "#3fb950" },
 ];

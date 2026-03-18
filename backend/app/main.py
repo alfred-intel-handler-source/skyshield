@@ -26,6 +26,7 @@ from app.actions import (
     handle_engage,
     handle_hold_fire,
     handle_identify,
+    handle_jammer_toggle,
     handle_release_hold_fire,
 )
 from app.bases import list_bases, load_base, load_equipment_catalog
@@ -38,7 +39,7 @@ from app.helpers import (
     build_sensors_from_placement,
     threat_level,
 )
-from app.jamming import update_jammed_drone
+from app.jamming import pick_jam_behavior, update_jammed_drone
 from app.ninja import update_shinobi_drone
 from app.models import (
     Affiliation,
@@ -69,6 +70,7 @@ VALID_ACTION_NAMES = {
     "confirm_track", "identify", "engage", "hold_fire",
     "release_hold_fire", "end_mission", "slew_camera",
     "shinobi_hold", "shinobi_land_now", "shinobi_deafen",
+    "jammer_toggle",
 }
 VALID_MSG_TYPES = {"action", "restart"}
 
@@ -206,6 +208,7 @@ def _init_game_state(
 
     # Init effector runtime state
     for eff in effector_configs_list:
+        is_jammer = eff.type.value in ("rf_jam", "electronic")
         gs.effector_states.append({
             "id": eff.id, "name": eff.name, "type": eff.type.value,
             "range_km": eff.range_km, "status": eff.status,
@@ -214,6 +217,7 @@ def _init_game_state(
             "facing_deg": eff.facing_deg, "requires_los": eff.requires_los,
             "single_use": eff.single_use, "ammo_count": eff.ammo_count,
             "ammo_remaining": eff.ammo_remaining,
+            **({"jammer_active": False} if is_jammer else {}),
         })
 
     # Init sensor runtime
@@ -393,6 +397,55 @@ def _tick_effector_recharge(gs: GameState, elapsed: float) -> list[dict]:
                 events.append({
                     "type": "event", "timestamp": round(elapsed, 1),
                     "message": f"{eff_state['name']}: Ready",
+                })
+    return events
+
+
+def _tick_passive_jamming(gs: GameState, elapsed: float) -> list[dict]:
+    """Passive area jamming — any active jammer auto-affects drones in range."""
+    events: list[dict] = []
+    for eff_state in gs.effector_states:
+        if eff_state.get("type") not in ("rf_jam", "electronic"):
+            continue
+        if not eff_state.get("jammer_active", False):
+            continue
+        if eff_state.get("recharge_remaining", 0) > 0:
+            continue
+
+        eff_x = eff_state.get("x", 0)
+        eff_y = eff_state.get("y", 0)
+        range_km = eff_state.get("range_km", 3.0)
+
+        for i, drone in enumerate(gs.drones):
+            if drone.neutralized or drone.jammed or drone.is_interceptor:
+                continue
+            if drone.shinobi_cm_active:
+                continue
+            dist = math.sqrt((drone.x - eff_x) ** 2 + (drone.y - eff_y) ** 2)
+            if dist > range_km:
+                continue
+
+            behavior = pick_jam_behavior(drone.drone_type)
+            if behavior is None:
+                if drone.id not in gs.jam_resist_notified:
+                    gs.jam_resist_notified.add(drone.id)
+                    events.append({
+                        "type": "event", "timestamp": round(elapsed, 1),
+                        "message": f"RF JAM: {drone.id.upper()} — RESISTANT (no effect)",
+                    })
+            else:
+                jam_duration = random.uniform(5.0, 10.0)
+                gs.drones[i] = drone.model_copy(update={
+                    "dtid_phase": DTIDPhase.DEFEATED,
+                    "jammed": True,
+                    "jammed_behavior": behavior,
+                    "jammed_time_remaining": jam_duration,
+                })
+                gs.engage_times.setdefault(drone.id, elapsed)
+                gs.effector_used.setdefault(drone.id, eff_state["type"])
+                events.append({
+                    "type": "event", "timestamp": round(elapsed, 1),
+                    "message": f"RF JAM: {drone.id.upper()} — {behavior.replace('_', ' ').upper()}",
                 })
     return events
 
@@ -661,6 +714,7 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
                 "id": es["id"], "status": es["status"],
                 **({"ammo_count": es["ammo_count"]} if es.get("ammo_count") is not None else {}),
                 **({"ammo_remaining": es["ammo_remaining"]} if es.get("ammo_remaining") is not None else {}),
+                **({"jammer_active": es["jammer_active"]} if "jammer_active" in es else {}),
             }
             for es in gs.effector_states
         ],
@@ -887,6 +941,7 @@ async def game_websocket(ws: WebSocket):
             events.extend(_tick_spawns(gs, elapsed))
             events.extend(_tick_waves(gs, elapsed))
             events.extend(_tick_effector_recharge(gs, elapsed))
+            events.extend(_tick_passive_jamming(gs, elapsed))
             events.extend(_tick_drones(gs, elapsed))
 
             # Send state
@@ -953,6 +1008,10 @@ async def game_websocket(ws: WebSocket):
                         await _send_msgs(ws, handle_engage(
                             gs, target_id, msg.get("effector", ""), elapsed,
                             shinobi_cm=action_name,
+                        ))
+                    elif action_name == "jammer_toggle":
+                        await _send_msgs(ws, handle_jammer_toggle(
+                            gs, msg.get("effector_id", ""), elapsed,
                         ))
                     elif action_name == "end_mission":
                         handle_end_mission(gs)

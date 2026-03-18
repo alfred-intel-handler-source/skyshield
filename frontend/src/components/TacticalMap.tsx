@@ -44,6 +44,7 @@ interface Props {
   baseAssets?: ProtectedAsset[];
   activeJammers?: Record<string, number>;
   activeIntercepts?: InterceptAnimationData[];
+  onJammerToggle?: (effectorId: string) => void;
 }
 
 export interface InterceptAnimationData {
@@ -306,13 +307,22 @@ function createSensorIcon(name: string): L.DivIcon {
   return L.divIcon({ html: svg, className: "", iconSize: [34, 34], iconAnchor: [17, 17] });
 }
 
-function createEffectorIcon(name: string): L.DivIcon {
+function createEffectorIcon(name: string, jammerActive?: boolean): L.DivIcon {
   const label = (name || "EFFECTOR").toUpperCase().slice(0, 8);
+  const glowFilter = jammerActive
+    ? `<filter id="jam-glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`
+    : "";
+  const pulseCircle = jammerActive
+    ? `<circle cx="17" cy="17" r="15" fill="none" stroke="#e3b341" stroke-width="1.5" opacity="0.6"><animate attributeName="r" values="15;20;15" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.6;0.15;0.6" dur="1.5s" repeatCount="indefinite"/></circle>`
+    : "";
+  const filterAttr = jammerActive ? ' filter="url(#jam-glow)"' : "";
   const svg = `<svg width="34" height="34" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
-    <rect x="7" y="7" width="20" height="20" rx="2" fill="rgba(240,136,62,0.15)" stroke="#f0883e" stroke-width="1.5"/>
+    ${glowFilter}
+    ${pulseCircle}
+    <rect x="7" y="7" width="20" height="20" rx="2" fill="rgba(240,136,62,0.15)" stroke="#f0883e" stroke-width="1.5"${filterAttr}/>
     <line x1="17" y1="11" x2="17" y2="23" stroke="#f0883e" stroke-width="1.5"/>
     <line x1="11" y1="17" x2="23" y2="17" stroke="#f0883e" stroke-width="1.5"/>
-    <text x="17" y="33" text-anchor="middle" fill="#f0883e" font-size="7" font-weight="600" font-family="monospace">${label}</text>
+    <text x="17" y="33" text-anchor="middle" fill="${jammerActive ? "#e3b341" : "#f0883e"}" font-size="7" font-weight="600" font-family="monospace">${label}</text>
   </svg>`;
   return L.divIcon({ html: svg, className: "", iconSize: [34, 34], iconAnchor: [17, 17] });
 }
@@ -839,6 +849,7 @@ export default function TacticalMap({
   baseAssets = [],
   activeJammers = {},
   activeIntercepts = [],
+  onJammerToggle,
 }: Props) {
   const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
@@ -1276,20 +1287,27 @@ export default function TacticalMap({
           );
         })}
 
-        {/* EW Radiate animation for active jammers */}
-        {Object.keys(activeJammers).map((jammerId) => {
-          const eff = effectors.find((e) => e.id === jammerId);
-          if (!eff || eff.x == null) return null;
-          return (
-            <EWRadiateOverlay
-              key={`ew-radiate-${jammerId}`}
-              center={[eff.x ?? 0, eff.y ?? 0]}
-              rangeKm={eff.range_km ?? 3}
-              baseLat={baseLat}
-              baseLng={baseLng}
-            />
-          );
-        })}
+        {/* EW Radiate animation for active jammers (engagement-triggered + passive toggle) */}
+        {(() => {
+          const activeIds = new Set(Object.keys(activeJammers));
+          // Also include jammers with jammer_active flag from passive toggle
+          effectors.forEach((e) => {
+            if (e.jammer_active) activeIds.add(e.id);
+          });
+          return Array.from(activeIds).map((jammerId) => {
+            const eff = effectors.find((e) => e.id === jammerId);
+            if (!eff || eff.x == null) return null;
+            return (
+              <EWRadiateOverlay
+                key={`ew-radiate-${jammerId}`}
+                center={[eff.x ?? 0, eff.y ?? 0]}
+                rangeKm={eff.range_km ?? 3}
+                baseLat={baseLat}
+                baseLng={baseLng}
+              />
+            );
+          });
+        })()}
 
         {/* JACKAL intercept animations */}
         {activeIntercepts.map((intercept) => (
@@ -1347,7 +1365,7 @@ export default function TacticalMap({
             <Marker
               key={`effector-marker-${eff.id}`}
               position={ePos}
-              icon={createEffectorIcon(eff.name || eff.id)}
+              icon={createEffectorIcon(eff.name || eff.id, eff.jammer_active)}
               eventHandlers={{
                 contextmenu: (e) => {
                   L.DomEvent.stopPropagation(e.originalEvent);
@@ -1840,6 +1858,7 @@ export default function TacticalMap({
                 })[0];
               if (nearestHostile) onEngage(nearestHostile.id, effectorId);
             } : undefined}
+            onJammerToggle={onJammerToggle}
             onClose={() => setDeviceWheelState(null)}
           />
         );

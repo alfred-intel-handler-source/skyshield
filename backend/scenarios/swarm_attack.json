@@ -1,7 +1,7 @@
 {
   "id": "swarm_attack",
   "name": "Swarm Attack",
-  "description": "Five contacts inbound from multiple directions. A mix of commercial quads, a fixed-wing, a micro drone, and one bird (false alarm). Staggered arrival — expect the second wave at T+30s and a late contact at T+60s. Prioritize threats, manage effectors, and don't waste resources on the bird.",
+  "description": "Six contacts inbound from multiple directions. A mix of commercial quads, a fixed-wing, a micro drone, one Shahed-type autonomous drone (jam-immune), and one bird (false alarm). Staggered arrival — expect the second wave at T+30s and late contacts at T+60s. Prioritize threats, manage effectors, and don't waste resources on the bird.",
   "difficulty": "Hard",
   "duration_seconds": 180,
   "base_radius_km": 0.1,
@@ -99,6 +99,24 @@
     },
     {
       "id": "bogey-5",
+      "drone_type": "shahed",
+      "start_x": -4.5,
+      "start_y": -1.5,
+      "altitude": 500,
+      "speed": 130,
+      "heading": 60,
+      "behavior": "direct_approach",
+      "rf_emitting": false,
+      "spawn_delay": 60,
+      "correct_classification": "shahed",
+      "correct_affiliation": "hostile",
+      "optimal_effectors": ["kinetic"],
+      "acceptable_effectors": ["kinetic"],
+      "roe_violations": [],
+      "should_engage": true
+    },
+    {
+      "id": "bogey-6",
       "drone_type": "bird",
       "start_x": 1.5,
       "start_y": 4.5,
