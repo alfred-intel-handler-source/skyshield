@@ -1114,7 +1114,7 @@ export default function App() {
         <SensorPanel sensors={sensors} />
         <EffectorPanel effectors={effectors} activeJammers={activeJammers} />
         <TrackList
-          tracks={tracks.filter((t) => !t.neutralized && !t.is_ambient && !t.is_interceptor)}
+          tracks={tracks.filter((t) => !t.neutralized && !t.is_interceptor)}
           selectedTrackId={selectedTrackId}
           onSelectTrack={setSelectedTrackId}
         />
