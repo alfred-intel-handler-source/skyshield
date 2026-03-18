@@ -138,7 +138,8 @@ class DroneState(BaseModel):
     # JACKAL interceptor fields
     is_interceptor: bool = False
     interceptor_target: str | None = None
-    intercept_phase: str | None = None  # launch, midcourse, terminal, self_destruct
+    intercept_phase: str | None = None  # spinup, launch, midcourse, terminal, self_destruct
+    spinup_remaining: float = 0.0  # seconds remaining in spinup phase
     intercept_attempts: int = 0  # track retry count for terminal intercept
     # SHINOBI RF track properties
     frequency_band: str | None = None  # "2.4GHz", "5.8GHz", "430MHz", "900MHz"

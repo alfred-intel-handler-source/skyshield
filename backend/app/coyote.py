@@ -44,6 +44,30 @@ def update_jackal(
 
     phase = jackal.intercept_phase
 
+    # --- Spinup phase (10-15s warmup before launch) ---
+    if phase == "spinup":
+        spinup_remaining = jackal.spinup_remaining - tick_rate
+        if spinup_remaining <= 0:
+            jackal = jackal.model_copy(update={
+                "intercept_phase": "launch",
+                "spinup_remaining": 0.0,
+            })
+            events.append({
+                "type": "event",
+                "timestamp": round(elapsed, 1),
+                "message": f"{jackal.id.upper()} — LAUNCH SEQUENCE COMPLETE — AWAY",
+            })
+        else:
+            countdown = int(spinup_remaining) + 1
+            if int(spinup_remaining * 10) % 20 == 0:  # every 2s
+                events.append({
+                    "type": "event",
+                    "timestamp": round(elapsed, 1),
+                    "message": f"{jackal.id.upper()} — SPINUP T-{countdown}s",
+                })
+            jackal = jackal.model_copy(update={"spinup_remaining": spinup_remaining})
+        return jackal, drone_mutations, events, engagement_results
+
     # --- Self-destruct phase ---
     if phase == "self_destruct":
         if jackal.altitude < 328:

@@ -15,6 +15,7 @@ export interface TrackData {
   confidence: number;
   classification: string | null;
   drone_type: string | null;
+  spinup_remaining?: number;
   trail: [number, number][];
   sensors_detecting: string[];
   neutralized: boolean;
