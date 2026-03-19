@@ -32,7 +32,7 @@ All systems are fictional but specification-accurate — designed to reflect the
 
 | System | Type | Range | Notes |
 |--------|------|-------|-------|
-| **RF/PNT Jammer** | Electronic warfare | 3 km | Disrupts RF command links and GPS/PNT navigation; effective against commercial UAS; passive area suppression once activated; rechargeable; can affect friendly GPS |
+| **RF/PNT Jammer** | Electronic warfare | 5 km | Disrupts RF command links and GPS/PNT navigation; effective against commercial UAS; passive area suppression once activated; rechargeable; can affect friendly GPS |
 | **JACKAL Pallet** | Kinetic interceptor | 10 km | Tube-launched, Ku-Band radar-guided; proximity-fused warhead; 10–15s spinup before launch; 4 interceptors per pallet (single-use); requires Ku-Band Fire Control Radar for mid-course guidance |
 
 #### Combined Sensor/Effector

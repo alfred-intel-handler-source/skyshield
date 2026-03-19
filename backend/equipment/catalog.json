@@ -65,7 +65,7 @@
       "catalog_id": "rf_jammer",
       "name": "RF/PNT Jammer",
       "type": "electronic",
-      "range_km": 3.0,
+      "range_km": 5.0,
       "fov_deg": 360,
       "recharge_seconds": 10,
       "single_use": false,
