@@ -9,44 +9,83 @@
 ## Features
 
 ### Core Gameplay — DTID Kill Chain
-- **Detect** — AN/TPQ-51 radar picks up contacts at 10km, KURZ FCS at 10km
+- **Detect** — L-Band surveillance radar and Ku-Band fire control radar pick up contacts at 10km
 - **Track** — Confirm contacts, watch trail history, monitor coasting tracks
 - **Identify** — Slew EO/IR camera, visually ID drone silhouette (quad, fixed-wing, Shahed, bird, balloon)
-- **Defeat** — Kinetic (JACKAL interceptor), EW (RF jammer), or SHINOBI protocol manipulation
+- **Defeat** — Kinetic (JACKAL interceptor), EW (RF/PNT Jammer), or RF protocol manipulation (SHINOBI)
 
-### Equipment (Fictional but Spec-Accurate)
+---
+
+### Equipment
+
+All systems are fictional but specification-accurate — designed to reflect the capabilities and limitations of real-world C-UAS equipment without reproducing any specific program of record.
+
+#### Sensors
+
+| System | Type | Range | FOV | Notes |
+|--------|------|-------|-----|-------|
+| **L-Band Multi-Mission Radar** | Surveillance radar | 10 km | 360° | Lightweight rotating antenna; primary detection sensor for Group 1–3 UAS; all-weather; no LOS required |
+| **Ku-Band Fire Control Radar** | Fire control radar | 10 km | 360° | Precision track data; guides JACKAL interceptors to target; requires line of sight; single track at a time |
+| **EO/IR Camera** | Pan/tilt/zoom camera | 8 km | 360° pan | Electro-optical + infrared; thermal and daylight modes; 1x–40x zoom; used for visual ID; weather/LOS dependent |
+
+#### Effectors
+
 | System | Type | Range | Notes |
 |--------|------|-------|-------|
-| AN/TPQ-51 | Surveillance radar | 10km | 360°, all-weather |
-| KURZ FCS | Fire control radar | 10km | Guides JACKAL intercepts |
-| EO/IR Camera | Pan/tilt camera | 8km | Thermal + daylight, 1-8x zoom |
-| RF/PNT Jammer | Electronic warfare | 3km | Passive area suppression once activated |
-| JACKAL Pallet | Kinetic interceptor | 10km | 4 rounds, 10-15s spinup, KURZ-guided |
-| SHINOBI | RF detect + defeat | 8km detect / 6km defeat | HOLD / LAND NOW / DEAFEN |
+| **RF/PNT Jammer** | Electronic warfare | 3 km | Disrupts RF command links and GPS/PNT navigation; effective against commercial UAS; passive area suppression once activated; rechargeable; can affect friendly GPS |
+| **JACKAL Pallet** | Kinetic interceptor | 10 km | Tube-launched, Ku-Band radar-guided; proximity-fused warhead; 10–15s spinup before launch; 4 interceptors per pallet (single-use); requires Ku-Band Fire Control Radar for mid-course guidance |
+
+#### Combined Sensor/Effector
+
+| System | Type | Detect Range | Defeat Range | Notes |
+|--------|------|-------------|--------------|-------|
+| **SHINOBI** | RF detect + Protocol Manipulation | 8 km | 6 km | Passive omnidirectional antennas scan 2.4 GHz, 5.8 GHz, 430 MHz, and 900 MHz for drone control links; library-based (known protocols only); CM state progresses from 1/2 (downlink acquired) to 2/2 (uplink acquired, full defeat available); defeat modes: **HOLD** (freeze in place), **LAND NOW** (forced descent), **DEAFEN** (sever RF link); no collateral risk; ineffective vs. autonomous/non-RF targets |
+
+---
 
 ### Threat Types
-- **Commercial Quad** — GPS/RF dependent, fully jammable
-- **Fixed-Wing** — 40% jam resistance, faster
-- **Micro UAS** — Small, hard to see on camera
-- **Improvised** — Unknown electronics, 50% jam resistance
-- **Shahed-style** — Autonomous INS navigation, **100% jam immune**
-- **Bird / Weather Balloon / Passenger Aircraft / Military Jet** — Ambient traffic for ROE training
+
+| Threat | Jam Resistance | Notes |
+|--------|---------------|-------|
+| **Commercial Quad** | 0% | GPS/RF dependent; fully jammable; SHINOBI-vulnerable |
+| **Fixed-Wing UAS** | 40% | Faster; harder to track; partially jam-resistant |
+| **Micro UAS** | 0% | Small radar cross-section; difficult to visually ID |
+| **Improvised UAS** | 50% | Unknown electronics; SHINOBI library miss likely |
+| **Shahed-style** | 100% | Autonomous INS navigation; **immune to RF/GPS jamming**; kinetic defeat only |
+| **Bird / Weather Balloon** | — | Ambient traffic; **cannot be engaged** (ROE) |
+| **Passenger Aircraft / Military Jet** | — | Ambient traffic; ATC-clearable via CLEAR AIRSPACE |
+
+---
 
 ### UI/UX
-- **Real-world satellite maps** via Leaflet.js + OpenStreetMap (any location)
-- **FAAD C2 / Medusa-style interface** — Radial action wheel (WOD), track data blocks, range rings
-- **EO/IR Camera panel** — Thermal/daylight modes, realistic silhouettes, heat shimmer
-- **Track list** — Live contact feed in left sidebar (all contacts including ambient)
-- **Event log** — Color-coded by severity, full engagement history
-- **Debrief screen** — Per-category scoring across all waves
+
+- **Real-world satellite maps** via Leaflet.js + OpenStreetMap (any location on Earth)
+- **FAAD C2 / Medusa-style interface** — radial action wheel (WOD), track data blocks, range rings
+- **EO/IR Camera panel** — thermal/daylight modes, realistic drone silhouettes, heat shimmer effect
+- **Track list** — live contact feed in left sidebar (all contacts including ambient traffic)
+- **Event log** — color-coded by severity, full engagement history
+- **Debrief screen** — per-category scoring, full mission timeline
 
 ### Operational Features
-- **JAM ALL** — Activates all jammers simultaneously
-- **CLEAR AIRSPACE** — Removes ATC-clearable aircraft (jets/commercial), birds/balloons unaffected
+
+- **JAM ALL** — activates all RF/PNT jammers simultaneously
+- **CLEAR AIRSPACE** — removes ATC-clearable aircraft (jets/commercial); birds and balloons unaffected
 - **Hold Fire** — ROE lockout on individual tracks
-- **Continuous ops** — Wave-based, mission runs until player ends it
-- **JACKAL spinup** — 10-15s warmup sequence before launch (realistic)
-- **Passive area jamming** — Activated jammer auto-affects all targets in range each tick
+- **Continuous ops** — wave-based; mission runs until player ends it
+- **JACKAL spinup** — realistic 10–15s warmup sequence before intercept launch
+- **SHINOBI 1/2 → 2/2 progression** — downlink detection → uplink acquisition → full defeat options
+- **Passive area jamming** — activated jammer auto-affects all susceptible targets in range each tick
+
+---
+
+## Scenarios
+
+| Scenario | Description | Difficulty |
+|----------|-------------|------------|
+| **Tutorial** | Guided walkthrough of the full DTID kill chain | Beginner |
+| **Lone Wolf** | Single drone threat; practice the basic kill chain | Easy |
+| **Swarm Attack** | 5 drones including a Shahed-style autonomous threat + active jammer | Hard |
+| **Recon Probe** | 3 drones with ROE trigger discipline — not everything should be engaged | Medium |
 
 ---
 
@@ -63,10 +102,10 @@ make install
 
 ### Run
 ```bash
-# Terminal 1
+# Terminal 1 — backend
 cd backend && python3 -m uvicorn app.main:app --reload --port 8000
 
-# Terminal 2
+# Terminal 2 — frontend
 cd frontend && npm run dev
 ```
 
@@ -90,10 +129,10 @@ backend/
     waves.py         — Wave spawning
     drone.py         — Drone movement/behavior
   equipment/
-    catalog.json     — Equipment definitions
+    catalog.json     — Equipment definitions (L-Band radar, Ku-Band FCS, EO/IR, RF Jammer, JACKAL, SHINOBI)
   scenarios/
     lone_wolf.json   — Single drone
-    swarm_attack.json — 5 drones + Shahed
+    swarm_attack.json — 5 drones + Shahed-style
     recon_probe.json — 3 drones with trigger discipline
     tutorial.json    — Guided walkthrough
   bases/
@@ -117,8 +156,6 @@ frontend/src/
 - [ ] Base Defense Planner — drag/drop sensor placement pre-mission
 - [ ] Coverage gap visualization (LOS shadows, uncovered sectors)
 - [ ] Planning score in debrief (coverage completeness, effector positioning)
-- [ ] Fix JAM ALL / CLEAR AIRSPACE visual feedback issues
-- [ ] End-to-end smoke test pass before external beta
 
 ---
 
