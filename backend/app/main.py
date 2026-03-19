@@ -29,7 +29,9 @@ from app.actions import (
     handle_identify,
     handle_jam_all,
     handle_jammer_toggle,
+    handle_pause_mission,
     handle_release_hold_fire,
+    handle_resume_mission,
 )
 from app.bases import list_bases, load_base, load_equipment_catalog
 from app.coyote import update_jackal
@@ -73,6 +75,7 @@ VALID_ACTION_NAMES = {
     "release_hold_fire", "end_mission", "slew_camera",
     "shinobi_hold", "shinobi_land_now", "shinobi_deafen",
     "jammer_toggle", "jam_all", "clear_airspace",
+    "pause_mission", "resume_mission",
 }
 VALID_MSG_TYPES = {"action", "restart"}
 
@@ -497,15 +500,20 @@ def _tick_drones(gs: GameState, elapsed: float) -> list[dict]:
             events.extend(nevents)
             continue
 
-        # --- Normal movement ---
-        cfg = gs.drone_configs[drone.id]
-        gs.drones[i] = update_drone(
-            drone, gs.tick_rate, gs.behaviors[drone.id],
-            waypoints=cfg.waypoints,
-            orbit_radius=cfg.orbit_radius or 1.5,
-            orbit_center=cfg.orbit_center,
-            detected_by_player=drone.detected,
-        )
+        # --- Tutorial gate: freeze drone until operator completes step ---
+        if gs.scenario.tutorial and not drone.is_ambient and _tutorial_gate_active(gs, drone):
+            # Don't move — drone holds position
+            pass
+        else:
+            # --- Normal movement ---
+            cfg = gs.drone_configs[drone.id]
+            gs.drones[i] = update_drone(
+                drone, gs.tick_rate, gs.behaviors[drone.id],
+                waypoints=cfg.waypoints,
+                orbit_radius=cfg.orbit_radius or 1.5,
+                orbit_center=cfg.orbit_center,
+                detected_by_player=drone.detected,
+            )
 
         # Base proximity check
         if not gs.drones[i].is_ambient and distance_to_base(gs.drones[i]) < gs.scenario.base_radius_km:
@@ -730,7 +738,88 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
             for es in gs.effector_states
         ],
         "ambient_suppressed_until": round(gs.ambient_suppressed_until, 1),
+        "paused": gs.paused,
+        **({"tutorial_step": gs.tutorial_step} if gs.scenario.tutorial else {}),
     }
+
+
+def _tutorial_gate_active(gs: GameState, drone: DroneState) -> bool:
+    """Return True if the tutorial drone should be frozen (gate active).
+
+    Gates:
+      step 0: drone moves until detected by sensors (gate releases → step 1)
+      step 1: DETECT — drone holds, waiting for confirm_track → step 2
+      step 2: TRACK — drone holds, waiting for slew_camera → step 3
+      step 3: SLEW  — drone holds, waiting for identify → step 4
+      step 4: IDENTIFY — drone holds, waiting for engage → step 5
+      step 5+: no gate — drone resumes
+    """
+    step = gs.tutorial_step
+    if step == 0:
+        # Gate releases automatically once drone is detected
+        if drone.detected:
+            gs.tutorial_step = 1
+            return True  # Hold on step 1
+        return False  # Let drone approach until detected
+    if step >= 5:
+        return False  # Drone resumes after engage
+    return True  # Steps 1-4: hold position
+
+
+def _advance_tutorial_step(gs: GameState, action_name: str, target_id: str,
+                           effector_id: str | None = None) -> list[dict]:
+    """Check if a player action should advance the tutorial step.
+    Returns tutorial feedback messages (wrong-choice warnings, etc.)."""
+    if not gs.scenario.tutorial:
+        return []
+    msgs: list[dict] = []
+    step = gs.tutorial_step
+
+    if step == 1 and action_name == "confirm_track":
+        gs.tutorial_step = 2
+        msgs.append({"type": "tutorial",
+                      "message": "Track confirmed. Now slew the EO/IR Camera to get a visual on the target. "
+                                 "Use the Radial Action Wheel (right-click the track) → SLEW CAMERA, "
+                                 "or use the button in the Engagement Panel."})
+    elif step == 2 and action_name == "slew_camera":
+        gs.tutorial_step = 3
+        gs.tutorial_camera_slewed = True
+        msgs.append({"type": "tutorial",
+                      "message": "Camera is locked on. Study the silhouette — this determines your "
+                                 "classification. When ready, proceed to IDENTIFY."})
+    elif step == 3 and action_name == "identify":
+        gs.tutorial_step = 4
+        # Check for incorrect classification
+        drone = next((d for d in gs.drones if d.id == target_id), None)
+        if drone:
+            cfg = gs.drone_configs.get(target_id)
+            given_cls = gs.classification_given.get(target_id)
+            correct_cls = cfg.correct_classification if cfg else gs.scenario.correct_classification.value
+            if given_cls and given_cls != correct_cls:
+                msgs.append({"type": "tutorial_feedback",
+                             "message": "Incorrect classification. Check the camera feed — look at the silhouette shape.",
+                             "severity": "warning"})
+        msgs.append({"type": "tutorial",
+                      "message": "Threat identified! Now select an effector to engage. RF/PNT Jammer is the "
+                                 "optimal choice for a commercial quad — it has low collateral risk."})
+    elif step == 4 and action_name == "engage":
+        # Check for suboptimal effector choice
+        eff_state = None
+        for es in gs.effector_states:
+            if es["id"] == effector_id:
+                eff_state = es
+                break
+        if eff_state and eff_state.get("type") == "kinetic":
+            # Kinetic on a commercial quad — suboptimal
+            drone = next((d for d in gs.drones if d.id == target_id), None)
+            if drone and drone.drone_type.value == "commercial_quad":
+                msgs.append({"type": "tutorial_feedback",
+                             "message": "JACKAL is overkill for a commercial quad — high collateral risk. "
+                                        "Jammer is the optimal choice.",
+                             "severity": "warning"})
+        gs.tutorial_step = 5
+
+    return msgs
 
 
 def _check_tutorial_prompts(gs: GameState) -> list[dict]:
@@ -744,18 +833,18 @@ def _check_tutorial_prompts(gs: GameState) -> list[dict]:
             continue
         should_send = False
         if trigger == "detected":
-            should_send = any(d.detected for d in gs.drones)
+            should_send = any(d.detected for d in gs.drones) and gs.tutorial_step >= 1
         elif trigger == "tracked":
-            should_send = any(d.dtid_phase == DTIDPhase.TRACKED for d in gs.drones)
+            should_send = gs.tutorial_step >= 2
         elif trigger == "identify_ready":
-            should_send = any(
-                d.dtid_phase == DTIDPhase.TRACKED and d.confidence >= 0.4
-                for d in gs.drones
-            )
+            # Replaced by gated camera step — skip this trigger in gated mode
+            continue
         elif trigger == "identified":
-            should_send = any(d.dtid_phase == DTIDPhase.IDENTIFIED for d in gs.drones)
+            should_send = gs.tutorial_step >= 4
         elif trigger == "defeated":
-            should_send = any(d.dtid_phase == DTIDPhase.DEFEATED for d in gs.drones)
+            should_send = gs.tutorial_step >= 5
+            if should_send:
+                gs.tutorial_step = 6  # DEBRIEF step
         if should_send:
             msgs.append({"type": "tutorial", "message": tp["message"]})
             gs.tutorial_prompts_sent.add(trigger)
@@ -946,15 +1035,19 @@ async def game_websocket(ws: WebSocket):
 
         # --- Main game loop ---
         while gs.phase == GamePhase.RUNNING:
-            elapsed = time.time() - gs.start_time
+            # Subtract accumulated paused time (and current pause if active)
+            wall_elapsed = time.time() - gs.start_time
+            paused_now = (time.time() - gs.pause_start_time) if gs.paused else 0.0
+            elapsed = wall_elapsed - gs.total_paused_seconds - paused_now
             time_remaining = max(0, gs.max_duration - elapsed)
             events: list[dict] = []
 
-            events.extend(_tick_spawns(gs, elapsed))
-            events.extend(_tick_waves(gs, elapsed))
-            events.extend(_tick_effector_recharge(gs, elapsed))
-            events.extend(_tick_passive_jamming(gs, elapsed))
-            events.extend(_tick_drones(gs, elapsed))
+            if not gs.paused:
+                events.extend(_tick_spawns(gs, elapsed))
+                events.extend(_tick_waves(gs, elapsed))
+                events.extend(_tick_effector_recharge(gs, elapsed))
+                events.extend(_tick_passive_jamming(gs, elapsed))
+                events.extend(_tick_drones(gs, elapsed))
 
             # Send state
             await ws.send_json(_build_state_msg(gs, elapsed, time_remaining))
@@ -1002,20 +1095,28 @@ async def game_websocket(ws: WebSocket):
                         await _send_error(ws, f"Unknown action: {action_name}", "invalid_action")
                     elif action_name == "confirm_track":
                         await _send_msgs(ws, handle_confirm_track(gs, target_id, elapsed))
+                        await _send_msgs(ws, _advance_tutorial_step(gs, "confirm_track", target_id))
                     elif action_name == "identify":
                         await _send_msgs(ws, handle_identify(
                             gs, target_id, msg.get("classification"),
                             msg.get("affiliation", "unknown"), elapsed,
                         ))
+                        await _send_msgs(ws, _advance_tutorial_step(gs, "identify", target_id))
+                    elif action_name == "slew_camera":
+                        # Tutorial-aware camera slew — advance tutorial step
+                        await _send_msgs(ws, _advance_tutorial_step(gs, "slew_camera", target_id))
                     elif action_name == "hold_fire":
                         await _send_msgs(ws, handle_hold_fire(gs, target_id, elapsed))
                     elif action_name == "release_hold_fire":
                         await _send_msgs(ws, handle_release_hold_fire(gs, target_id, elapsed))
                     elif action_name == "engage":
+                        effector_id = msg.get("effector", "")
                         await _send_msgs(ws, handle_engage(
-                            gs, target_id, msg.get("effector", ""), elapsed,
+                            gs, target_id, effector_id, elapsed,
                             shinobi_cm=msg.get("shinobi_cm"),
                         ))
+                        await _send_msgs(ws, _advance_tutorial_step(
+                            gs, "engage", target_id, effector_id=effector_id))
                     elif action_name in ("shinobi_hold", "shinobi_land_now", "shinobi_deafen"):
                         await _send_msgs(ws, handle_engage(
                             gs, target_id, msg.get("effector", ""), elapsed,
@@ -1029,6 +1130,14 @@ async def game_websocket(ws: WebSocket):
                         await _send_msgs(ws, handle_jam_all(gs, elapsed))
                     elif action_name == "clear_airspace":
                         await _send_msgs(ws, handle_clear_airspace(gs, elapsed))
+                    elif action_name == "pause_mission":
+                        await _send_msgs(ws, handle_pause_mission(gs, elapsed))
+                        _tr = max(0, gs.max_duration - elapsed)
+                        await _send_msgs(ws, [_build_state_msg(gs, elapsed, _tr)])
+                    elif action_name == "resume_mission":
+                        await _send_msgs(ws, handle_resume_mission(gs, elapsed))
+                        _tr = max(0, gs.max_duration - elapsed)
+                        await _send_msgs(ws, [_build_state_msg(gs, elapsed, _tr)])
                     elif action_name == "end_mission":
                         handle_end_mission(gs)
 
