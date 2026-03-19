@@ -77,6 +77,7 @@ export function useWebSocket(
                 base_id: connectOpts.placement.base_id,
                 sensors: connectOpts.placement.sensors,
                 effectors: connectOpts.placement.effectors,
+                combined: connectOpts.placement.combined ?? [],
               };
             }
             ws.send(JSON.stringify(initMsg));

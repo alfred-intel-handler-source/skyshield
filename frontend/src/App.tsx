@@ -438,27 +438,28 @@ export default function App() {
         }, 3000);
       }
 
-      // Warning area entry
+      // Warning area entry — eta_protected is in SECONDS
       if (eta != null) {
-        // Track is heading toward protected area
-        const inWarning = distToProtected <= 60; // roughly within warning area by time
-        const inProtected = distToProtected <= 5; // basically at the edge
-        const isCritical = distToProtected <= 15;
+        // Thresholds: warning = 120s out, critical = 45s, protected = 10s
+        const inWarning = distToProtected <= 120;
+        const isCritical = distToProtected <= 45;
+        const inProtected = distToProtected <= 10;
 
+        // Only fire each alert once per approach (set-based dedup)
         if (isCritical && !tracksCriticalRef.current.has(track.id)) {
           tracksCriticalRef.current.add(track.id);
           newBlinks[track.id] = "track-blink-rapid";
-          soundEngine.play("critical_alarm");
+          if (!isNew) soundEngine.play("critical_alarm"); // suppress on spawn
           alerts++;
         } else if (inProtected && !tracksInProtectedRef.current.has(track.id)) {
           tracksInProtectedRef.current.add(track.id);
           newBlinks[track.id] = "track-blink-fast";
-          soundEngine.play("protected_area_entry");
+          if (!isNew) soundEngine.play("protected_area_entry");
           alerts++;
         } else if (inWarning && !tracksInWarningRef.current.has(track.id)) {
           tracksInWarningRef.current.add(track.id);
           newBlinks[track.id] = "track-blink-fast";
-          soundEngine.play("warning_area_entry");
+          if (!isNew) soundEngine.play("warning_area_entry");
           alerts++;
         } else if (tracksCriticalRef.current.has(track.id)) {
           newBlinks[track.id] = "track-blink-rapid";
