@@ -1494,11 +1494,11 @@ export default function TacticalMap({
                   center={bullseyeCenter}
                   radius={r * 1000}
                   pathOptions={{
-                    color: "rgba(255,255,255,0.3)",
+                    color: "rgba(255,255,255,0.75)",
                     fillColor: "transparent",
                     fillOpacity: 0,
-                    weight: 1,
-                    dashArray: "4,4",
+                    weight: 1.5,
+                    dashArray: "6,4",
                   }}
                 />
               ))}
@@ -1510,7 +1510,7 @@ export default function TacticalMap({
                     key={`be-label-${r}`}
                     position={labelPos}
                     icon={L.divIcon({
-                      html: `<span style="font:500 8px 'JetBrains Mono',monospace;color:rgba(255,255,255,0.5);white-space:nowrap;pointer-events:none;">${r}km</span>`,
+                      html: `<span style="font:700 9px 'JetBrains Mono',monospace;color:rgba(255,255,255,0.9);white-space:nowrap;pointer-events:none;text-shadow:0 0 4px rgba(0,0,0,0.8);">${r}km</span>`,
                       className: "",
                       iconSize: [30, 12],
                       iconAnchor: [-2, 6],
@@ -1530,9 +1530,9 @@ export default function TacticalMap({
                     key={`be-spoke-${deg}`}
                     positions={[bullseyeCenter, endPos]}
                     pathOptions={{
-                      color: "rgba(255,255,255,0.2)",
+                      color: "rgba(255,255,255,0.45)",
                       weight: 1,
-                      dashArray: "2,4",
+                      dashArray: "2,6",
                     }}
                   />
                 );
@@ -1561,10 +1561,10 @@ export default function TacticalMap({
               <Marker
                 position={bullseyeCenter}
                 icon={L.divIcon({
-                  html: `<svg width="12" height="12" viewBox="0 0 12 12"><line x1="6" y1="0" x2="6" y2="12" stroke="rgba(255,255,255,0.4)" stroke-width="1"/><line x1="0" y1="6" x2="12" y2="6" stroke="rgba(255,255,255,0.4)" stroke-width="1"/></svg>`,
+                  html: `<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><line x1="10" y1="0" x2="10" y2="6" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><line x1="10" y1="14" x2="10" y2="20" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><line x1="0" y1="10" x2="6" y2="10" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><line x1="14" y1="10" x2="20" y2="10" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/></svg>`,
                   className: "",
-                  iconSize: [12, 12],
-                  iconAnchor: [6, 6],
+                  iconSize: [20, 20],
+                  iconAnchor: [10, 10],
                 })}
                 interactive={false}
               />
