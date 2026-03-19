@@ -756,11 +756,14 @@ def _tutorial_gate_active(gs: GameState, drone: DroneState) -> bool:
     """
     step = gs.tutorial_step
     if step == 0:
-        # Gate releases automatically once drone is detected
-        if drone.detected:
+        # Gate releases when drone is detected AND within engagement range
+        # so the player always has a valid effector shot when the tutorial freezes
+        engage_range = gs.scenario.engagement_zones.engagement_range_km if gs.scenario.engagement_zones else 2.5
+        dist = math.sqrt(drone.x ** 2 + drone.y ** 2)
+        if drone.detected and dist <= engage_range:
             gs.tutorial_step = 1
             return True  # Hold on step 1
-        return False  # Let drone approach until detected
+        return False  # Let drone approach until detected and in range
     if step >= 5:
         return False  # Drone resumes after engage
     return True  # Steps 1-4: hold position
