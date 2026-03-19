@@ -856,6 +856,7 @@ export default function App() {
         base_id: tutBaseId,
         sensors: [
           { catalog_id: "tpq51", x: 0.0, y: 0.0, facing_deg: 0 },
+          { catalog_id: "kurz_fcs", x: 0.0, y: 0.0, facing_deg: 0 },
           { catalog_id: "eoir_camera", x: 0.0, y: 0.0, facing_deg: 0 },
         ],
         effectors: [
