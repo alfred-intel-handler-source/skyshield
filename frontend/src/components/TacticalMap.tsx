@@ -1067,8 +1067,8 @@ export default function TacticalMap({
           </LayersControl.BaseLayer>
         </LayersControl>
 
-        {/* Engagement zone rings */}
-        {engagementZones && (
+        {/* Engagement zone rings — only when range rings are toggled on */}
+        {engagementZones && showRangeRings && (
           <>
             <Circle
               center={baseCenter}
