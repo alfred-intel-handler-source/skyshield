@@ -856,7 +856,7 @@ export default function TacticalMap({
   const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
   const [deviceWheelState, setDeviceWheelState] = useState<DeviceWheelState | null>(null);
-  const [showRangeRings, setShowRangeRings] = useState(true);
+  const [showRangeRings, setShowRangeRings] = useState(false);
   const [hiddenRings, setHiddenRings] = useState<Set<string>>(new Set());
   const [selectionList, setSelectionList] = useState<SelectionListState | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -1452,15 +1452,7 @@ export default function TacticalMap({
                   opacity: 0.8,
                 }}
               />
-              <Polyline
-                positions={[camPos, targetPos]}
-                pathOptions={{
-                  color: "#d29922",
-                  weight: 1.5,
-                  opacity: 0.9,
-                  dashArray: "6,3",
-                }}
-              />
+              {/* LOS line removed — cone fill is sufficient */}
             </>
           );
         })()}
