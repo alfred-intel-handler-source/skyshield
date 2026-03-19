@@ -26,7 +26,7 @@
     {"id": "eoir", "name": "EO/IR Camera", "type": "eoir", "range_km": 8.0, "status": "active"}
   ],
   "effectors": [
-    {"id": "jammer", "name": "RF/PNT Jammer", "type": "electronic", "range_km": 3.0, "status": "ready", "recharge_seconds": 10},
+    {"id": "jammer", "name": "RF/PNT Jammer", "type": "electronic", "range_km": 5.0, "status": "ready", "recharge_seconds": 10},
     {"id": "jackal", "name": "JACKAL Pallet", "type": "kinetic", "range_km": 5.0, "status": "ready", "recharge_seconds": 0, "single_use": true, "ammo_count": 4, "ammo_remaining": 4}
   ],
   "correct_classification": "commercial_quad",
