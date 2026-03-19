@@ -213,6 +213,7 @@ export default function App() {
   const tracksInProtectedRef = useRef<Set<string>>(new Set());
   const tracksCriticalRef = useRef<Set<string>>(new Set());
   const engagedTracksRef = useRef<Set<string>>(new Set());
+  const detectionPingedRef = useRef<Set<string>>(new Set()); // tracks that have already triggered a detection ping
 
   const handleToggleMute = useCallback(() => {
     soundEngine.init();
@@ -298,7 +299,13 @@ export default function App() {
         // Trigger sounds based on event message content
         const m = msg.message;
         if (m.includes("New contact detected") || m.includes("New contact emerging")) {
-          soundEngine.play("detection_ping");
+          // Extract track ID to debounce — only ping once per unique track
+          const trackMatch = m.match(/—\s+([A-Z0-9-]+)\s*$/);
+          const trackId = trackMatch ? trackMatch[1].toLowerCase() : m;
+          if (!detectionPingedRef.current.has(trackId)) {
+            detectionPingedRef.current.add(trackId);
+            soundEngine.play("detection_ping");
+          }
         } else if (m.includes("Track") && m.includes("confirmed")) {
           soundEngine.play("track_confirmed");
         } else if (m.includes("identified as")) {
@@ -682,6 +689,7 @@ export default function App() {
     setThreatLevel("green");
     setCameraTrackId(null);
     autoOpenedCameraRef.current.clear();
+      detectionPingedRef.current.clear();
     setTutorialMessage(null);
     setIsTutorial(false);
     setTutorialStep(0);
@@ -714,6 +722,7 @@ export default function App() {
     setThreatLevel("green");
     setCameraTrackId(null);
     autoOpenedCameraRef.current.clear();
+      detectionPingedRef.current.clear();
     setPlacementConfig(null);
     setTutorialMessage(null);
     setIsTutorial(false);
@@ -884,6 +893,7 @@ export default function App() {
       setThreatLevel("green");
       setCameraTrackId(null);
       autoOpenedCameraRef.current.clear();
+      detectionPingedRef.current.clear();
       setTutorialMessage(null);
       setIsTutorial(false);
       setTutorialStep(0);
@@ -955,6 +965,7 @@ export default function App() {
       setThreatLevel("green");
       setCameraTrackId(null);
       autoOpenedCameraRef.current.clear();
+      detectionPingedRef.current.clear();
       setTutorialMessage(null);
       setIsTutorial(false);
       setTutorialStep(0);
