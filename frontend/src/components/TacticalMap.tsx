@@ -1447,9 +1447,9 @@ export default function TacticalMap({
                 pathOptions={{
                   color: "#d29922",
                   fillColor: "#d29922",
-                  fillOpacity: 0.1,
-                  weight: 1,
-                  opacity: 0.5,
+                  fillOpacity: 0.25,
+                  weight: 1.5,
+                  opacity: 0.8,
                 }}
               />
               <Polyline
@@ -1457,7 +1457,7 @@ export default function TacticalMap({
                 pathOptions={{
                   color: "#d29922",
                   weight: 1.5,
-                  opacity: 0.7,
+                  opacity: 0.9,
                   dashArray: "6,3",
                 }}
               />

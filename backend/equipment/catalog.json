@@ -44,7 +44,7 @@
       "name": "EO/IR Camera",
       "type": "eoir",
       "range_km": 8.0,
-      "fov_deg": 30,
+      "fov_deg": 15,
       "description": "Pan/tilt/zoom electro-optical and infrared camera. 360\u00b0 continuous rotation gimbal with thermal and daylight imaging. Used for visual identification of UAS targets.",
       "pros": [
         "Visual ID capability",

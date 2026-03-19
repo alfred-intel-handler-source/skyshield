@@ -59,7 +59,7 @@
       "type": "eoir",
       "range_km": 8.0,
       "status": "active",
-      "fov_deg": 30
+      "fov_deg": 15
     }
   ],
   "effectors": [
