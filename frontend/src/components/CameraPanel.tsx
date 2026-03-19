@@ -73,98 +73,118 @@ function angleDiff(a: number, b: number): number {
 // ---------------------------------------------------------------------------
 
 function drawCommercialQuad(ctx: CanvasRenderingContext2D, s: number, time: number) {
-  // Hover wobble
-  const wobbleY = Math.sin(time * 3.2) * 1.5 * s;
-  const wobbleRot = Math.sin(time * 2.1) * 0.04;
+  // Mavic/Phantom-style: compact folded-arm body, gimbal pod, 4 rotors
+  const wobbleY = Math.sin(time * 2.8) * 1.2 * s;
+  const wobbleRot = Math.sin(time * 1.9) * 0.025;
   ctx.save();
   ctx.translate(0, wobbleY);
   ctx.rotate(wobbleRot);
 
-  const armLen = 28 * s;
-  const armW = Math.max(1, 2.5 * s);
-  const bodyW = 14 * s;
-  const bodyH = 10 * s;
-  const rotorR = 10 * s;
+  const bodyW = 18 * s;
+  const bodyH = 8 * s;
+  const rotorR = 12 * s;
+  const rotorSpeed = 22;
 
-  // Landing gear legs
-  ctx.lineWidth = Math.max(1, 2 * s);
-  ctx.beginPath();
-  ctx.moveTo(-bodyW * 0.6, bodyH / 2);
-  ctx.lineTo(-bodyW * 0.8, bodyH / 2 + 12 * s);
-  ctx.moveTo(bodyW * 0.6, bodyH / 2);
-  ctx.lineTo(bodyW * 0.8, bodyH / 2 + 12 * s);
-  ctx.stroke();
-  // Landing skids
-  ctx.lineWidth = Math.max(1, 2.5 * s);
-  ctx.beginPath();
-  ctx.moveTo(-bodyW * 1.1, bodyH / 2 + 12 * s);
-  ctx.lineTo(-bodyW * 0.4, bodyH / 2 + 12 * s);
-  ctx.moveTo(bodyW * 0.4, bodyH / 2 + 12 * s);
-  ctx.lineTo(bodyW * 1.1, bodyH / 2 + 12 * s);
-  ctx.stroke();
+  // ── Folded arms (angled outward like Mavic) ──
+  // Front-left, front-right, rear-left, rear-right arm endpoints
+  const arms = [
+    { sx: -bodyW * 0.38, sy: -bodyH * 0.3, ex: -bodyW * 0.9, ey: -bodyH * 1.9 },  // FL
+    { sx:  bodyW * 0.38, sy: -bodyH * 0.3, ex:  bodyW * 0.9, ey: -bodyH * 1.9 },  // FR
+    { sx: -bodyW * 0.38, sy:  bodyH * 0.3, ex: -bodyW * 0.85, ey: bodyH * 1.9 },  // RL
+    { sx:  bodyW * 0.38, sy:  bodyH * 0.3, ex:  bodyW * 0.85, ey: bodyH * 1.9 },  // RR
+  ];
+  ctx.lineWidth = Math.max(1.5, 2.5 * s);
+  arms.forEach(arm => {
+    ctx.beginPath();
+    ctx.moveTo(arm.sx, arm.sy);
+    ctx.lineTo(arm.ex, arm.ey);
+    ctx.stroke();
+  });
 
-  // Central body (rounded rectangle)
-  const cr = 3 * s;
+  // ── Main body — tapered fuselage (wider front, narrower rear) ──
   ctx.beginPath();
-  ctx.moveTo(-bodyW / 2 + cr, -bodyH / 2);
-  ctx.lineTo(bodyW / 2 - cr, -bodyH / 2);
-  ctx.quadraticCurveTo(bodyW / 2, -bodyH / 2, bodyW / 2, -bodyH / 2 + cr);
-  ctx.lineTo(bodyW / 2, bodyH / 2 - cr);
-  ctx.quadraticCurveTo(bodyW / 2, bodyH / 2, bodyW / 2 - cr, bodyH / 2);
-  ctx.lineTo(-bodyW / 2 + cr, bodyH / 2);
-  ctx.quadraticCurveTo(-bodyW / 2, bodyH / 2, -bodyW / 2, bodyH / 2 - cr);
-  ctx.lineTo(-bodyW / 2, -bodyH / 2 + cr);
-  ctx.quadraticCurveTo(-bodyW / 2, -bodyH / 2, -bodyW / 2 + cr, -bodyH / 2);
+  ctx.moveTo(-bodyW * 0.42, -bodyH / 2);       // front-left top
+  ctx.lineTo( bodyW * 0.42, -bodyH / 2);       // front-right top
+  ctx.lineTo( bodyW * 0.3,   bodyH / 2);       // rear-right bottom
+  ctx.lineTo(-bodyW * 0.3,   bodyH / 2);       // rear-left bottom
   ctx.closePath();
   ctx.fill();
 
-  // Camera/gimbal bump underneath
+  // Body highlight (top ridge)
+  ctx.save();
+  ctx.globalAlpha = 0.35;
   ctx.beginPath();
-  ctx.ellipse(0, bodyH / 2 + 3 * s, 4 * s, 3 * s, 0, 0, Math.PI * 2);
+  ctx.moveTo(-bodyW * 0.3, -bodyH / 2);
+  ctx.lineTo( bodyW * 0.3, -bodyH / 2);
+  ctx.lineTo( bodyW * 0.2, -bodyH * 0.05);
+  ctx.lineTo(-bodyW * 0.2, -bodyH * 0.05);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.restore();
+
+  // Nose sensor bump (front)
+  ctx.beginPath();
+  ctx.ellipse(0, -bodyH / 2 - 2 * s, 4 * s, 2.5 * s, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Arms + spinning rotors
-  const armAngles = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
-  for (let i = 0; i < armAngles.length; i++) {
-    const a = armAngles[i];
-    const ex = Math.cos(a) * armLen;
-    const ey = Math.sin(a) * armLen;
+  // ── Gimbal pod (hanging below center, 3-axis style) ──
+  // Gimbal arm
+  ctx.lineWidth = Math.max(1, 1.5 * s);
+  ctx.beginPath();
+  ctx.moveTo(0, bodyH / 2);
+  ctx.lineTo(0, bodyH / 2 + 5 * s);
+  ctx.stroke();
+  // Gimbal housing (sphere-ish)
+  ctx.beginPath();
+  ctx.arc(0, bodyH / 2 + 8 * s, 4.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // Lens glint
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = "#58a6ff";
+  ctx.beginPath();
+  ctx.arc(0.8 * s, bodyH / 2 + 7.5 * s, 1.8 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
-    // Arm
-    ctx.lineWidth = armW;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(ex, ey);
-    ctx.stroke();
+  // ── Motor hubs + spinning rotors ──
+  arms.forEach((arm, i) => {
+    const ex = arm.ex;
+    const ey = arm.ey;
 
     // Motor hub
     ctx.beginPath();
     ctx.arc(ex, ey, 3 * s, 0, Math.PI * 2);
     ctx.fill();
 
-    // Spinning rotor blades (2 blades per rotor, different phase per rotor)
-    const rotorSpeed = 18; // rad/s
+    // Rotor disc blur
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.beginPath();
+    ctx.arc(ex, ey, rotorR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 2-blade prop
     const phase = time * rotorSpeed + i * (Math.PI / 2);
-    ctx.lineWidth = Math.max(1, 2.2 * s);
-    ctx.globalAlpha = 0.7;
+    ctx.lineWidth = Math.max(1.5, 2.5 * s);
+    ctx.save();
+    ctx.globalAlpha = 0.75;
     for (let b = 0; b < 2; b++) {
-      const bladeAngle = phase + b * Math.PI;
-      const bx1 = ex + Math.cos(bladeAngle) * rotorR;
-      const by1 = ey + Math.sin(bladeAngle) * rotorR;
-      const bx2 = ex - Math.cos(bladeAngle) * rotorR;
-      const by2 = ey - Math.sin(bladeAngle) * rotorR;
+      const angle = phase + b * Math.PI;
+      // Slightly tapered blade: wider at tip
+      const bx1 = ex + Math.cos(angle) * rotorR;
+      const by1 = ey + Math.sin(angle) * rotorR;
+      const bx2 = ex - Math.cos(angle) * rotorR;
+      const by2 = ey - Math.sin(angle) * rotorR;
       ctx.beginPath();
       ctx.moveTo(bx1, by1);
       ctx.lineTo(bx2, by2);
       ctx.stroke();
     }
-    // Rotor disc (motion blur circle)
-    ctx.globalAlpha = 0.15;
-    ctx.beginPath();
-    ctx.arc(ex, ey, rotorR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
+    ctx.restore();
+  });
 
   ctx.restore();
 }
