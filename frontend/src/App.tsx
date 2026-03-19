@@ -560,6 +560,7 @@ export default function App() {
           if (tid) {
             setCameraTrackId(tid);
             soundEngine.play("camera_slew");
+            send({ type: "action", action: "slew_camera", target_id: tid });
           }
           break;
         }

@@ -780,7 +780,11 @@ def _advance_tutorial_step(gs: GameState, action_name: str, target_id: str,
         msgs.append({"type": "tutorial",
                       "message": "Camera is locked on. Study the silhouette — this determines your "
                                  "classification. When ready, proceed to IDENTIFY."})
-    elif step == 3 and action_name == "identify":
+    elif action_name == "identify" and step in (2, 3):
+        # Accept identify at step 2 (skipped slew) or step 3 (normal flow)
+        if step == 2:
+            gs.tutorial_step = 3  # auto-advance slew step
+            gs.tutorial_camera_slewed = True
         gs.tutorial_step = 4
         # Check for incorrect classification
         drone = next((d for d in gs.drones if d.id == target_id), None)
