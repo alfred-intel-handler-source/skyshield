@@ -98,7 +98,12 @@ def update_shinobi_drone(
     if cm_state == "1/2":
         # After ~2 more seconds, acquire uplink if close enough (2/2)
         if drone.uplink_detected:
-            drone = drone.model_copy(update={"shinobi_cm_state": "2/2"})
+            # Reset timer to full duration when full control is established
+            import random as _random
+            drone = drone.model_copy(update={
+                "shinobi_cm_state": "2/2",
+                "shinobi_cm_time_remaining": _random.uniform(20.0, 40.0),
+            })
             events.append({
                 "type": "event",
                 "timestamp": round(elapsed, 1),
