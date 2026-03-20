@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import random
 
+from app.config import KTS_TO_KMS
 from app.models import DroneState, DroneStartConfig
 
 
@@ -58,7 +59,7 @@ def _direct_approach(drone: DroneState, dt: float) -> DroneState:
         return drone
 
     angle = math.atan2(-drone.y, -drone.x)
-    speed_kms = drone.speed * 0.000514
+    speed_kms = drone.speed * KTS_TO_KMS
 
     dx = math.cos(angle) * speed_kms * dt
     dy = math.sin(angle) * speed_kms * dt
@@ -94,7 +95,7 @@ def _orbit(
     rel_y = drone.y - cy
     dist = math.sqrt(rel_x ** 2 + rel_y ** 2)
 
-    speed_kms = drone.speed * 0.000514
+    speed_kms = drone.speed * KTS_TO_KMS
 
     if dist < 0.01:
         # Start the orbit from directly east of center
@@ -167,7 +168,7 @@ def _waypoint_path(
         return drone
 
     angle = math.atan2(dy, dx)
-    speed_kms = drone.speed * 0.000514
+    speed_kms = drone.speed * KTS_TO_KMS
 
     move_x = math.cos(angle) * speed_kms * dt
     move_y = math.sin(angle) * speed_kms * dt
@@ -219,7 +220,7 @@ def _evasive(drone: DroneState, dt: float, detected_by_player: bool) -> DroneSta
         state["alt_offset"] = random.uniform(25, 50) * random.choice([-1, 1])
         state["next_jink"] = state["tick_counter"] + random.uniform(2.0, 4.0)
 
-    speed_kms = drone.speed * 0.000514
+    speed_kms = drone.speed * KTS_TO_KMS
     base_angle = math.atan2(-drone.y, -drone.x)
     angle = base_angle + state["offset_rad"]
 

@@ -72,10 +72,10 @@ function HookCard({ track, onUnhook }: { track: TrackData; onUnhook: () => void 
           track.eta_protected != null && track.eta_protected < 45 ? "#f85149" :
           track.eta_protected != null && track.eta_protected < 120 ? "#d29922" : undefined
         } />
-        <Field label="RNG" value={(track as any).range_km != null ? `${((track as any).range_km as number).toFixed(1)}km` : "---"} />
+        <Field label="RNG" value={track.x != null && track.y != null ? `${Math.sqrt(track.x * track.x + track.y * track.y).toFixed(1)}km` : "---"} />
         <Field label="DTID" value={track.dtid_phase ?? "---"} color={color} />
-        <Field label="TYPE" value={(track as any).drone_type ?? (track as any).threat_type ?? "---"} />
-        <Field label="RF" value={(track as any).frequency_band ?? (track as any).rf_freq_mhz != null ? `${(track as any).rf_freq_mhz}MHz` : "---"} />
+        <Field label="TYPE" value={track.drone_type ?? "---"} />
+        <Field label="RF" value={track.frequency_band ?? "---"} />
       </div>
     </div>
   );

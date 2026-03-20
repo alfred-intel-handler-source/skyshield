@@ -17,6 +17,7 @@ import math
 import random
 from typing import TYPE_CHECKING
 
+from app.config import KTS_TO_KMS
 from app.models import DroneState, DroneType, DTIDPhase
 
 if TYPE_CHECKING:
@@ -239,7 +240,7 @@ def _apply_deafen(
     else:
         # Fixed-wing / swarm: continue on last heading (no corrections)
         heading_rad = math.radians(drone.heading)
-        speed_kms = drone.speed * 0.000514
+        speed_kms = drone.speed * KTS_TO_KMS
         new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
         trail = list(drone.trail)
