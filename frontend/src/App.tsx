@@ -16,7 +16,7 @@ import CameraPanel from "./components/CameraPanel";
 import TutorialStepTracker from "./components/TutorialStepTracker";
 import TutorialFeedback from "./components/TutorialFeedback";
 import PauseOverlay from "./components/PauseOverlay";
-import { useWebSocket } from "./hooks/useWebSocket";
+import { useGameEngine as useWebSocket } from "./hooks/useGameEngine";
 import { soundEngine } from "./audio/SoundEngine";
 import type {
   BaseTemplate,
@@ -626,7 +626,7 @@ export default function App() {
     if (customLocation) {
       // Build a custom base template from Small FOB structure at the custom coordinates
       try {
-        const res = await fetch(`${API_BASE}/bases/small_fob`);
+        const res = await fetch(`/data/bases/small_fob.json`);
         const fobData = await res.json();
         const customBase: BaseTemplate = {
           ...fobData,
@@ -647,7 +647,7 @@ export default function App() {
     } else {
       // Fetch base template for the loadout screen limits
       try {
-        const res = await fetch(`${API_BASE}/bases/${selBaseId}`);
+        const res = await fetch(`/data/bases/${selBaseId}.json`);
         const data = await res.json();
         setBaseTemplate(data);
         setMaxSensors(data.max_sensors);
@@ -978,7 +978,7 @@ export default function App() {
     const placement = placementMap[scenarioId] ?? loneWolfPlacement;
 
     try {
-      const res = await fetch(`${API_BASE}/bases/${baseId}`);
+      const res = await fetch(`/data/bases/${baseId}.json`);
       const base = await res.json();
       setBaseTemplate(base);
       setScenarioId(scenarioId);

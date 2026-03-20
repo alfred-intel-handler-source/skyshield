@@ -53,7 +53,7 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
   const [combinedQty, setCombinedQty] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    fetch(`${API_BASE}/equipment`)
+    fetch("/data/equipment/catalog.json")
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

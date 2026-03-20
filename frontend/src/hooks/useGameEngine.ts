@@ -1,0 +1,412 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PlacementConfig, ServerMessage } from "../types";
+import type {
+  ScenarioConfig,
+  GameState,
+  SensorConfig,
+  EffectorConfig,
+  BaseTemplate,
+  EquipmentCatalog,
+  CatalogSensor,
+  CatalogEffector,
+  CatalogCombined,
+} from "@skyshield/game/state";
+import {
+  buildSensorsFromPlacement,
+  buildEffectorsFromPlacement,
+} from "@skyshield/game/helpers";
+import {
+  initGameState,
+  buildGameStartMsg,
+  buildStateMsg,
+  buildDebrief,
+  tickSpawns,
+  tickWaves,
+  tickEffectorRecharge,
+  tickPassiveJamming,
+  tickDrones,
+  advanceTutorialStep,
+  checkTutorialPrompts,
+} from "@skyshield/game/loop";
+import {
+  handleConfirmTrack,
+  handleIdentify,
+  handleEngage,
+  handleHoldFire,
+  handleReleaseHoldFire,
+  handleJammerToggle,
+  handleJamAll,
+  handleCeaseJam,
+  handleClearAirspace,
+  handlePauseMission,
+  handleResumeMission,
+  handleEndMission,
+} from "@skyshield/game/actions";
+
+// Re-export the same interfaces used by useWebSocket
+export interface ConnectOptions {
+  scenarioId: string;
+  baseId?: string;
+  placement?: PlacementConfig;
+}
+
+type MessageHandler = (msg: ServerMessage) => void;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Msg = Record<string, any>;
+
+export function useGameEngine(onMessage: MessageHandler) {
+  const gsRef = useRef<GameState | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const catalogRef = useRef<EquipmentCatalog | null>(null);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
+
+  const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  const dispatch = useCallback((msg: Msg) => {
+    onMessageRef.current(msg as ServerMessage);
+  }, []);
+
+  const dispatchAll = useCallback(
+    (msgs: Msg[]) => {
+      for (const m of msgs) dispatch(m);
+    },
+    [dispatch],
+  );
+
+  const connect = useCallback(
+    async (connectOpts: ConnectOptions | string) => {
+      // Clean up any prior game
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      gsRef.current = null;
+      setConnectionError(null);
+
+      try {
+        const scenarioId =
+          typeof connectOpts === "string"
+            ? connectOpts
+            : connectOpts.scenarioId;
+        const baseId =
+          typeof connectOpts === "string" ? undefined : connectOpts.baseId;
+        const placement =
+          typeof connectOpts === "string" ? undefined : connectOpts.placement;
+
+        // Load scenario JSON
+        const scenarioRes = await fetch(
+          `/data/scenarios/${scenarioId}.json`,
+        );
+        if (!scenarioRes.ok) throw new Error(`Scenario not found: ${scenarioId}`);
+        const scenarioData = await scenarioRes.json();
+
+        // Normalize scenario: add missing defaults
+        const scenario: ScenarioConfig = {
+          tutorial: false,
+          tutorial_prompts: null,
+          no_ambient: false,
+          ...scenarioData,
+          drones: (scenarioData.drones ?? []).map(
+            (d: Record<string, unknown>) => ({
+              spawn_delay: 0,
+              rf_emitting: true,
+              should_engage: true,
+              ...d,
+            }),
+          ),
+          sensors: (scenarioData.sensors ?? []).map(
+            (s: Record<string, unknown>) => ({
+              x: 0,
+              y: 0,
+              fov_deg: 360,
+              facing_deg: 0,
+              requires_los: false,
+              ...s,
+            }),
+          ),
+          effectors: (scenarioData.effectors ?? []).map(
+            (e: Record<string, unknown>) => ({
+              x: 0,
+              y: 0,
+              fov_deg: 360,
+              facing_deg: 0,
+              requires_los: false,
+              single_use: false,
+              recharge_seconds: 0,
+              ammo_count: null,
+              ammo_remaining: null,
+              ...e,
+            }),
+          ),
+        };
+
+        // Load base template if specified
+        let baseTemplate: BaseTemplate | null = null;
+        const resolvedBaseId = baseId ?? (placement?.base_id ?? null);
+        if (resolvedBaseId) {
+          try {
+            const baseRes = await fetch(`/data/bases/${resolvedBaseId}.json`);
+            if (baseRes.ok) baseTemplate = await baseRes.json();
+          } catch {
+            // Base not found — proceed without it
+          }
+        }
+
+        // Load equipment catalog (for placement builds + debrief scoring)
+        let catalog: EquipmentCatalog | null = null;
+        try {
+          const catRes = await fetch("/data/equipment/catalog.json");
+          if (catRes.ok) catalog = await catRes.json();
+        } catch {
+          // Proceed without catalog
+        }
+        catalogRef.current = catalog;
+
+        // Build sensor/effector configs from placement or scenario defaults
+        let sensorConfigs: SensorConfig[];
+        let effectorConfigs: EffectorConfig[];
+
+        if (placement && catalog) {
+          const catSensors = new Map<string, CatalogSensor>();
+          for (const s of catalog.sensors) catSensors.set(s.catalog_id, s);
+          const catEffectors = new Map<string, CatalogEffector>();
+          for (const e of catalog.effectors) catEffectors.set(e.catalog_id, e);
+          const catCombined = new Map<string, CatalogCombined>();
+          for (const c of catalog.combined) catCombined.set(c.catalog_id, c);
+
+          sensorConfigs = buildSensorsFromPlacement(
+            placement as unknown as import("@skyshield/game/state").PlacementConfig,
+            catSensors,
+            catCombined,
+          );
+          effectorConfigs = buildEffectorsFromPlacement(
+            placement as unknown as import("@skyshield/game/state").PlacementConfig,
+            catEffectors,
+            catCombined,
+          );
+        } else {
+          sensorConfigs = scenario.sensors;
+          effectorConfigs = scenario.effectors;
+        }
+
+        // Initialize game state
+        const gs = initGameState(
+          scenario,
+          sensorConfigs,
+          effectorConfigs,
+          placement
+            ? (placement as unknown as import("@skyshield/game/state").PlacementConfig)
+            : null,
+          baseTemplate as unknown as import("@skyshield/game/state").BaseTemplate | null,
+          baseTemplate?.terrain ?? [],
+        );
+
+        gsRef.current = gs;
+        setConnected(true);
+
+        // Dispatch game_start message
+        const startMsg = buildGameStartMsg(gs);
+        dispatch(startMsg);
+
+        // Start 10Hz game loop
+        intervalRef.current = setInterval(() => {
+          const g = gsRef.current;
+          if (!g || g.phase === "debrief") return;
+
+          if (g.paused) {
+            // Still send state so UI stays updated
+            const elapsed =
+              Date.now() / 1000 -
+              g.start_time -
+              g.total_paused_seconds -
+              (Date.now() / 1000 - g.pause_start_time);
+            const timeRemaining = Math.max(0, g.max_duration - elapsed);
+            dispatch(buildStateMsg(g, elapsed, timeRemaining));
+            return;
+          }
+
+          const elapsed =
+            Date.now() / 1000 - g.start_time - g.total_paused_seconds;
+          const timeRemaining = Math.max(0, g.max_duration - elapsed);
+
+          // Time's up
+          if (timeRemaining <= 0) {
+            g.phase = "debrief";
+            dispatch(buildDebrief(g, catalogRef.current ?? undefined));
+            if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+            }
+            return;
+          }
+
+          // Run all tick functions
+          dispatchAll(tickSpawns(g, elapsed));
+          dispatchAll(tickWaves(g, elapsed));
+          dispatchAll(tickEffectorRecharge(g, elapsed));
+          dispatchAll(tickPassiveJamming(g, elapsed));
+          dispatchAll(tickDrones(g, elapsed));
+          dispatchAll(checkTutorialPrompts(g));
+
+          // Build and dispatch state
+          dispatch(buildStateMsg(g, elapsed, timeRemaining));
+        }, 100);
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : "Failed to start game";
+        setConnectionError(msg);
+        console.error("[SKYSHIELD Engine]", msg);
+      }
+    },
+    [dispatch, dispatchAll],
+  );
+
+  const send = useCallback(
+    (data: Record<string, unknown>) => {
+      const gs = gsRef.current;
+      if (!gs) return;
+
+      const elapsed =
+        Date.now() / 1000 - gs.start_time - gs.total_paused_seconds;
+
+      if (data.type === "restart") {
+        // Disconnect and let the caller reconnect
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        gsRef.current = null;
+        setConnected(false);
+        return;
+      }
+
+      if (data.type !== "action") return;
+
+      const action = data.action as string;
+      const targetId = (data.target_id as string) ?? "";
+      let msgs: Msg[] = [];
+
+      switch (action) {
+        case "confirm_track":
+          msgs = handleConfirmTrack(gs, targetId, elapsed);
+          dispatchAll(advanceTutorialStep(gs, "confirm_track", targetId));
+          break;
+
+        case "identify":
+          msgs = handleIdentify(
+            gs,
+            targetId,
+            (data.classification as string) ?? null,
+            (data.affiliation as string) ?? "unknown",
+            elapsed,
+          );
+          dispatchAll(advanceTutorialStep(gs, "identify", targetId));
+          break;
+
+        case "engage":
+          msgs = handleEngage(
+            gs,
+            targetId,
+            (data.effector as string) ?? "",
+            elapsed,
+          );
+          dispatchAll(advanceTutorialStep(gs, "engage", targetId, data.effector as string));
+          break;
+
+        case "shinobi_hold":
+        case "shinobi_land_now":
+        case "shinobi_deafen":
+          msgs = handleEngage(
+            gs,
+            targetId,
+            (data.effector as string) ?? "",
+            elapsed,
+            action,
+          );
+          dispatchAll(advanceTutorialStep(gs, "engage", targetId, data.effector as string));
+          break;
+
+        case "hold_fire":
+          msgs = handleHoldFire(gs, targetId, elapsed);
+          break;
+
+        case "release_hold_fire":
+          msgs = handleReleaseHoldFire(gs, targetId, elapsed);
+          break;
+
+        case "jammer_toggle":
+          msgs = handleJammerToggle(
+            gs,
+            (data.effector_id as string) ?? "",
+            elapsed,
+          );
+          break;
+
+        case "jam_all":
+          msgs = handleJamAll(gs, elapsed);
+          break;
+
+        case "cease_jam":
+          msgs = handleCeaseJam(gs, elapsed);
+          break;
+
+        case "clear_airspace":
+          msgs = handleClearAirspace(gs, elapsed);
+          break;
+
+        case "pause_mission":
+          msgs = handlePauseMission(gs, elapsed);
+          break;
+
+        case "resume_mission":
+          msgs = handleResumeMission(gs, elapsed);
+          break;
+
+        case "end_mission":
+          msgs = handleEndMission(gs);
+          dispatch(buildDebrief(gs, catalogRef.current ?? undefined));
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          break;
+
+        case "slew_camera":
+          // Camera slew is handled client-side in App.tsx
+          // But we still need to notify the game engine for tutorial gating
+          dispatchAll(advanceTutorialStep(gs, "slew_camera", targetId));
+          break;
+
+        default:
+          console.warn("[SKYSHIELD Engine] Unknown action:", action);
+      }
+
+      dispatchAll(msgs);
+    },
+    [dispatch, dispatchAll],
+  );
+
+  const disconnect = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    gsRef.current = null;
+    setConnected(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
+  return { connect, send, disconnect, connected, connectionError };
+}
