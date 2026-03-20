@@ -987,6 +987,7 @@ async def game_websocket(ws: WebSocket):
                 await ws.close(1000)
                 return
 
+            pd = None
             try:
                 pd = init_msg["placement"]
                 placement_config = PlacementConfig(
@@ -1034,6 +1035,19 @@ async def game_websocket(ws: WebSocket):
             scenario, sensor_configs, effector_configs_list,
             placement_config, base_template, terrain,
         )
+
+        # Override protected/warning radii when a custom perimeter boundary was provided
+        if pd and "boundary" in pd and isinstance(pd["boundary"], list):
+            import math as _math
+            pts = pd["boundary"]
+            if len(pts) >= 2:
+                xs = [p[0] for p in pts]
+                ys = [p[1] for p in pts]
+                w = max(xs) - min(xs)
+                h = max(ys) - min(ys)
+                half_diag = _math.sqrt(w**2 + h**2) / 2.0
+                gs.protected_area_radius = max(half_diag, 0.2)
+                gs.warning_area_radius = gs.protected_area_radius * 1.5
 
         # Send game_start
         await ws.send_json(_build_game_start_msg(gs))
