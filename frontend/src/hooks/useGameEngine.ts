@@ -148,7 +148,7 @@ export function useGameEngine(onMessage: MessageHandler) {
         const resolvedBaseId = baseId ?? (placement?.base_id ?? null);
         if (resolvedBaseId) {
           try {
-            const baseRes = await fetch(`/data/bases/${resolvedBaseId}.json`);
+            const baseRes = await fetch(`${import.meta.env.BASE_URL}data/bases/${resolvedBaseId}.json`);
             if (baseRes.ok) baseTemplate = await baseRes.json();
           } catch {
             // Base not found — proceed without it
@@ -158,7 +158,7 @@ export function useGameEngine(onMessage: MessageHandler) {
         // Load equipment catalog (for placement builds + debrief scoring)
         let catalog: EquipmentCatalog | null = null;
         try {
-          const catRes = await fetch("/data/equipment/catalog.json");
+          const catRes = await fetch(`${import.meta.env.BASE_URL}data/equipment/catalog.json`);
           if (catRes.ok) catalog = await catRes.json();
         } catch {
           // Proceed without catalog

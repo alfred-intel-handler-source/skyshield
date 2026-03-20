@@ -94,11 +94,11 @@ export default function ScenarioSelect({ onSelect }: Props) {
 
   useEffect(() => {
     Promise.all([
-      fetch("/data/scenarios/index.json").then((r) => {
+      fetch(`${import.meta.env.BASE_URL}data/scenarios/index.json`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch scenarios");
         return r.json();
       }),
-      fetch("/data/bases/index.json").then((r) => {
+      fetch(`${import.meta.env.BASE_URL}data/bases/index.json`).then((r) => {
         if (!r.ok) throw new Error("Failed to fetch bases");
         return r.json();
       }),

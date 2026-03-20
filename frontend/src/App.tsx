@@ -626,7 +626,7 @@ export default function App() {
     if (customLocation) {
       // Build a custom base template from Small FOB structure at the custom coordinates
       try {
-        const res = await fetch(`/data/bases/small_fob.json`);
+        const res = await fetch(`${import.meta.env.BASE_URL}data/bases/small_fob.json`);
         const fobData = await res.json();
         const customBase: BaseTemplate = {
           ...fobData,
@@ -647,7 +647,7 @@ export default function App() {
     } else {
       // Fetch base template for the loadout screen limits
       try {
-        const res = await fetch(`/data/bases/${selBaseId}.json`);
+        const res = await fetch(`${import.meta.env.BASE_URL}data/bases/${selBaseId}.json`);
         const data = await res.json();
         setBaseTemplate(data);
         setMaxSensors(data.max_sensors);
@@ -978,7 +978,7 @@ export default function App() {
     const placement = placementMap[scenarioId] ?? loneWolfPlacement;
 
     try {
-      const res = await fetch(`/data/bases/${baseId}.json`);
+      const res = await fetch(`${import.meta.env.BASE_URL}data/bases/${baseId}.json`);
       const base = await res.json();
       setBaseTemplate(base);
       setScenarioId(scenarioId);
