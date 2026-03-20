@@ -13,6 +13,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config
+from app.config import KTS_TO_KMS
 from app.security import (
     ConnectionTracker,
     RateLimitMiddleware,
@@ -34,7 +35,7 @@ from app.actions import (
     handle_resume_mission,
 )
 from app.bases import list_bases, load_base, load_equipment_catalog
-from app.coyote import update_jackal
+from app.jackal import update_jackal
 from app.detection import calculate_confidence, update_sensors
 from app.drone import create_drone, distance_to_base, update_drone
 from app.game_state import GameState
@@ -44,7 +45,7 @@ from app.helpers import (
     threat_level,
 )
 from app.jamming import pick_jam_behavior, update_jammed_drone
-from app.ninja import update_shinobi_drone
+from app.shinobi import update_shinobi_drone
 from app.models import (
     Affiliation,
     BaseTemplate,
@@ -630,7 +631,7 @@ def _run_sensors_for_drone(gs: GameState, i: int, elapsed: float) -> list[dict]:
                     "message": f"TRACK: {drone_id.upper()} — Coasting (extrapolating)",
                 })
             heading_rad = math.radians(gs.drones[i].last_known_heading)
-            speed_kms = gs.drones[i].last_known_speed * 0.000514
+            speed_kms = gs.drones[i].last_known_speed * KTS_TO_KMS
             new_x = gs.drones[i].x + math.sin(heading_rad) * speed_kms * gs.tick_rate
             new_y = gs.drones[i].y + math.cos(heading_rad) * speed_kms * gs.tick_rate
             new_trail = list(gs.drones[i].trail)
@@ -679,7 +680,7 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
                 dy = drone.y - gs.protected_area_center[1]
                 dist_to_center = math.sqrt(dx * dx + dy * dy)
                 dist_to_edge = max(0.0, dist_to_center - gs.protected_area_radius)
-                speed_kms = drone.speed * 0.000514444
+                speed_kms = drone.speed * KTS_TO_KMS
                 if speed_kms > 0:
                     eta_seconds = dist_to_edge / speed_kms
 

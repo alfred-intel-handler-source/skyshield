@@ -44,3 +44,9 @@ MAX_WS_MESSAGE_BYTES: int = int(os.environ.get("SKYSHIELD_MAX_WS_MESSAGE_BYTES",
 # General
 # ---------------------------------------------------------------------------
 DEBUG: bool = os.environ.get("SKYSHIELD_DEBUG", "false").lower() in ("1", "true", "yes")
+
+# ---------------------------------------------------------------------------
+# Physics constants
+# ---------------------------------------------------------------------------
+# Knots → km/s conversion factor (1 knot ≈ 0.000514444 km/s)
+KTS_TO_KMS: float = 0.000514444

@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 import random
 
+from app.config import KTS_TO_KMS
 from app.models import DroneState, DTIDPhase
 
 
@@ -113,7 +114,7 @@ def update_jackal(
     if phase == "launch":
         new_alt = min(300, jackal.altitude + 250 * tick_rate)
         new_speed = min(150, jackal.speed + 50 * tick_rate)
-        speed_kms = new_speed * 0.000514
+        speed_kms = new_speed * KTS_TO_KMS
         heading_rad = math.radians(heading_to_target)
         new_x = jackal.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = jackal.y + math.cos(heading_rad) * speed_kms * tick_rate
@@ -129,7 +130,7 @@ def update_jackal(
     # --- Midcourse phase ---
     if phase == "midcourse":
         speed = 150.0
-        speed_kms = speed * 0.000514
+        speed_kms = speed * KTS_TO_KMS
         heading_rad = math.radians(heading_to_target)
         new_x = jackal.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = jackal.y + math.cos(heading_rad) * speed_kms * tick_rate
@@ -160,7 +161,7 @@ def update_jackal(
     # --- Terminal phase ---
     if phase == "terminal":
         speed = 200.0
-        speed_kms = speed * 0.000514
+        speed_kms = speed * KTS_TO_KMS
         heading_rad = math.radians(heading_to_target)
         new_x = jackal.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = jackal.y + math.cos(heading_rad) * speed_kms * tick_rate

@@ -6,6 +6,7 @@ from __future__ import annotations
 import math
 import random
 
+from app.config import KTS_TO_KMS
 from app.models import DroneState, DroneType
 
 
@@ -14,9 +15,10 @@ JAM_RESIST: dict[DroneType, float] = {
     DroneType.COMMERCIAL_QUAD: 0.0,   # Fully jammable — GPS + RF dependent
     DroneType.MICRO: 0.10,            # Mostly jammable — small GPS receiver
     DroneType.FIXED_WING: 0.40,       # Partial — may have basic autopilot
+    DroneType.IMPROVISED: 0.50,       # Unknown RF dependency — coin flip
     DroneType.SHAHED: 1.0,            # Jam-immune — autonomous INS nav, no RF link
 }
-# Default for any type not listed (e.g. bird, improvised, swarm)
+# Default for any type not listed (e.g. bird, swarm)
 _DEFAULT_JAM_RESIST = 0.50
 
 
@@ -52,7 +54,7 @@ def update_jammed_drone(
     jb = drone.jammed_behavior
 
     if jb == "loss_of_control":
-        speed_kms = drone.speed * 0.000514 * 0.5  # half-speed drift
+        speed_kms = drone.speed * KTS_TO_KMS * 0.5  # half-speed drift
         heading_rad = math.radians(drone.heading)
         new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
@@ -77,7 +79,7 @@ def update_jammed_drone(
 
     elif jb == "rth":
         away_angle = math.atan2(drone.y, drone.x)
-        speed_kms = drone.speed * 0.000514
+        speed_kms = drone.speed * KTS_TO_KMS
         new_x = drone.x + math.cos(away_angle) * speed_kms * tick_rate
         new_y = drone.y + math.sin(away_angle) * speed_kms * tick_rate
         heading_deg = math.degrees(away_angle) % 360
@@ -120,7 +122,7 @@ def update_jammed_drone(
             drone.heading + random.uniform(90, 180) * random.choice([-1, 1])
         ) % 360
         heading_rad = math.radians(spoof_heading)
-        speed_kms = drone.speed * 0.000514
+        speed_kms = drone.speed * KTS_TO_KMS
         new_x = drone.x + math.sin(heading_rad) * speed_kms * tick_rate
         new_y = drone.y + math.cos(heading_rad) * speed_kms * tick_rate
         trail = list(drone.trail)

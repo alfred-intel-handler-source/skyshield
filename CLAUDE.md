@@ -1,4 +1,4 @@
-# CLAUDE.md — SKYSHIELD Project Guide (Updated 2026-03-19)
+# CLAUDE.md — SKYSHIELD Project Guide (Updated 2026-03-20)
 
 ## What Is This?
 SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teach military operators the **DTID kill chain** (Detect → Track → Identify → Defeat). It's built to feel like a real FAAD C2 or Medusa workstation. No clearance required — purely training.
@@ -7,7 +7,7 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 
 **Vision:** Deployable worldwide so any military member can train C-UAS operations without needing real systems at their base.
 
-## Current State (~50+ commits today, ~20,000+ lines)
+## Current State (105 commits, ~18,600 lines)
 
 ### Equipment (Generic Band Names — No Real System Designators)
 | System | Type | Range | Notes |
@@ -64,6 +64,8 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 ### Known Issues / TODO
 - Custom Mission perimeter: visual confirmation could be cleaner (rings now scale correctly)
 - Intermittent stuck bogey in Lone Wolf — root cause not confirmed
+- SHINOBI uplink_detected never set in game loop — CM state can't transition 1/2 → 2/2 without it (needs detection loop trigger)
+- Module-level `_evasive_state` dict in drone.py — shared across connections (blocks multiplayer)
 - Phase 2 features (terrain LOS, planning score) — deferred
 
 ## Tech Stack
@@ -79,25 +81,29 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 - `app/models.py` — DroneState, GameState, ScenarioConfig (includes no_ambient flag)
 - `app/actions.py` — All player action handlers including `handle_cease_jam`
 - `app/jamming.py` — EW logic, JAM_RESIST dict per drone type
-- `app/coyote.py` — JACKAL lifecycle
-- `app/ninja.py` — SHINOBI protocol manipulation state machine
+- `app/jackal.py` — JACKAL interceptor lifecycle (spinup, launch, midcourse, terminal, intercept, self-destruct)
+- `app/shinobi.py` — SHINOBI protocol manipulation state machine (HOLD/LAND NOW/DEAFEN, CM state 1/2 → 2/2)
+- `app/config.py` — Server config + shared constants (KTS_TO_KMS, CORS, rate limits)
 - `app/waves.py` — Ambient spawn logic (AMBIENT_INTERVALS dict)
 - `equipment/catalog.json` — All equipment definitions
 - `scenarios/*.json` — lone_wolf, swarm_attack, recon_probe, tutorial
 
 **Frontend:**
-- `App.tsx` — State machine, WebSocket, all handlers, phase transitions; `hookedTrackIds` Set for hook panel
+- `App.tsx` — State machine, WebSocket, all handlers, phase transitions; `hookedTrackIds` Set for hook panel; doctrine loadouts per scenario
 - `components/TacticalMap.tsx` — Leaflet map, range rings (default ON), bullseye (default ON), 15° amber camera cone
 - `components/CameraPanel.tsx` — Canvas EO/IR renderer; `drawShahed()` wide delta silhouette added
+- `components/EngagementPanel.tsx` — DTID phase controls; SHINOBI CM submenu (HOLD/LAND NOW/DEAFEN); CM state progress bar (pending→1/2→2/2)
+- `components/RadialActionWheel.tsx` — Right-click pie menu; SHINOBI CM submenu; all classification types including friendlies
 - `components/EventLog.tsx` — Bottom bar: EVENT LOG (280px) + HOOK PANEL (flex); multi-card additive hook
 - `components/HeaderBar.tsx` — JAM ALL ↔ CEASE JAMMING toggle; `onCeaseJam` prop
 - `components/SensorPanel.tsx` — Filters `combined_sensor_*` from SENSORS section
 - `components/EffectorPanel.tsx` — Shows `combined_effector_*` under COMBINED section
-- `components/PlacementScreen.tsx` — Resizable perimeter box with drag handles; sends boundary + placement_bounds_km
+- `components/LoadoutScreen.tsx` — Equipment selection with COMBINED SYSTEMS section for SHINOBI
+- `components/PlacementScreen.tsx` — Resizable perimeter box with drag handles; sends boundary + placement_bounds_km; map search
 - `types.ts` — All TypeScript interfaces
 
 ## Valid Action Names (backend VALID_ACTION_NAMES)
-`confirm_track`, `identify`, `engage`, `hold_fire`, `release_hold_fire`, `end_mission`, `slew_camera`, `shinobi_hold`, `shinobi_land_now`, `shinobi_deafen`, `jammer_toggle`, `jam_all`, `cease_jam`, `clear_airspace`
+`confirm_track`, `identify`, `engage`, `hold_fire`, `release_hold_fire`, `end_mission`, `slew_camera`, `shinobi_hold`, `shinobi_land_now`, `shinobi_deafen`, `jammer_toggle`, `jam_all`, `cease_jam`, `clear_airspace`, `pause_mission`, `resume_mission`
 
 ## Dev Server Notes
 - Backend: `cd backend && python3 -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`

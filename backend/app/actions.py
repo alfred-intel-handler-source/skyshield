@@ -19,7 +19,7 @@ from app.helpers import (
     find_effector_config,
 )
 from app.jamming import pick_jam_behavior
-from app.ninja import is_shinobi_vulnerable, pick_shinobi_cm_effectiveness, DRONE_FREQUENCY_MAP
+from app.shinobi import is_shinobi_vulnerable, pick_shinobi_cm_effectiveness, DRONE_FREQUENCY_MAP
 from app.models import (
     Affiliation,
     DroneState,

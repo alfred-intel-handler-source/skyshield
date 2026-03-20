@@ -121,13 +121,17 @@ backend/
     main.py          — FastAPI app, WebSocket game loop (10Hz)
     models.py        — DroneState, GameState, enums
     actions.py       — Player action handlers
+    config.py        — Server config, shared constants (KTS_TO_KMS)
     jamming.py       — EW jamming logic + jam resistance by drone type
-    coyote.py        — JACKAL interceptor lifecycle (spinup/launch/midcourse/terminal)
+    jackal.py        — JACKAL interceptor lifecycle (spinup/launch/midcourse/terminal)
+    shinobi.py       — SHINOBI protocol manipulation state machine
     detection.py     — Sensor detection logic
-    ninja.py         — SHINOBI protocol manipulation
+    helpers.py       — Placement builders, range checks, threat level
     scenario.py      — Scenario loading
-    waves.py         — Wave spawning
+    waves.py         — Wave spawning + ambient traffic
     drone.py         — Drone movement/behavior
+    scoring.py       — DTID scoring engine (5 categories, S–F grades)
+    game_state.py    — Per-connection game state management
   equipment/
     catalog.json     — Equipment definitions (L-Band radar, Ku-Band FCS, EO/IR, RF Jammer, JACKAL, SHINOBI)
   scenarios/
@@ -139,23 +143,39 @@ backend/
     small_fob.json / medium_airbase.json / large_installation.json
 
 frontend/src/
-  App.tsx            — State machine, WebSocket, phase transitions
+  App.tsx            — State machine, WebSocket, phase transitions, doctrine loadouts
+  hooks/
+    useWebSocket.ts  — WebSocket connection + reconnection logic
   components/
     TacticalMap.tsx  — Leaflet map, track icons, range rings, WOD
-    CameraPanel.tsx  — EO/IR canvas renderer (thermal + daylight)
-    RadialActionWheel.tsx — Right-click action wheel
-    HeaderBar.tsx    — Mission status, JAM ALL, CLEAR AIRSPACE
+    CameraPanel.tsx  — EO/IR canvas renderer (thermal + daylight, 6 silhouettes)
+    RadialActionWheel.tsx — Right-click action wheel + SHINOBI CM submenu
+    EngagementPanel.tsx — DTID phase controls + SHINOBI CM state display
+    EventLog.tsx     — Event log + FAAD hook panel (multi-track baseball cards)
+    HeaderBar.tsx    — Mission status, JAM ALL / CEASE JAMMING, CLEAR AIRSPACE
     TrackList.tsx    — Live contact list (left sidebar)
-    EngagementPanel.tsx — DTID phase controls
+    SensorPanel.tsx  — Sensor status (filters combined systems)
+    EffectorPanel.tsx — Effector status + COMBINED section
+    LoadoutScreen.tsx — Equipment selection for Custom Mission
+    PlacementScreen.tsx — Drag-drop placement on real-world map
     DebriefScreen.tsx — Post-mission scoring
 ```
 
 ---
 
-## Roadmap (Phase 2)
-- [ ] Base Defense Planner — drag/drop sensor placement pre-mission
+## Roadmap
+
+### Phase 2 (Next)
+- [ ] Terrain LOS checks for sensors/effectors
+- [ ] After-action replay (timeline scrub on debrief)
+- [ ] Score system improvements (ambient aircraft handling, multi-wave scoring)
 - [ ] Coverage gap visualization (LOS shadows, uncovered sectors)
-- [ ] Planning score in debrief (coverage completeness, effector positioning)
+
+### Phase 3
+- [ ] Multi-operator / shared mission (two operators on same WebSocket)
+- [ ] Mobile-responsive layout (tablet field demos)
+- [ ] Docker production deployment
+- [ ] Port to all-client-side JS (zero-server, deployable anywhere)
 
 ---
 
