@@ -15,7 +15,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@skyshield/game/*": ["../src/game/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../src/game"]
 }

@@ -1,33 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
   cacheDir: "/tmp/vite-cache",
+  resolve: {
+    alias: {
+      "@skyshield/game": path.resolve(__dirname, "../src/game"),
+    },
+  },
   server: {
     port: 5173,
-    proxy: {
-      "/ws": {
-        target: "ws://localhost:8000",
-        ws: true,
-      },
-      "/scenarios": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-      },
-      "/bases": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-      },
-      "/equipment": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-      },
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ""),
-      },
-    },
   },
 });
