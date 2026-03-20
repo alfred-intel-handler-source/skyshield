@@ -5,7 +5,7 @@
 import type { DroneState, GameState, PlayerAction, EffectorRuntimeState } from './state.js';
 import {
   checkEffectorInRange,
-  checkKurzFcsTracking,
+  checkKuFcsTracking,
   checkShinobiRfTracking,
   effectorEffectiveness,
   findEffectorConfig,
@@ -159,7 +159,7 @@ export function handleEngage(
 
     // JACKAL requires Ku-Band FCS
     if (effState.ammo_count !== null && effState.ammo_count !== undefined && effState.type === 'kinetic') {
-      if (!checkKurzFcsTracking(gs.sensor_configs, d)) {
+      if (!checkKuFcsTracking(gs.sensor_configs, d)) {
         msgs.push(_event(elapsed, 'ENGAGEMENT: NO Ku-FC TRACK \u2014 CANNOT GUIDE INTERCEPTOR'));
         break;
       }

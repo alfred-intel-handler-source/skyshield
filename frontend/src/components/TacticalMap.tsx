@@ -84,7 +84,7 @@ interface SelectionListState {
 function getRingStyleByName(name?: string, type?: string): { color: string; dashArray?: string } {
   const n = (name || "").toLowerCase();
   if (n.includes("tpq")) return { color: "#58a6ff", dashArray: "8,4" };
-  if (n.includes("kurz")) return { color: "#d29922" };
+  if (n.includes("kufcs")) return { color: "#d29922" };
   if (n.includes("eoir") || n.includes("eo/ir") || type === "eoir") return { color: "#3fb950", dashArray: "2,4" };
   if (n.includes("shinobi") || type === "shinobi_pm") return { color: "#a371f7", dashArray: "4,4" };  // Purple for SHINOBI
   if (n.includes("jammer") || type === "electronic") return { color: "#e3b341", dashArray: "8,4" };

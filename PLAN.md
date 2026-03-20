@@ -203,7 +203,7 @@ Before public release, migrate Python/FastAPI backend to pure TypeScript running
 - `app/main.py` — 10Hz game loop → `setInterval` in browser
 - `app/actions.py` → TypeScript action handlers
 - `app/jamming.py` → TypeScript EW logic
-- `app/coyote.py` → TypeScript JACKAL lifecycle
+- `app/jackal.py` → TypeScript JACKAL lifecycle
 - `app/shinobi.py` → TypeScript SHINOBI state machine
 - Scoring engine
 

@@ -15,7 +15,7 @@ Free, browser-based C-UAS training simulator that any military member worldwide 
 ## Systems Modeled
 - **FAAD C2** — Primary C2 interface (hook bubbles, pie menus, track management, engagement workflow)
 - **Medusa** — Wheel of Death, AGE map, device management
-- **Sensors:** AN/TPQ-51, KURZ FCS, EO/IR Camera
+- **Sensors:** AN/TPQ-51, Ku-Band FCS, EO/IR Camera
 - **Effectors:** JACKAL, RF/PNT Jammer
 - **Network:** Joint Data Network (Link-16, SIAP)
 
@@ -23,7 +23,7 @@ Free, browser-based C-UAS training simulator that any military member worldwide 
 
 ### JACKAL Intercept (Full Lifecycle)
 - Green JACKAL track appears on tactical map at launch
-- KURZ FCS radar guides mid-course (waypoints to avoid friendly air tracks — ATA)
+- Ku-Band FCS radar guides mid-course (waypoints to avoid friendly air tracks — ATA)
 - Terminal phase: seeker acquires target
 - Impact: explosion on camera feed + map
 - Failure: self-destruct at 100m+ altitude

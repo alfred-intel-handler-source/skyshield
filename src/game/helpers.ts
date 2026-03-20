@@ -132,14 +132,14 @@ export function checkEffectorInRange(
 }
 
 /** Check if any Ku-Band FCS radar has the drone in range. */
-export function checkKurzFcsTracking(
+export function checkKuFcsTracking(
   sensorConfigs: SensorConfig[],
   drone: DroneState,
 ): boolean {
   for (const s of sensorConfigs) {
     if (
-      !s.id.toLowerCase().includes('kurz') &&
-      !s.name.toLowerCase().includes('kurz')
+      !s.id.toLowerCase().includes('kufcs') &&
+      !s.name.toLowerCase().includes('kufcs')
     )
       continue;
     const dist = Math.sqrt((drone.x - s.x) ** 2 + (drone.y - s.y) ** 2);

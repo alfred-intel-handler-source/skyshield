@@ -19,7 +19,7 @@
       "status": "active"
     },
     {
-      "id": "kurz_fcs",
+      "id": "kufcs",
       "name": "Ku-Band Fire Control Radar",
       "type": "radar",
       "range_km": 8.0,

@@ -21,7 +21,7 @@
       "requires_los": false
     },
     {
-      "catalog_id": "kurz_fcs",
+      "catalog_id": "kufcs",
       "name": "Ku-Band Fire Control Radar",
       "type": "radar",
       "range_km": 10.0,

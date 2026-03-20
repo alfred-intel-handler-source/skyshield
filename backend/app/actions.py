@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from app.helpers import (
     check_effector_in_range,
-    check_kurz_fcs_tracking,
+    check_ku_fcs_tracking,
     check_shinobi_rf_tracking,
     effector_effectiveness,
     find_effector_config,
@@ -204,7 +204,7 @@ def handle_engage(
         # JACKAL requires Ku-Band FCS
         if (eff_state.get("ammo_count") is not None
                 and eff_state["type"] == "kinetic"):
-            if not check_kurz_fcs_tracking(gs.sensor_configs, d):
+            if not check_ku_fcs_tracking(gs.sensor_configs, d):
                 msgs.append(_event(elapsed,
                     "ENGAGEMENT: NO Ku-FC TRACK \u2014 CANNOT GUIDE INTERCEPTOR"))
                 break
