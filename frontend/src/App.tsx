@@ -155,6 +155,7 @@ export default function App() {
   // Running phase state
   const [tracks, setTracks] = useState<TrackData[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [hookedTrackIds, setHookedTrackIds] = useState<Set<string>>(new Set());
   const [sensors, setSensors] = useState<SensorStatus[]>([]);
   const [sensorConfigs, setSensorConfigs] = useState<SensorStatus[]>([]);
   const [effectors, setEffectors] = useState<EffectorStatus[]>([]);
@@ -677,6 +678,7 @@ export default function App() {
     setScore(null);
     setTracks([]);
     setSelectedTrackId(null);
+    setHookedTrackIds(new Set());
     setEvents([]);
     setSensors([]);
     setSensorConfigs([]);
@@ -710,6 +712,7 @@ export default function App() {
     setScore(null);
     setTracks([]);
     setSelectedTrackId(null);
+    setHookedTrackIds(new Set());
     setEvents([]);
     setSensors([]);
     setSensorConfigs([]);
@@ -881,6 +884,7 @@ export default function App() {
       setScore(null);
       setTracks([]);
       setSelectedTrackId(null);
+    setHookedTrackIds(new Set());
       setEvents([]);
       setSensors([]);
       setSensorConfigs([]);
@@ -953,6 +957,7 @@ export default function App() {
       setScore(null);
       setTracks([]);
       setSelectedTrackId(null);
+    setHookedTrackIds(new Set());
       setEvents([]);
       setSensors([]);
       setSensorConfigs([]);
@@ -1316,7 +1321,10 @@ export default function App() {
         <TrackList
           tracks={tracks.filter((t) => !t.neutralized && !t.is_interceptor)}
           selectedTrackId={selectedTrackId}
-          onSelectTrack={setSelectedTrackId}
+          onSelectTrack={(id) => {
+            setSelectedTrackId(id);
+            if (id) setHookedTrackIds((prev) => { const next = new Set(prev); next.add(id); return next; });
+          }}
         />
       </div>
 
@@ -1332,7 +1340,10 @@ export default function App() {
         <TacticalMap
           tracks={tracks}
           selectedTrackId={selectedTrackId}
-          onSelectTrack={setSelectedTrackId}
+          onSelectTrack={(id) => {
+            setSelectedTrackId(id);
+            if (id) setHookedTrackIds((prev) => { const next = new Set(prev); next.add(id); return next; });
+          }}
           engagementZones={engagementZones}
           elapsed={elapsed}
           baseLat={baseTemplate?.center_lat}
@@ -1469,7 +1480,11 @@ export default function App() {
       </div>
 
       {/* Bottom: Event Log */}
-      <EventLog events={events} hookedTrack={selectedTrack} onUnhook={() => setSelectedTrackId(null)} />
+      <EventLog
+        events={events}
+        hookedTracks={tracks.filter((t) => hookedTrackIds.has(t.id))}
+        onUnhook={(id) => setHookedTrackIds((prev) => { const next = new Set(prev); next.delete(id); return next; })}
+      />
 
       {/* Keyboard shortcuts hint */}
       {phase === "running" && (
