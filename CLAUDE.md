@@ -7,7 +7,7 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 
 **Vision:** Deployable worldwide so any military member can train C-UAS operations without needing real systems at their base.
 
-## Current State (105 commits, ~18,600 lines)
+## Current State (107 commits, ~18,600 lines)
 
 ### Equipment (Generic Band Names — No Real System Designators)
 | System | Type | Range | Notes |
@@ -64,9 +64,21 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 ### Known Issues / TODO
 - Custom Mission perimeter: visual confirmation could be cleaner (rings now scale correctly)
 - Intermittent stuck bogey in Lone Wolf — root cause not confirmed
-- SHINOBI uplink_detected never set in game loop — CM state can't transition 1/2 → 2/2 without it (needs detection loop trigger)
+- SHINOBI `uplink_detected` never set in game loop — CM state can't transition 1/2 → 2/2 without it (needs detection loop trigger)
 - Module-level `_evasive_state` dict in drone.py — shared across connections (blocks multiplayer)
 - Phase 2 features (terrain LOS, planning score) — deferred
+
+### Recently Fixed (2026-03-20 Opus Audit)
+- ✅ SHINOBI CM state machine: pending→1/2 timing fixed (was ~9s, now ~1s)
+- ✅ Coasting heading math: coordinate convention mismatch fixed (drones coast on correct bearing)
+- ✅ Ambient aircraft exit: waypoint pushed to 15km so aircraft pass 12km cleanup
+- ✅ 10Hz tick rate: enforced via tick budget (was drifting to ~7Hz under load)
+- ✅ Scoring `should_engage`: no longer hard-coded True; ambient/friendly drones scored correctly
+- ✅ `military_jet` classification: EngagementPanel + RadialActionWheel now send correct value
+- ✅ `KTS_TO_KMS` constant: extracted to config.py, replaced 13 magic numbers
+- ✅ Module renames: `ninja.py` → `shinobi.py`, `coyote.py` → `jackal.py`
+- ✅ `IMPROVISED` jam resistance: explicit 50% in JAM_RESIST dict
+- ✅ EventLog `as any` casts: removed, using typed fields
 
 ## Tech Stack
 - **Backend:** FastAPI (Python 3.13), WebSocket at 10Hz tick rate
