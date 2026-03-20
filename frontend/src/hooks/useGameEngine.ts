@@ -258,7 +258,7 @@ export function useGameEngine(onMessage: MessageHandler) {
         const msg =
           err instanceof Error ? err.message : "Failed to start game";
         setConnectionError(msg);
-        console.error("[SKYSHIELD Engine]", msg);
+        console.error("[OpenSentry Engine]", msg);
       }
     },
     [dispatch, dispatchAll],
@@ -381,7 +381,7 @@ export function useGameEngine(onMessage: MessageHandler) {
           break;
 
         default:
-          console.warn("[SKYSHIELD Engine] Unknown action:", action);
+          console.warn("[OpenSentry Engine] Unknown action:", action);
       }
 
       dispatchAll(msgs);

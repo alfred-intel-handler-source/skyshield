@@ -84,7 +84,7 @@ export default function HeaderBar({
             letterSpacing: 2,
           }}
         >
-          SKYSHIELD
+          OpenSentry
         </span>
         <span
           style={{

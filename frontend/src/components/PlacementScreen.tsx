@@ -299,7 +299,7 @@ function MapSearchControl() {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5`,
-        { headers: { "User-Agent": "SKYSHIELD-Training-Sim/1.0" } },
+        { headers: { "User-Agent": "OpenSentry-Training-Sim/1.0" } },
       );
       setResults(await res.json());
     } catch { setResults([]); }

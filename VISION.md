@@ -1,4 +1,4 @@
-# SKYSHIELD — Vision & Roadmap
+# OpenSentry — Vision & Roadmap
 
 ## Mission
 Free, browser-based C-UAS training simulator that any military member worldwide can use to train on the DTID kill chain — even if they don't have real systems at their base.

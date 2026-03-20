@@ -36,7 +36,7 @@ export function useWebSocket(
 
   const reportError = useCallback(
     (message: string) => {
-      console.error(`[SKYSHIELD WS] ${message}`);
+      console.error(`[OpenSentry WS] ${message}`);
       setConnectionError(message);
       onError?.(message);
     },
@@ -99,7 +99,7 @@ export function useWebSocket(
 
           // Basic validation: messages must have a "type" field
           if (!msg || typeof msg !== "object" || !("type" in msg)) {
-            console.warn("[SKYSHIELD WS] Received message without type field:", msg);
+            console.warn("[OpenSentry WS] Received message without type field:", msg);
             return;
           }
 
@@ -107,7 +107,7 @@ export function useWebSocket(
         } catch (err) {
           // JSON parse error or handler error -- log but don't crash the app
           console.error(
-            "[SKYSHIELD WS] Failed to process message:",
+            "[OpenSentry WS] Failed to process message:",
             err instanceof Error ? err.message : String(err),
             "Raw data:",
             typeof event.data === "string"
@@ -118,7 +118,7 @@ export function useWebSocket(
       };
 
       ws.onerror = (event) => {
-        console.error("[SKYSHIELD WS] Connection error:", event);
+        console.error("[OpenSentry WS] Connection error:", event);
         reportError("WebSocket connection error -- server may be down");
       };
 
@@ -140,7 +140,7 @@ export function useWebSocket(
           const delay = Math.min(1000 * 2 ** (attempt - 1), 5000);
 
           console.warn(
-            `[SKYSHIELD WS] Connection lost (code ${event.code}). ` +
+            `[OpenSentry WS] Connection lost (code ${event.code}). ` +
             `Reconnecting in ${delay}ms (attempt ${attempt}/${maxReconnectAttempts})...`,
           );
 
@@ -173,7 +173,7 @@ export function useWebSocket(
         }
       } else {
         console.warn(
-          "[SKYSHIELD WS] Attempted to send while not connected. Message dropped:",
+          "[OpenSentry WS] Attempted to send while not connected. Message dropped:",
           data,
         );
       }

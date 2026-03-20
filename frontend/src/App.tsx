@@ -1063,7 +1063,7 @@ export default function App() {
                 textAlign: "center",
               }}
             >
-              SKYSHIELD
+              OpenSentry
             </div>
             <div
               style={{
@@ -1229,7 +1229,7 @@ export default function App() {
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "#58a6ff"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "#484f58"; }}
             >
-              ⬡ SKYSHIELD — Open Source C-UAS Training Simulator
+              ⬡ OpenSentry — Open Source C-UAS Training Simulator
             </a>
           </div>
         </div>

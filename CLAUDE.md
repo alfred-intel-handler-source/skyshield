@@ -1,7 +1,7 @@
-# CLAUDE.md — SKYSHIELD Project Guide (Updated 2026-03-20)
+# CLAUDE.md — OpenSentry Project Guide (Updated 2026-03-20)
 
 ## What Is This?
-SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teach military operators the **DTID kill chain** (Detect → Track → Identify → Defeat). It's built to feel like a real FAAD C2 or Medusa workstation. No clearance required — purely training.
+OpenSentry is a **free, browser-based C-UAS training simulator** designed to teach military operators the **DTID kill chain** (Detect → Track → Identify → Defeat). It's built to feel like a real FAAD C2 or Medusa workstation. No clearance required — purely training.
 
 **Target User:** "The E-5 who gets handed the C-UAS binder and told to figure it out."
 
@@ -125,5 +125,5 @@ SKYSHIELD is a **free, browser-based C-UAS training simulator** designed to teac
 ## Next Session — Priority Work
 1. Investigate intermittent stuck bogey in Lone Wolf
 2. Run full smoke test of Recon Probe end-to-end
-3. Draft AFWERX/DIU one-pager for SKYSHIELD innovation submission
+3. Draft AFWERX/DIU one-pager for OpenSentry innovation submission
 4. Consider: score system improvements, debrief detail, Phase 2 terrain LOS

@@ -1,4 +1,4 @@
-# SKYSHIELD — Open Source C-UAS Training Simulator
+# OpenSentry — Open Source C-UAS Training Simulator
 
 ## Concept
 A browser-based counter-drone training simulator that puts players in a tactical operations center, responding to drone incursions with realistic decision-making under pressure. Unclassified, but informed by real operational knowledge.
@@ -163,7 +163,7 @@ A browser-based counter-drone training simulator that puts players in a tactical
 ---
 
 ## Name Options
-- **SKYSHIELD** ← current favorite
+- **OpenSentry** ← selected name
 - **VANGUARD Sim**
 - **Drone Guard Trainer**
 - **Overwatch Sim** (might conflict with the game)
