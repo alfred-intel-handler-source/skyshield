@@ -56,7 +56,7 @@ export default function ScenarioSelect({ onSelect }: Props) {
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`,
-        { headers: { "User-Agent": "SKYSHIELD-Training-Sim/1.0" } },
+        { headers: { "User-Agent": "OpenSentry-Training-Sim/1.0" } },
       );
       const data: NominatimResult[] = await res.json();
       setSearchResults(data);
@@ -150,7 +150,7 @@ export default function ScenarioSelect({ onSelect }: Props) {
             color: "#e6edf3",
           }}
         >
-          SKYSHIELD
+          OpenSentry
         </span>
         <span
           style={{

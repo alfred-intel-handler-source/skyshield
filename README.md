@@ -1,4 +1,4 @@
-# SKYSHIELD
+# OpenSentry
 
 **Free, browser-based C-UAS training simulator.** Practice the full DTID kill chain (Detect → Track → Identify → Defeat) in a realistic tactical operations center environment — no clearance required.
 

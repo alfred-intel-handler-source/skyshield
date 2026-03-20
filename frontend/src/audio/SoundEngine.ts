@@ -1,5 +1,5 @@
 /**
- * SoundEngine — Procedural audio for SKYSHIELD using Web Audio API.
+ * SoundEngine — Procedural audio for OpenSentry using Web Audio API.
  * All sounds are synthesized with oscillators and noise. No external files.
  */
 
@@ -31,7 +31,7 @@ class SoundEngine {
 
   constructor() {
     // Restore preferences from localStorage
-    const saved = localStorage.getItem("skyshield_audio");
+    const saved = localStorage.getItem("opensentry_audio");
     if (saved) {
       try {
         const prefs = JSON.parse(saved);
@@ -62,7 +62,7 @@ class SoundEngine {
 
   private savePrefs(): void {
     localStorage.setItem(
-      "skyshield_audio",
+      "opensentry_audio",
       JSON.stringify({ volume: this._volume, muted: this._muted }),
     );
   }
