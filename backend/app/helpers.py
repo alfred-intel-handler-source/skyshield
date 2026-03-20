@@ -115,10 +115,10 @@ def check_effector_in_range(eff_state: dict, drone: DroneState) -> bool:
     return True
 
 
-def check_kurz_fcs_tracking(sensor_configs: list[SensorConfig], drone: DroneState) -> bool:
+def check_ku_fcs_tracking(sensor_configs: list[SensorConfig], drone: DroneState) -> bool:
     """Check if any Ku-Band FCS radar has the drone in range."""
     for s in sensor_configs:
-        if "kurz" not in s.id.lower() and "kurz" not in s.name.lower():
+        if "kufcs" not in s.id.lower() and "kufcs" not in s.name.lower():
             continue
         dist = math.sqrt((drone.x - s.x) ** 2 + (drone.y - s.y) ** 2)
         if dist <= s.range_km:

@@ -77,7 +77,7 @@ const COLORS = {
 // Per-system range ring styling keyed by catalog_id
 const RANGE_RING_STYLES: Record<string, { color: string; dashArray?: string }> = {
   tpq51:         { color: "#58a6ff", dashArray: "8,4" },      // blue, dashed
-  kurz:          { color: "#d29922" },                          // orange, solid (sector)
+  kufcs:          { color: "#d29922" },                          // orange, solid (sector)
   eoir_camera:   { color: "#3fb950", dashArray: "2,4" },       // green, dotted
   rf_jammer:     { color: "#e3b341", dashArray: "8,4" },       // yellow, dashed
   jackal_pallet: { color: "#f85149", dashArray: "8,4" },       // red, dashed

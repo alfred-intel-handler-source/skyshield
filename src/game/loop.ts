@@ -442,7 +442,7 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
     const hasShinobi = readings.some(r => (r as unknown as Record<string, unknown>).is_shinobi);
     const hasNonShinobiRadar = detectingIds.some(sid =>
       !sid.toLowerCase().includes('shinobi') &&
-      (sid.toLowerCase().includes('radar') || sid.toLowerCase().includes('tpq') || sid.toLowerCase().includes('kurz'))
+      (sid.toLowerCase().includes('radar') || sid.toLowerCase().includes('tpq') || sid.toLowerCase().includes('kufcs'))
     );
     const detectLabel = hasShinobi && !hasNonShinobiRadar ? 'SHINOBI RF' : 'RADAR';
     events.push({

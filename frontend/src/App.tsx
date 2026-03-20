@@ -919,7 +919,7 @@ export default function App() {
       base_id: "medium_airbase",
       sensors: [
         { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
-        { catalog_id: "kurz_fcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
         { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
       ],
       effectors: [
@@ -936,7 +936,7 @@ export default function App() {
       base_id: "medium_airbase",
       sensors: [
         { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
-        { catalog_id: "kurz_fcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
         { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
         { catalog_id: "eoir_camera", x: 0.4, y: -0.2, facing_deg: 180 },
       ],
@@ -956,7 +956,7 @@ export default function App() {
       base_id: "medium_airbase",
       sensors: [
         { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
-        { catalog_id: "kurz_fcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
         { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
         { catalog_id: "eoir_camera", x: 0.4, y: -0.2, facing_deg: 180 },
       ],

@@ -608,7 +608,7 @@ def _run_sensors_for_drone(gs: GameState, i: int, elapsed: float) -> list[dict]:
         # Determine if SHINOBI detected it (use "RF" label) vs radar
         has_shinobi = any(r.get("is_shinobi") for r in readings)
         detect_label = "SHINOBI RF" if has_shinobi and not any(
-            "radar" in sid.lower() or "tpq" in sid.lower() or "kurz" in sid.lower()
+            "radar" in sid.lower() or "tpq" in sid.lower() or "kufcs" in sid.lower()
             for sid in detecting_ids if not ("shinobi" in sid.lower())
         ) else "RADAR"
         events.append({
