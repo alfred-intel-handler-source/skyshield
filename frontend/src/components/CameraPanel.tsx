@@ -559,6 +559,54 @@ function drawBalloon(ctx: CanvasRenderingContext2D, s: number, time: number) {
   ctx.restore();
 }
 
+function drawShahed(ctx: CanvasRenderingContext2D, s: number, _time: number) {
+  // Shahed-136 / loitering munition: wide flat delta wing, small central body, pusher prop at tail
+  // Top-down view — wide triangular planform
+
+  // Main delta wing — very wide, short chord
+  ctx.beginPath();
+  ctx.moveTo(18 * s, 0);           // nose
+  ctx.lineTo(-10 * s, -38 * s);   // left wingtip
+  ctx.lineTo(-16 * s, -34 * s);   // left trailing edge
+  ctx.lineTo(-18 * s, 0);         // tail center-left
+  ctx.lineTo(-16 * s, 34 * s);    // right trailing edge
+  ctx.lineTo(-10 * s, 38 * s);    // right wingtip
+  ctx.closePath();
+  ctx.fill();
+
+  // Narrow central fuselage stripe
+  ctx.save();
+  const prevFill = ctx.fillStyle;
+  ctx.fillStyle = "rgba(80,90,100,0.6)";
+  ctx.beginPath();
+  ctx.ellipse(2 * s, 0, 14 * s, 3 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = prevFill;
+  ctx.restore();
+
+  // Pusher prop circle at tail
+  ctx.beginPath();
+  ctx.arc(-18 * s, 0, 4 * s, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Small V-tail fins
+  ctx.beginPath();
+  ctx.moveTo(-14 * s, 0);
+  ctx.lineTo(-20 * s, -8 * s);
+  ctx.lineTo(-18 * s, -7 * s);
+  ctx.lineTo(-13 * s, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(-14 * s, 0);
+  ctx.lineTo(-20 * s, 8 * s);
+  ctx.lineTo(-18 * s, 7 * s);
+  ctx.lineTo(-13 * s, 0);
+  ctx.closePath();
+  ctx.fill();
+}
+
 function drawImprovised(ctx: CanvasRenderingContext2D, s: number, time: number) {
   // Slight wobble — improvised drones are unstable
   const wobble = Math.sin(time * 4.5) * 0.06;
@@ -770,6 +818,11 @@ function drawSilhouette(
       break;
     case "improvised":
       drawImprovised(ctx, scale, time);
+      break;
+    case "shahed":
+    case "loitering_munition":
+    case "one_way_attack":
+      drawShahed(ctx, scale, time);
       break;
     default:
       drawUnknownBlob(ctx, scale, time);
