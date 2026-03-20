@@ -98,7 +98,7 @@ export function useGameEngine(onMessage: MessageHandler) {
 
         // Load scenario JSON
         const scenarioRes = await fetch(
-          `/data/scenarios/${scenarioId}.json`,
+          `${import.meta.env.BASE_URL}data/scenarios/${scenarioId}.json`,
         );
         if (!scenarioRes.ok) throw new Error(`Scenario not found: ${scenarioId}`);
         const scenarioData = await scenarioRes.json();
