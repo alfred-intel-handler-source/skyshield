@@ -810,6 +810,10 @@ export default function App() {
     send({ type: "action", action: "jam_all" });
   };
 
+  const handleCeaseJam = () => {
+    send({ type: "action", action: "cease_jam" });
+  };
+
   const handleClearAirspace = () => {
     send({ type: "action", action: "clear_airspace" });
   };
@@ -1293,6 +1297,7 @@ export default function App() {
         waveNumber={waveNumber}
         onEndMission={handleEndMission}
         onJamAll={handleJamAll}
+        onCeaseJam={handleCeaseJam}
         onClearAirspace={handleClearAirspace}
         isPaused={paused}
         onPause={handlePause}
