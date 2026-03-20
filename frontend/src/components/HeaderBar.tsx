@@ -13,6 +13,7 @@ interface Props {
   waveNumber?: number;
   onEndMission?: () => void;
   onJamAll?: () => void;
+  onCeaseJam?: () => void;
   onClearAirspace?: () => void;
   isPaused?: boolean;
   onPause?: () => void;
@@ -41,6 +42,7 @@ export default function HeaderBar({
   waveNumber = 1,
   onEndMission,
   onJamAll,
+  onCeaseJam,
   onClearAirspace,
   isPaused = false,
   onPause,
@@ -236,37 +238,35 @@ export default function HeaderBar({
           </span>
         </div>
 
-        {/* JAM ALL button */}
+        {/* JAM ALL / CEASE JAMMING toggle */}
         {onJamAll && (
           <button
-            onClick={onJamAll}
-            disabled={allJammersActive}
+            onClick={allJammersActive ? onCeaseJam : onJamAll}
             style={{
               padding: "4px 12px",
               background: allJammersActive
-                ? "rgba(210, 153, 34, 0.08)"
+                ? "rgba(248, 81, 73, 0.15)"
                 : "rgba(210, 153, 34, 0.15)",
-              border: `1px solid rgba(210, 153, 34, ${allJammersActive ? "0.2" : "0.4"})`,
+              border: `1px solid ${allJammersActive ? "rgba(248,81,73,0.5)" : "rgba(210,153,34,0.4)"}`,
               borderRadius: 4,
-              color: allJammersActive ? "#8b7a3a" : "#d29922",
+              color: allJammersActive ? "#f85149" : "#d29922",
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 10,
               fontWeight: 700,
               letterSpacing: 1,
-              cursor: allJammersActive ? "default" : "pointer",
+              cursor: "pointer",
               transition: "all 0.15s",
-              opacity: allJammersActive ? 0.6 : 1,
             }}
             onMouseEnter={(e) => {
-              if (!allJammersActive)
-                (e.currentTarget as HTMLElement).style.background = "rgba(210, 153, 34, 0.3)";
+              (e.currentTarget as HTMLElement).style.background = allJammersActive
+                ? "rgba(248,81,73,0.28)" : "rgba(210,153,34,0.28)";
             }}
             onMouseLeave={(e) => {
-              if (!allJammersActive)
-                (e.currentTarget as HTMLElement).style.background = "rgba(210, 153, 34, 0.15)";
+              (e.currentTarget as HTMLElement).style.background = allJammersActive
+                ? "rgba(248,81,73,0.15)" : "rgba(210,153,34,0.15)";
             }}
           >
-            {allJammersActive ? "JAMMERS ACTIVE" : "JAM ALL"}
+            {allJammersActive ? "CEASE JAMMING" : "JAM ALL"}
           </button>
         )}
 

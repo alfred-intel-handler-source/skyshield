@@ -281,6 +281,22 @@ def handle_jam_all(gs: GameState, elapsed: float) -> list[dict]:
     return msgs
 
 
+def handle_cease_jam(gs: GameState, elapsed: float) -> list[dict]:
+    """Deactivate all jammer effectors at once."""
+    msgs: list[dict] = []
+    deactivated = 0
+    for eff_state in gs.effector_states:
+        if eff_state.get("type") in ("rf_jam", "electronic"):
+            if eff_state.get("jammer_active", False):
+                eff_state["jammer_active"] = False
+                deactivated += 1
+    if deactivated > 0:
+        msgs.append(_event(elapsed, "RF JAMMERS: ALL SYSTEMS OFFLINE"))
+    else:
+        msgs.append(_event(elapsed, "RF JAMMERS: No active systems to cease"))
+    return msgs
+
+
 _ATC_CLEARABLE = {DroneType.PASSENGER_AIRCRAFT, DroneType.MILITARY_JET}
 
 def handle_clear_airspace(gs: GameState, elapsed: float) -> list[dict]:

@@ -27,7 +27,7 @@ from app.actions import (
     handle_engage,
     handle_hold_fire,
     handle_identify,
-    handle_jam_all,
+    handle_jam_all, handle_cease_jam,
     handle_jammer_toggle,
     handle_pause_mission,
     handle_release_hold_fire,
@@ -74,7 +74,7 @@ VALID_ACTION_NAMES = {
     "confirm_track", "identify", "engage", "hold_fire",
     "release_hold_fire", "end_mission", "slew_camera",
     "shinobi_hold", "shinobi_land_now", "shinobi_deafen",
-    "jammer_toggle", "jam_all", "clear_airspace",
+    "jammer_toggle", "jam_all", "cease_jam", "clear_airspace",
     "pause_mission", "resume_mission",
 }
 VALID_MSG_TYPES = {"action", "restart"}
@@ -998,6 +998,16 @@ async def game_websocket(ws: WebSocket):
                 # Apply client-provided perimeter overrides
                 if "boundary" in pd and isinstance(pd["boundary"], list):
                     base_template.boundary = pd["boundary"]
+                    # Derive base_radius_km from perimeter half-diagonal so threat-reach matches visual box
+                    import math as _math
+                    pts = pd["boundary"]
+                    if len(pts) >= 2:
+                        xs = [p[0] for p in pts]
+                        ys = [p[1] for p in pts]
+                        w = max(xs) - min(xs)
+                        h = max(ys) - min(ys)
+                        half_diag = _math.sqrt(w**2 + h**2) / 2.0
+                        scenario.base_radius_km = max(half_diag, 0.2)
                 if "placement_bounds_km" in pd and isinstance(pd["placement_bounds_km"], (int, float)):
                     base_template.placement_bounds_km = float(pd["placement_bounds_km"])
             except (TypeError, ValueError, KeyError) as e:
@@ -1130,6 +1140,8 @@ async def game_websocket(ws: WebSocket):
                         ))
                     elif action_name == "jam_all":
                         await _send_msgs(ws, handle_jam_all(gs, elapsed))
+                    elif action_name == "cease_jam":
+                        await _send_msgs(ws, handle_cease_jam(gs, elapsed))
                     elif action_name == "clear_airspace":
                         await _send_msgs(ws, handle_clear_airspace(gs, elapsed))
                     elif action_name == "pause_mission":
