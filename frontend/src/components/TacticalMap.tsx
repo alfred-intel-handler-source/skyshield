@@ -856,13 +856,13 @@ export default function TacticalMap({
   const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
   const [deviceWheelState, setDeviceWheelState] = useState<DeviceWheelState | null>(null);
-  const [showRangeRings, setShowRangeRings] = useState(false);
+  const [showRangeRings, setShowRangeRings] = useState(true);
   const [hiddenRings, setHiddenRings] = useState<Set<string>>(new Set());
   const [selectionList, setSelectionList] = useState<SelectionListState | null>(null);
   const mapRef = useRef<L.Map | null>(null);
 
   // Bulls-eye overlay state
-  const [showBullseye, setShowBullseye] = useState(false);
+  const [showBullseye, setShowBullseye] = useState(true);
   const [bullseyeCenter, setBullseyeCenter] = useState<[number, number]>(baseCenter);
   const [bullseyeContextMenu, setBullseyeContextMenu] = useState<{ x: number; y: number; latlng: [number, number] } | null>(null);
 
