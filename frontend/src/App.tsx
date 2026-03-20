@@ -1469,7 +1469,7 @@ export default function App() {
       </div>
 
       {/* Bottom: Event Log */}
-      <EventLog events={events} />
+      <EventLog events={events} hookedTrack={selectedTrack} onUnhook={() => setSelectedTrackId(null)} />
 
       {/* Keyboard shortcuts hint */}
       {phase === "running" && (
