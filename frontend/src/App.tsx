@@ -14,6 +14,7 @@ import LoadoutScreen from "./components/LoadoutScreen";
 import PlacementScreen from "./components/PlacementScreen";
 import CameraPanel from "./components/CameraPanel";
 import TutorialStepTracker from "./components/TutorialStepTracker";
+import FeedbackModal from "./components/FeedbackModal";
 import TutorialFeedback from "./components/TutorialFeedback";
 import PauseOverlay from "./components/PauseOverlay";
 import { useGameEngine as useWebSocket } from "./hooks/useGameEngine";
@@ -131,6 +132,7 @@ class ErrorBoundary extends React.Component<
 export default function App() {
   // --- Flow state ---
   const [phase, setPhase] = useState<GamePhase>("waiting");
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Scenario + base selection
   const [scenarioId, setScenarioId] = useState<string>("");
@@ -1214,7 +1216,33 @@ export default function App() {
           </button>
 
           {/* Footer */}
-          <div style={{ marginTop: 40, textAlign: "center" }}>
+          <div style={{ marginTop: 40, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setShowFeedback(true)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                color: "#8b949e", fontSize: 13, textDecoration: "none",
+                letterSpacing: 1, padding: "10px 20px",
+                border: "1px solid #21262d", borderRadius: 8,
+                background: "#161b22", transition: "all 0.15s", cursor: "pointer",
+                fontFamily: "'Inter', sans-serif",
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = "#3fb950";
+                el.style.color = "#3fb950";
+                el.style.background = "#1a2a1a";
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLElement;
+                el.style.borderColor = "#21262d";
+                el.style.color = "#8b949e";
+                el.style.background = "#161b22";
+              }}
+            >
+              <span style={{ fontSize: 16 }}>💬</span>
+              <span><span style={{ fontWeight: 700, letterSpacing: 1.5 }}>Feedback</span><span style={{ color: "#484f58", margin: "0 6px" }}>·</span><span style={{ fontWeight: 400 }}>Bug reports &amp; suggestions</span></span>
+            </button>
             <a
               href="https://github.com/alfred-intel-handler-source/skyshield#readme"
               target="_blank"
@@ -1255,6 +1283,7 @@ export default function App() {
               <span style={{ fontSize: 11, opacity: 0.5 }}>↗</span>
             </a>
           </div>
+          {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
         </div>
       </div>
     );
