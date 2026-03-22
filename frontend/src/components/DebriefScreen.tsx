@@ -222,9 +222,14 @@ export default function DebriefScreen({
         </div>
 
         <ScoreBar
-          label="DETECTION RESPONSE (20%)"
-          score={score.detection_response_score}
-          detail={score.details.detection_response || ""}
+          label="DETECTION AWARENESS (12%)"
+          score={score.detection_awareness_score}
+          detail={score.details.detection_awareness || ""}
+        />
+        <ScoreBar
+          label="CONFIRMATION QUALITY (8%)"
+          score={score.confirmation_quality_score}
+          detail={score.details.confirmation_quality || ""}
         />
         <ScoreBar
           label="TRACKING (15%)"
