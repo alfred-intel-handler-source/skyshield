@@ -80,7 +80,8 @@ export interface EventEntry {
 }
 
 export interface ScoreBreakdown {
-  detection_response_score: number;
+  detection_awareness_score: number;
+  confirmation_quality_score: number;
   tracking_score: number;
   identification_score: number;
   defeat_score: number;

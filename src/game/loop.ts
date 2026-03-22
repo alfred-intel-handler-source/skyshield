@@ -776,6 +776,12 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
 
   const scorableCfgs = threatDroneCfgs.length > 0 ? threatDroneCfgs : Array.from(gs.drone_configs.values());
 
+  // Build drone speed lookup from configs
+  const droneSpeeds = new Map<string, number>();
+  for (const cfg of scorableCfgs) {
+    droneSpeeds.set(cfg.id, cfg.speed);
+  }
+
   let score;
   if (scorableCfgs.length <= 1) {
     const primaryCfg = scorableCfgs[0] ?? null;
@@ -791,6 +797,8 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
       gs.effector_used.get(pid) ?? null,
       gs.drone_reached_base,
       gs.confidence_at_identify.get(pid) ?? 0,
+      gs.first_click_times.get(pid) ?? null,
+      droneSpeeds.get(pid) ?? 0,
       gs.placement_config,
       gs.base_template,
       catalog,
@@ -810,6 +818,8 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
       gs.effector_used,
       dronesReached,
       gs.confidence_at_identify,
+      gs.first_click_times,
+      droneSpeeds,
       gs.placement_config,
       gs.base_template,
       catalog,

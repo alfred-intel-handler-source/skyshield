@@ -208,7 +208,8 @@ export interface PlayerAction {
 }
 
 export interface ScoreBreakdown {
-  detection_response_score: number;
+  detection_awareness_score: number;
+  confirmation_quality_score: number;
   tracking_score: number;
   identification_score: number;
   defeat_score: number;
@@ -389,6 +390,7 @@ export interface GameState {
   drone_reached_base: boolean;
 
   detection_times: Map<string, number>;
+  first_click_times: Map<string, number>;
   confirm_times: Map<string, number>;
   identify_times: Map<string, number>;
   engage_times: Map<string, number>;
@@ -457,6 +459,7 @@ export function createGameState(
     actions: [],
     drone_reached_base: false,
     detection_times: new Map(),
+    first_click_times: new Map(),
     confirm_times: new Map(),
     identify_times: new Map(),
     engage_times: new Map(),

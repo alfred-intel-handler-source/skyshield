@@ -56,34 +56,66 @@ function _scoreDroneComponents(
   effectorUsed: string | null,
   droneReachedBase: boolean,
   confidenceAtIdentify: number,
+  firstClickTime: number | null,
+  droneSpeed: number,
 ): [Record<string, number>, Record<string, string>] {
   const scores: Record<string, number> = {};
   const details: Record<string, string> = {};
 
-  // --- Detection Response (20%) ---
-  if (confirmTime != null && detectionTime != null) {
-    const responseDelay = confirmTime - detectionTime;
-    if (responseDelay <= 5.0) {
-      scores['detection_response'] = 100;
-      details['detection_response'] = `Confirmed within ${responseDelay.toFixed(1)}s`;
-    } else if (responseDelay <= 10.0) {
-      scores['detection_response'] = 80;
-      details['detection_response'] = `Confirmed in ${responseDelay.toFixed(1)}s (slightly slow)`;
-    } else if (responseDelay <= 20.0) {
-      scores['detection_response'] = 50;
-      details['detection_response'] = `Confirmed in ${responseDelay.toFixed(1)}s (slow)`;
+  // --- Detection Awareness (60% of WEIGHT_DETECTION) ---
+  // Measures time from drone spawn (detectionTime) to operator first click
+  if (firstClickTime != null && detectionTime != null) {
+    const timeToFirstClick = firstClickTime - detectionTime;
+    if (timeToFirstClick <= 3.0) {
+      scores['detection_awareness'] = 100;
+    } else if (timeToFirstClick <= 8.0) {
+      scores['detection_awareness'] = 85;
+    } else if (timeToFirstClick <= 15.0) {
+      scores['detection_awareness'] = 70;
+    } else if (timeToFirstClick <= 30.0) {
+      scores['detection_awareness'] = 50;
     } else {
-      scores['detection_response'] = 20;
-      details['detection_response'] = `Confirmed in ${responseDelay.toFixed(1)}s (very slow)`;
+      scores['detection_awareness'] = 20;
+    }
+    details['detection_awareness'] = `Detected contact in ${timeToFirstClick.toFixed(1)}s`;
+
+    // Weight by threat urgency: faster drones closing on base are more urgent
+    const urgencyProxy = droneSpeed * timeToFirstClick;
+    if (urgencyProxy > 2.0) {
+      scores['detection_awareness'] = Math.max(0, scores['detection_awareness'] - 10);
+      details['detection_awareness'] += ' (high threat urgency)';
     }
   } else {
-    scores['detection_response'] = 0;
-    details['detection_response'] = 'Track was never confirmed';
+    scores['detection_awareness'] = 0;
+    details['detection_awareness'] = 'No operator interaction with contact';
   }
 
   if (droneReachedBase && shouldEngage) {
-    scores['detection_response'] = Math.max(0, scores['detection_response'] - 30);
-    details['detection_response'] += ' -- DRONE REACHED BASE';
+    scores['detection_awareness'] = Math.max(0, scores['detection_awareness'] - 30);
+    details['detection_awareness'] += ' -- DRONE REACHED BASE';
+  }
+
+  // --- Confirmation Quality (40% of WEIGHT_DETECTION) ---
+  // Rewards methodical confirmation over impulsive clicking
+  if (confirmTime != null && firstClickTime != null) {
+    const clickToConfirm = confirmTime - firstClickTime;
+    if (clickToConfirm >= 3.0 && clickToConfirm <= 15.0) {
+      scores['confirmation_quality'] = 100;
+      details['confirmation_quality'] = `Confirmed after ${clickToConfirm.toFixed(1)}s of assessment`;
+    } else if (clickToConfirm < 2.0) {
+      scores['confirmation_quality'] = 80;
+      details['confirmation_quality'] = 'Quick confirm \u2014 verify not a false track';
+    } else {
+      scores['confirmation_quality'] = 60;
+      details['confirmation_quality'] = `Slow confirmation (${clickToConfirm.toFixed(1)}s)`;
+    }
+  } else if (confirmTime != null) {
+    // First click was confirm itself — still counts, but no assessment gap
+    scores['confirmation_quality'] = 80;
+    details['confirmation_quality'] = 'Confirmed on first interaction';
+  } else {
+    scores['confirmation_quality'] = 0;
+    details['confirmation_quality'] = 'Track was never confirmed';
   }
 
   // --- Tracking (15%) ---
@@ -211,6 +243,8 @@ function _scoreSingleDrone(
   effectorUsed: string | null,
   droneReachedBase: boolean,
   confidenceAtIdentify: number,
+  firstClickTime: number | null = null,
+  droneSpeed: number = 0,
   placementConfig: PlacementConfig | null = null,
   baseTemplate: BaseTemplate | null = null,
   catalog: EquipmentCatalog | null = null,
@@ -231,10 +265,16 @@ function _scoreSingleDrone(
     effectorUsed,
     droneReachedBase,
     confidenceAtIdentify,
+    firstClickTime,
+    droneSpeed,
   );
 
+  // Split WEIGHT_DETECTION: 60% awareness, 40% confirmation quality
+  const detectionScore =
+    scores['detection_awareness'] * 0.6 + scores['confirmation_quality'] * 0.4;
+
   const total =
-    scores['detection_response'] * WEIGHT_DETECTION +
+    detectionScore * WEIGHT_DETECTION +
     scores['tracking'] * WEIGHT_TRACKING +
     scores['identification'] * WEIGHT_IDENTIFICATION +
     scores['defeat'] * WEIGHT_DEFEAT +
@@ -253,7 +293,8 @@ function _scoreSingleDrone(
   }
 
   return {
-    detection_response_score: Math.round(scores['detection_response'] * 10) / 10,
+    detection_awareness_score: Math.round(scores['detection_awareness'] * 10) / 10,
+    confirmation_quality_score: Math.round(scores['confirmation_quality'] * 10) / 10,
     tracking_score: Math.round(scores['tracking'] * 10) / 10,
     identification_score: Math.round(scores['identification'] * 10) / 10,
     defeat_score: Math.round(scores['defeat'] * 10) / 10,
@@ -336,6 +377,8 @@ export function calculateScore(
   effectorUsed: string | null,
   droneReachedBase: boolean,
   confidenceAtIdentify: number,
+  firstClickTime: number | null = null,
+  droneSpeed: number = 0,
   placementConfig: PlacementConfig | null = null,
   baseTemplate: BaseTemplate | null = null,
   catalog: EquipmentCatalog | null = null,
@@ -356,6 +399,8 @@ export function calculateScore(
     effectorUsed,
     droneReachedBase,
     confidenceAtIdentify,
+    firstClickTime,
+    droneSpeed,
     placementConfig,
     baseTemplate,
     catalog,
@@ -379,6 +424,8 @@ export function calculateScoreMulti(
   effectorsUsed: Map<string, string>,
   dronesReachedBase: Set<string>,
   confidenceAtIdentify: Map<string, number>,
+  firstClickTimes: Map<string, number>,
+  droneSpeeds: Map<string, number>,
   placementConfig: PlacementConfig | null = null,
   baseTemplate: BaseTemplate | null = null,
   catalog: EquipmentCatalog | null = null,
@@ -402,6 +449,8 @@ export function calculateScoreMulti(
       effectorsUsed.get(droneId) ?? null,
       dronesReachedBase.has(droneId),
       confidenceAtIdentify.get(droneId) ?? 0.0,
+      firstClickTimes.get(droneId) ?? null,
+      droneSpeeds.get(droneId) ?? 0,
       placementConfig,
       baseTemplate,
       catalog,
@@ -437,6 +486,8 @@ export function calculateScoreMulti(
       effectorsUsed.get(droneId) ?? null,
       dronesReachedBase.has(droneId),
       confidenceAtIdentify.get(droneId) ?? 0.0,
+      firstClickTimes.get(droneId) ?? null,
+      droneSpeeds.get(droneId) ?? 0,
     );
     perDroneScores.push(scores);
     perDroneDetails.push(details);
@@ -444,7 +495,9 @@ export function calculateScoreMulti(
 
   // Weighted average across all drones
   const n = perDroneScores.length;
-  const avgDetection = perDroneScores.reduce((s, d) => s + d['detection_response'], 0) / n;
+  const avgAwareness = perDroneScores.reduce((s, d) => s + d['detection_awareness'], 0) / n;
+  const avgConfirmQuality = perDroneScores.reduce((s, d) => s + d['confirmation_quality'], 0) / n;
+  const avgDetection = avgAwareness * 0.6 + avgConfirmQuality * 0.4;
   const avgTracking = perDroneScores.reduce((s, d) => s + d['tracking'], 0) / n;
   const avgIdentification = perDroneScores.reduce((s, d) => s + d['identification'], 0) / n;
   const avgDefeat = perDroneScores.reduce((s, d) => s + d['defeat'], 0) / n;
@@ -482,7 +535,8 @@ export function calculateScoreMulti(
   }
 
   return {
-    detection_response_score: Math.round(avgDetection * 10) / 10,
+    detection_awareness_score: Math.round(avgAwareness * 10) / 10,
+    confirmation_quality_score: Math.round(avgConfirmQuality * 10) / 10,
     tracking_score: Math.round(avgTracking * 10) / 10,
     identification_score: Math.round(avgIdentification * 10) / 10,
     defeat_score: Math.round(avgDefeat * 10) / 10,
