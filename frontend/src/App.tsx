@@ -702,11 +702,12 @@ export default function App() {
     setNotes([]);
     setWaveNumber(1);
 
-    // Connect with placement data
+    // Connect with placement data — score placement since player placed equipment
     connect({
       scenarioId,
       baseId,
       placement,
+      scorePlacement: true,
     });
   };
 

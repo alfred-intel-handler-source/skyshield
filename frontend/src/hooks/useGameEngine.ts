@@ -48,6 +48,8 @@ export interface ConnectOptions {
   scenarioId: string;
   baseId?: string;
   placement?: PlacementConfig;
+  /** When true, placement is scored in debrief (custom mission with PlacementScreen). */
+  scorePlacement?: boolean;
 }
 
 type MessageHandler = (msg: ServerMessage) => void;
@@ -95,6 +97,8 @@ export function useGameEngine(onMessage: MessageHandler) {
           typeof connectOpts === "string" ? undefined : connectOpts.baseId;
         const placement =
           typeof connectOpts === "string" ? undefined : connectOpts.placement;
+        const scorePlacement =
+          typeof connectOpts === "string" ? false : (connectOpts.scorePlacement ?? false);
 
         // Load scenario JSON
         const scenarioRes = await fetch(
@@ -197,7 +201,7 @@ export function useGameEngine(onMessage: MessageHandler) {
           scenario,
           sensorConfigs,
           effectorConfigs,
-          placement
+          placement && scorePlacement
             ? (placement as unknown as import("@skyshield/game/state").PlacementConfig)
             : null,
           baseTemplate as unknown as import("@skyshield/game/state").BaseTemplate | null,
