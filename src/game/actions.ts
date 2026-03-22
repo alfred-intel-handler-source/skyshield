@@ -34,6 +34,12 @@ function _label(gs: GameState, droneId: string): string {
   return d?.display_label || droneId;
 }
 
+function _recordFirstClick(gs: GameState, targetId: string, elapsed: number): void {
+  if (!gs.first_click_times.has(targetId)) {
+    gs.first_click_times.set(targetId, elapsed);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -43,6 +49,7 @@ export function handleConfirmTrack(gs: GameState, targetId: string, elapsed: num
   for (let j = 0; j < gs.drones.length; j++) {
     const d = gs.drones[j];
     if (d.id === targetId && d.dtid_phase === 'detected') {
+      _recordFirstClick(gs, targetId, elapsed);
       gs.drones[j] = { ...d, dtid_phase: 'tracked' };
       gs.confirm_times.set(targetId, elapsed);
       gs.actions.push({ action: 'confirm_track', target_id: targetId, timestamp: elapsed });
@@ -64,6 +71,7 @@ export function handleIdentify(
   for (let j = 0; j < gs.drones.length; j++) {
     const d = gs.drones[j];
     if (d.id === targetId && d.dtid_phase === 'tracked') {
+      _recordFirstClick(gs, targetId, elapsed);
       gs.drones[j] = {
         ...d,
         dtid_phase: 'identified',
@@ -94,6 +102,7 @@ export function handleHoldFire(gs: GameState, targetId: string, elapsed: number)
   for (let j = 0; j < gs.drones.length; j++) {
     const d = gs.drones[j];
     if (d.id === targetId) {
+      _recordFirstClick(gs, targetId, elapsed);
       gs.hold_fire_tracks.add(targetId);
       gs.actions.push({ action: 'hold_fire', target_id: targetId, timestamp: elapsed });
       msgs.push(_event(elapsed, `OPERATOR: HOLD FIRE on ${_label(gs, targetId).toUpperCase()}`));
@@ -148,6 +157,7 @@ export function handleEngage(
   for (let j = 0; j < gs.drones.length; j++) {
     const d = gs.drones[j];
     if (d.id !== targetId) continue;
+    _recordFirstClick(gs, targetId, elapsed);
 
     // Block engaging friendly interceptors
     if (d.is_interceptor) {
