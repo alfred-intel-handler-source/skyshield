@@ -89,6 +89,8 @@ export interface ScoreBreakdown {
   details: Record<string, string>;
   placement_score: number | null;
   placement_details: Record<string, string> | null;
+  completion_multiplier: number;
+  time_bonus_detail: string;
 }
 
 // Server messages

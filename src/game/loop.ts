@@ -15,7 +15,7 @@ import { updateShinobiDrone } from './shinobi.js';
 import { updateJackal } from './jackal.js';
 import { updateSensors, calculateConfidence } from './detection.js';
 import { generateWaveDrones, generateAmbientObject, initialAmbientSchedule, AMBIENT_INTERVALS } from './waves.js';
-import { calculateScore, calculateScoreMulti } from './scoring.js';
+import { calculateScore, calculateScoreMulti, applyCompletionMultiplier } from './scoring.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Msg = Record<string, any>;
@@ -801,6 +801,16 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
       catalog,
     );
   }
+
+  const elapsed = Date.now() / 1000 - gs.start_time - gs.total_paused_seconds;
+  const { completion_multiplier, time_bonus_detail } = applyCompletionMultiplier(elapsed, gs.max_duration);
+  score.total_score = Math.round(score.total_score * completion_multiplier * 10) / 10;
+  score.grade = score.total_score >= 95 ? 'S'
+    : score.total_score >= 85 ? 'A'
+    : score.total_score >= 70 ? 'B'
+    : score.total_score >= 50 ? 'C' : 'F';
+  score.completion_multiplier = completion_multiplier;
+  score.time_bonus_detail = time_bonus_detail;
 
   return {
     type: 'debrief',
