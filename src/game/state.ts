@@ -441,7 +441,7 @@ export function createGameState(
     phase: 'running',
     start_time: Date.now() / 1000,
     tick_rate: 0.1,
-    max_duration: 1800,
+    max_duration: scenario.duration_seconds ?? 1800,
     current_wave: 1,
     wave_drone_counter: 0,
     wave_all_neutralized_time: null,
