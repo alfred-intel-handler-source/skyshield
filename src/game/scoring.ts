@@ -263,7 +263,39 @@ function _scoreSingleDrone(
     details,
     placement_score: placementScoreVal,
     placement_details: placementDetailsVal,
+    completion_multiplier: 1.0,
+    time_bonus_detail: 'Mission completed (100% duration)',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Public: applyCompletionMultiplier
+// ---------------------------------------------------------------------------
+
+export function applyCompletionMultiplier(
+  elapsed: number,
+  maxDuration: number,
+): { completion_multiplier: number; time_bonus_detail: string } {
+  const pct = Math.min(elapsed / maxDuration, 1.0);
+  const pctRounded = Math.round(pct * 100);
+
+  let multiplier: number;
+  if (pct >= 0.9) {
+    multiplier = 1.0;
+  } else if (pct >= 0.7) {
+    multiplier = 0.95;
+  } else if (pct >= 0.5) {
+    multiplier = 0.85;
+  } else {
+    multiplier = 0.70;
+  }
+
+  const detail =
+    multiplier === 1.0
+      ? `Mission completed (${pctRounded}% duration)`
+      : `Early exit penalty applied (${pctRounded}% completion)`;
+
+  return { completion_multiplier: multiplier, time_bonus_detail: detail };
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +492,8 @@ export function calculateScoreMulti(
     details: combinedDetails,
     placement_score: placementScoreVal,
     placement_details: placementDetailsVal,
+    completion_multiplier: 1.0,
+    time_bonus_detail: 'Mission completed (100% duration)',
   };
 }
 
