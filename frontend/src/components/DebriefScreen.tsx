@@ -188,6 +188,24 @@ export default function DebriefScreen({
           >
             {score.total_score.toFixed(0)} / 100
           </div>
+
+          {score.completion_multiplier < 1.0 && (
+            <div
+              style={{
+                color: "#d29922",
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "6px 14px",
+                border: "1px solid #d2992244",
+                borderRadius: 6,
+                background: "#d2992211",
+                marginTop: 12,
+                letterSpacing: 0.5,
+              }}
+            >
+              {score.time_bonus_detail}
+            </div>
+          )}
         </div>
 
         {/* Execution scores */}
