@@ -1,0 +1,118 @@
+/*
+ * Tablet-responsive layout for iPad landscape (1024px+)
+ * Issue #22 — adjusts grid layout, touch targets, and panel reflow
+ */
+
+/* ============================================
+   Global touch-friendly defaults for tablets
+   ============================================ */
+@media (pointer: coarse) {
+  /* Prevent double-tap zoom and text selection on interactive elements */
+  button,
+  [role="button"],
+  svg g[style*="cursor"],
+  .leaflet-container {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Increase minimum touch target size */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ============================================
+   iPad landscape layout adjustments (1024–1199px)
+   ============================================ */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  /* Narrow sidebars for tablet-class screens */
+  #root > div {
+    grid-template-columns: 180px 1fr 280px !important;
+  }
+
+  /* Shrink bottom event log */
+  #root > div > div[style*="grid-column: 1 / -1"] {
+    height: 100px !important;
+  }
+}
+
+/* ============================================
+   iPad landscape + small laptops (1024px+)
+   ============================================ */
+@media (min-width: 1024px) and (max-width: 1399px) and (pointer: coarse) {
+  /* Scale down header text sizes for tighter space */
+  #root > div > header,
+  #root > div > div[style*="grid-column: 1 / -1"]:first-child {
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   Tablet portrait fallback (768–1023px)
+   Forces single-column stack so it remains usable
+   ============================================ */
+@media (max-width: 1023px) {
+  #root > div {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 48px auto auto 120px !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  /* Left sidebar: full width, collapsed by default */
+  #root > div > div[style*="grid-column: 1"][style*="grid-row: 2"] {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    border-right: none !important;
+    border-bottom: 1px solid #30363d;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  /* Map area: full width */
+  #root > div > div[style*="grid-column: 2"][style*="grid-row: 2"] {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+    min-height: 50vh;
+  }
+
+  /* Right sidebar: full width below map */
+  #root > div > div[style*="grid-column: 3"][style*="grid-row: 2"] {
+    grid-column: 1 !important;
+    grid-row: 4 !important;
+    border-left: none !important;
+    border-top: 1px solid #30363d;
+    max-height: 300px;
+  }
+
+  /* Event log at bottom */
+  #root > div > div[style*="grid-column: 1 / -1"][style*="height: 120"] {
+    grid-column: 1 !important;
+    grid-row: 5 !important;
+  }
+}
+
+/* ============================================
+   Radial action wheel — tablet touch adjustments
+   ============================================ */
+@media (pointer: coarse) {
+  /* Make the wheel slightly larger on touch devices for better targets */
+  svg[viewBox="0 0 200 200"] {
+    transform: scale(1.15);
+    transform-origin: center center;
+  }
+}
+
+/* ============================================
+   Prevent iOS Safari bounce / overscroll
+   ============================================ */
+@media (pointer: coarse) {
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+}
