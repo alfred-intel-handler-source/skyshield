@@ -3,14 +3,14 @@
   "name": "Swarm Attack",
   "description": "Six contacts inbound from multiple directions. A mix of commercial quads, a fixed-wing, a micro drone, one Shahed-type autonomous drone (jam-immune), and one bird (false alarm). Staggered arrival \u2014 expect the second wave at T+30s and late contacts at T+60s. Prioritize threats, manage effectors, and don't waste resources on the bird.",
   "difficulty": "Hard",
-  "duration_seconds": 180,
+  "duration_seconds": 900,
   "base_radius_km": 0.1,
   "roe_briefing": [
-    "Weapons free against all confirmed hostile UAS — engage at will within WEZ",
+    "Weapons free against all confirmed hostile UAS \u2014 engage at will within WEZ",
     "Do not engage tracks classified as NEUTRAL or CIVILIAN (expect false alarms in high-density environment)",
-    "Prioritize inbound threats by range and speed — nearest threats first",
+    "Prioritize inbound threats by range and speed \u2014 nearest threats first",
     "Kinetic engagement authorized immediately for jam-resistant targets (e.g., autonomous UAS)",
-    "Conserve interceptor munitions — prefer electronic defeat for RF-emitting targets"
+    "Conserve interceptor munitions \u2014 prefer electronic defeat for RF-emitting targets"
   ],
   "engagement_zones": {
     "detection_range_km": 5.0,
@@ -98,8 +98,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-1.5, 1.5],
-        "y_range": [-1.5, 1.5],
+        "x_range": [
+          -1.5,
+          1.5
+        ],
+        "y_range": [
+          -1.5,
+          1.5
+        ],
         "heading_variance": 25,
         "speed_variance": 8
       }
@@ -128,8 +134,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-1.5, 1.5],
-        "y_range": [-1.5, 1.5],
+        "x_range": [
+          -1.5,
+          1.5
+        ],
+        "y_range": [
+          -1.5,
+          1.5
+        ],
         "heading_variance": 25,
         "speed_variance": 8
       }
@@ -157,8 +169,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-2.0, 2.0],
-        "y_range": [-2.0, 2.0],
+        "x_range": [
+          -2.0,
+          2.0
+        ],
+        "y_range": [
+          -2.0,
+          2.0
+        ],
         "heading_variance": 20,
         "speed_variance": 10
       }
@@ -188,8 +206,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-1.0, 1.0],
-        "y_range": [-1.0, 1.0],
+        "x_range": [
+          -1.0,
+          1.0
+        ],
+        "y_range": [
+          -1.0,
+          1.0
+        ],
         "heading_variance": 20,
         "speed_variance": 5
       }
@@ -216,8 +240,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-2.0, 2.0],
-        "y_range": [-2.0, 2.0],
+        "x_range": [
+          -2.0,
+          2.0
+        ],
+        "y_range": [
+          -2.0,
+          2.0
+        ],
         "heading_variance": 15,
         "speed_variance": 10
       }
@@ -257,8 +287,14 @@
       ],
       "should_engage": false,
       "spawn_variance": {
-        "x_range": [-1.0, 1.0],
-        "y_range": [-1.0, 1.0],
+        "x_range": [
+          -1.0,
+          1.0
+        ],
+        "y_range": [
+          -1.0,
+          1.0
+        ],
         "heading_variance": 15,
         "speed_variance": 3
       }

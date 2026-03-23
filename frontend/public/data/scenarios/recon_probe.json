@@ -3,11 +3,11 @@
   "name": "Recon Probe",
   "description": "Three contacts arrive one at a time. The first is a bird \u2014 do NOT engage. The second is a fixed-wing on a reconnaissance pass across your airspace. The third is a commercial quad on direct approach. Test your identification discipline and ROE compliance.",
   "difficulty": "Medium",
-  "duration_seconds": 180,
+  "duration_seconds": 720,
   "base_radius_km": 0.1,
   "roe_briefing": [
-    "Weapons tight — do not engage unless target is positively identified as hostile",
-    "Expect non-hostile air traffic in the area — positive ID is critical",
+    "Weapons tight \u2014 do not engage unless target is positively identified as hostile",
+    "Expect non-hostile air traffic in the area \u2014 positive ID is critical",
     "Do not engage birds or civilian aircraft under any circumstances",
     "Electronic countermeasures authorized only against confirmed hostile UAS",
     "Document all tracks for post-mission intelligence analysis"
@@ -100,8 +100,14 @@
       ],
       "should_engage": false,
       "spawn_variance": {
-        "x_range": [-1.0, 1.0],
-        "y_range": [-1.0, 1.0],
+        "x_range": [
+          -1.0,
+          1.0
+        ],
+        "y_range": [
+          -1.0,
+          1.0
+        ],
         "heading_variance": 15,
         "speed_variance": 3
       }
@@ -147,8 +153,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-1.5, 1.5],
-        "y_range": [-1.5, 1.5],
+        "x_range": [
+          -1.5,
+          1.5
+        ],
+        "y_range": [
+          -1.5,
+          1.5
+        ],
         "heading_variance": 20,
         "speed_variance": 8
       }
@@ -177,8 +189,14 @@
       "roe_violations": [],
       "should_engage": true,
       "spawn_variance": {
-        "x_range": [-1.5, 1.5],
-        "y_range": [-1.5, 1.5],
+        "x_range": [
+          -1.5,
+          1.5
+        ],
+        "y_range": [
+          -1.5,
+          1.5
+        ],
         "heading_variance": 20,
         "speed_variance": 5
       }
