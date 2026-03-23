@@ -204,6 +204,7 @@ export interface ScenarioConfig {
   tutorial: boolean;
   tutorial_prompts: Array<{ trigger: string; message: string }> | null;
   no_ambient: boolean;
+  waves_enabled?: boolean;
 }
 
 export interface PlayerAction {

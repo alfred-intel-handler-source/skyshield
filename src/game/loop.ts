@@ -226,6 +226,7 @@ export function tickSpawns(gs: GameState, elapsed: number): Msg[] {
 
 export function tickWaves(gs: GameState, elapsed: number): Msg[] {
   const events: Msg[] = [];
+  if (gs.scenario.waves_enabled === false) return events;
   const threatDrones = gs.drones.filter(d => !d.is_ambient);
   if (!gs.pending_spawns.length && threatDrones.length && threatDrones.every(d => d.neutralized)) {
     if (gs.wave_all_neutralized_time === null) {
