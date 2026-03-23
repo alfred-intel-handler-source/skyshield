@@ -3,7 +3,7 @@
   "name": "Lone Wolf",
   "description": "A single commercial quadcopter (DJI-class) on direct approach toward the protected asset. Low altitude, single target. Work through the DTID kill chain: detect, track, identify, and defeat the threat.",
   "difficulty": "Easy",
-  "duration_seconds": 120,
+  "duration_seconds": 480,
   "base_radius_km": 0.1,
   "roe_briefing": [
     "Positive identification required before any engagement",
@@ -85,8 +85,14 @@
       "behavior": "direct_approach",
       "rf_emitting": true,
       "spawn_variance": {
-        "x_range": [-1.5, 1.5],
-        "y_range": [-1.5, 1.5],
+        "x_range": [
+          -1.5,
+          1.5
+        ],
+        "y_range": [
+          -1.5,
+          1.5
+        ],
         "heading_variance": 25,
         "speed_variance": 8
       }
