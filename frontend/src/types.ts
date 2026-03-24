@@ -37,6 +37,10 @@ export interface TrackData {
   downlink_detected?: boolean;
   nexus_cm_active?: string | null;
   nexus_cm_state?: string | null;  // "pending", "1/2", "2/2"
+  // ATC coordination
+  atc_status?: "none" | "pending" | "responded";
+  atc_response?: string | null;
+  atc_called_at?: number | null;
 }
 
 export interface SensorStatus {

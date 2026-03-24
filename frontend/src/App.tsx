@@ -197,6 +197,10 @@ export default function App() {
   const [paused, setPaused] = useState(false);
   const [notes, setNotes] = useState<string[]>([]);
 
+  // ATC coordination
+  const [blueonblueCount, setBlueonblueCount] = useState(0);
+  const atcTimersRef = useRef<Record<string, number>>({});
+
   // Audio state
   const [audioMuted, setAudioMuted] = useState(soundEngine.muted);
   const [audioVolume, setAudioVolume] = useState(soundEngine.volume);
@@ -269,7 +273,25 @@ export default function App() {
         break;
 
       case "state":
-        setTracks(msg.tracks);
+        setTracks((prev) => {
+          const prevMap = new Map(prev.map((t) => [t.id, t]));
+          return msg.tracks.map((t) => {
+            const existing = prevMap.get(t.id);
+            if (t.affiliation === "unknown") {
+              return {
+                ...t,
+                atc_status: existing?.atc_status ?? "none",
+                atc_response: existing?.atc_response ?? null,
+                atc_called_at: existing?.atc_called_at ?? null,
+              };
+            }
+            // Preserve ATC fields for tracks that were previously unknown
+            if (existing?.atc_status) {
+              return { ...t, atc_status: existing.atc_status, atc_response: existing.atc_response, atc_called_at: existing.atc_called_at };
+            }
+            return t;
+          });
+        });
         setElapsed(msg.elapsed);
         setTimeRemaining(msg.time_remaining);
         setThreatLevel(msg.threat_level);
@@ -792,6 +814,13 @@ export default function App() {
   };
 
   const engage = (trackId: string, effectorId: string, nexusCm?: string) => {
+    // Blue-on-blue check: firing at unknown track without ATC confirmation
+    const targetTrack = tracks.find((t) => t.id === trackId);
+    if (targetTrack && targetTrack.affiliation === "unknown" && targetTrack.atc_status !== "responded") {
+      const label = targetTrack.display_label || targetTrack.id;
+      setBlueonblueCount((c) => c + 1);
+      setEvents((prev) => [...prev, { timestamp: elapsed, message: `⚠️ BLUE-ON-BLUE: Engaged unknown track ${label} without ATC confirmation!` }]);
+    }
     if (nexusCm) {
       // NEXUS Protocol Manipulation — send specific CM action
       send({
@@ -866,6 +895,38 @@ export default function App() {
   const handleDeleteNote = (index: number) => {
     setNotes((prev) => prev.filter((_, i) => i !== index));
   };
+
+  // ATC coordination
+  const callATC = useCallback((trackId: string) => {
+    setTracks((prev) => {
+      const track = prev.find((t) => t.id === trackId);
+      if (!track || track.atc_status !== "none") return prev;
+      const label = track.display_label || track.id;
+      const hdg = Math.round(track.heading_deg ?? 0);
+      const alt = Math.round(track.altitude_ft ?? 0);
+      setEvents((evts) => [...evts, { timestamp: elapsed, message: `ATC CALL: Track ${label} — bearing ${hdg}°, alt ${alt}ft` }]);
+      // Schedule ATC response after 6-10 seconds
+      const delay = 6000 + Math.random() * 4000;
+      const timer = window.setTimeout(() => {
+        setTracks((cur) => {
+          const t = cur.find((tr) => tr.id === trackId);
+          if (!t) return cur;
+          const tLabel = t.display_label || t.id;
+          const response = t.affiliation === "friendly"
+            ? `Track ${tLabel} — confirmed authorized aircraft. IFF: FRIENDLY.`
+            : `Track ${tLabel} — not in our system. Cannot confirm.`;
+          setEvents((evts) => [...evts, { timestamp: elapsed, message: `ATC RESPONSE: ${response}` }]);
+          return cur.map((tr) => tr.id === trackId ? { ...tr, atc_status: "responded" as const, atc_response: response } : tr);
+        });
+      }, delay);
+      atcTimersRef.current[trackId] = timer;
+      return prev.map((t) => t.id === trackId ? { ...t, atc_status: "pending" as const, atc_called_at: elapsed } : t);
+    });
+  }, [elapsed]);
+
+  const tagFriendly = useCallback((trackId: string) => {
+    setTracks((prev) => prev.map((t) => t.id === trackId ? { ...t, affiliation: "friendly" } : t));
+  }, []);
 
   const handleExportNotes = () => {
     const text = notes.join("\n");
@@ -1614,6 +1675,8 @@ export default function App() {
         events={events}
         hookedTracks={tracks.filter((t) => hookedTrackIds.has(t.id))}
         onUnhook={(id) => setHookedTrackIds((prev) => { const next = new Set(prev); next.delete(id); return next; })}
+        onCallATC={callATC}
+        onTagFriendly={tagFriendly}
       />
 
       {/* Keyboard shortcuts hint */}
