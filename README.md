@@ -8,7 +8,7 @@
 
 > No install. No account. Just open the link and train.
 
-**Version:** v1.2.0 | **Status:** Active development
+**Version:** v1.3.0 | **Status:** Active development
 
 ---
 
@@ -86,9 +86,12 @@ All systems are fictional but specification-accurate — no real program of reco
 - **Track type display** — classification and affiliation shown post-identification
 - **Camera orientation** — aircraft rotate in the camera view based on viewing angle
 - **Spawn randomization** — threat positions, headings, and speeds vary each run
-- **Radial action wheel** — WOD-style engagement controls
+- **Radial action wheel** — tap/click engagement controls (touch and desktop)
+- **ATC coordination mechanic** — unknown tracks require ATC call before engagement; blue-on-blue penalty enforced
+- **Radio comms panel** — floating Chat Surfer-style panel shows ATC exchanges with typewriter effect in real time
 - **Event log** — full engagement history, color-coded by severity
 - **Debrief screen** — per-category scoring breakdown with letter grade
+- **Tablet/iPad optimized** — responsive layout for landscape iPad; touch-friendly controls
 
 ---
 
@@ -114,6 +117,7 @@ frontend/src/
   hooks/
     useGameEngine.ts ← 10Hz game loop (browser-native, no WebSocket needed)
   components/       ← All UI components
+    ATCCommsPanel.tsx ← Floating radio comms chat panel
 
 frontend/public/data/
   scenarios/        ← JSON scenario definitions
@@ -140,9 +144,12 @@ No Python backend required. The game engine runs entirely client-side via `useGa
 
 ## Roadmap
 
-### Open Issues (v1.3+)
-- [ ] **#10** — ATC coordination mechanic for unidentified tracks
-- [ ] **#22** — Tablet-responsive layout (iPad landscape)
+### Recently Completed (v1.3.0)
+- [x] **#22** — Tablet-responsive layout (iPad landscape) — touch-friendly radial wheel, hidden keyboard hints on touch devices
+- [x] **#10** — ATC coordination mechanic — unknown track identification, radio comms panel, blue-on-blue penalty
+
+### In Progress
+- [ ] **#31** — C-UAS training library / study module
 
 ### Future
 - After-action replay (timeline scrub on debrief)
