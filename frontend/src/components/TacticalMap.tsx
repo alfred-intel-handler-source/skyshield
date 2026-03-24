@@ -992,6 +992,8 @@ export default function TacticalMap({
       const sy = e.originalEvent.clientY;
       if (!checkDisambiguation(sx, sy, false)) {
         onSelectTrack(null);
+        setWheelState(null);
+        setDeviceWheelState(null);
       }
     },
     [checkDisambiguation, onSelectTrack],
@@ -1348,7 +1350,7 @@ export default function TacticalMap({
           interactive={false}
         />
 
-        {/* Sensor device markers (right-clickable) */}
+        {/* Sensor device markers (clickable) */}
         {sensorConfigs.map((sensor) => {
           if (sensor.x == null && sensor.x !== 0) return null;
           const sPos = gameXYToLatLng(sensor.x ?? 0, sensor.y ?? 0, baseLat, baseLng);
@@ -1358,9 +1360,8 @@ export default function TacticalMap({
               position={sPos}
               icon={createSensorIcon(sensor.name || sensor.id)}
               eventHandlers={{
-                contextmenu: (e) => {
+                click: (e) => {
                   L.DomEvent.stopPropagation(e.originalEvent);
-                  e.originalEvent.preventDefault();
                   setWheelState(null);
                   setDeviceWheelState({
                     deviceId: sensor.id,
@@ -1374,7 +1375,7 @@ export default function TacticalMap({
           );
         })}
 
-        {/* Effector device markers (right-clickable) */}
+        {/* Effector device markers (clickable) */}
         {effectors.map((eff) => {
           if (eff.x == null && eff.x !== 0) return null;
           const ePos = gameXYToLatLng(eff.x ?? 0, eff.y ?? 0, baseLat, baseLng);
@@ -1384,9 +1385,8 @@ export default function TacticalMap({
               position={ePos}
               icon={createEffectorIcon(eff.name || eff.id, eff.jammer_active)}
               eventHandlers={{
-                contextmenu: (e) => {
+                click: (e) => {
                   L.DomEvent.stopPropagation(e.originalEvent);
-                  e.originalEvent.preventDefault();
                   setWheelState(null);
                   setDeviceWheelState({
                     deviceId: eff.id,
@@ -1661,11 +1661,6 @@ export default function TacticalMap({
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stopPropagation(e.originalEvent);
-                    onSelectTrack(track.id);
-                  },
-                  contextmenu: (e) => {
-                    L.DomEvent.stopPropagation(e.originalEvent);
-                    e.originalEvent.preventDefault();
                     onSelectTrack(track.id);
                     setWheelState({
                       trackId: track.id,

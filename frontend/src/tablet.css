@@ -97,6 +97,48 @@
 }
 
 /* ============================================
+   Header bar — prevent clipping on tablet
+   ============================================ */
+@media (max-width: 1180px) {
+  /* Allow header items to shrink and wrap */
+  #root > div > div:first-child {
+    padding: 0 8px !important;
+    gap: 8px !important;
+  }
+
+  #root > div > div:first-child span,
+  #root > div > div:first-child button {
+    font-size: 9px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  #root > div > div:first-child button {
+    padding: 3px 8px !important;
+    white-space: nowrap;
+  }
+
+  /* Shrink the clock */
+  #root > div > div:first-child span[style*="fontSize: 22"] {
+    font-size: 16px !important;
+  }
+
+  /* Reduce min-widths so items can shrink */
+  #root > div > div:first-child > div {
+    min-width: 0 !important;
+    flex-shrink: 1;
+  }
+}
+
+/* ============================================
+   Hide keyboard shortcut hints on touch devices
+   ============================================ */
+@media (pointer: coarse) {
+  .kb-hints {
+    display: none !important;
+  }
+}
+
+/* ============================================
    Radial action wheel — tablet touch adjustments
    ============================================ */
 @media (pointer: coarse) {
@@ -115,4 +157,10 @@
     overscroll-behavior: none;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* Hook panel — hide mouse-specific hints on touch devices */
+@media (pointer: coarse) {
+  .hook-hint-mouse { display: none !important; }
+  .hook-hint-touch { display: inline !important; }
 }
