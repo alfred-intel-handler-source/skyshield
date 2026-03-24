@@ -1565,6 +1565,7 @@ export default function App() {
       {/* Keyboard shortcuts hint */}
       {phase === "running" && (
         <div
+          className="kb-hints"
           style={{
             position: "fixed",
             bottom: 6,
