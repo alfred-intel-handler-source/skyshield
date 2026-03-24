@@ -18,6 +18,8 @@ import FeedbackModal from "./components/FeedbackModal";
 import TutorialFeedback from "./components/TutorialFeedback";
 import PauseOverlay from "./components/PauseOverlay";
 import ROEBriefing from "./components/ROEBriefing";
+import ATCCommsPanel from "./components/ATCCommsPanel";
+import type { ATCCommsMessage } from "./components/ATCCommsPanel";
 import { useGameEngine as useWebSocket } from "./hooks/useGameEngine";
 import { soundEngine } from "./audio/SoundEngine";
 import type {
@@ -200,6 +202,9 @@ export default function App() {
   // ATC coordination
   const [blueonblueCount, setBlueonblueCount] = useState(0);
   const atcTimersRef = useRef<Record<string, number>>({});
+  const [atcCommsMessages, setAtcCommsMessages] = useState<ATCCommsMessage[]>([]);
+  const [atcPanelVisible, setAtcPanelVisible] = useState(false);
+  const atcAutoHideRef = useRef<number>(0);
 
   // Audio state
   const [audioMuted, setAudioMuted] = useState(soundEngine.muted);
@@ -904,7 +909,12 @@ export default function App() {
       const label = track.display_label || track.id;
       const hdg = Math.round(track.heading_deg ?? 0);
       const alt = Math.round(track.altitude_ft ?? 0);
+      const outbound = `ATC, ${label} — bearing ${hdg}°, alt ${alt}ft, request ident`;
       setEvents((evts) => [...evts, { timestamp: elapsed, message: `ATC CALL: Track ${label} — bearing ${hdg}°, alt ${alt}ft` }]);
+      // Push outbound comms message and show panel
+      setAtcCommsMessages((msgs) => [...msgs, { id: trackId, label, outbound, timestamp: elapsed }]);
+      setAtcPanelVisible(true);
+      window.clearTimeout(atcAutoHideRef.current);
       // Schedule ATC response after 6-10 seconds
       const delay = 6000 + Math.random() * 4000;
       const timer = window.setTimeout(() => {
@@ -916,6 +926,18 @@ export default function App() {
             ? `Track ${tLabel} — confirmed authorized aircraft. IFF: FRIENDLY.`
             : `Track ${tLabel} — not in our system. Cannot confirm.`;
           setEvents((evts) => [...evts, { timestamp: elapsed, message: `ATC RESPONSE: ${response}` }]);
+          // Update comms panel with inbound response
+          setAtcCommsMessages((msgs) =>
+            msgs.map((m) => m.id === trackId && !m.inbound ? { ...m, inbound: response } : m)
+          );
+          // Auto-hide panel after 10s if no pending calls remain
+          setAtcCommsMessages((msgs) => {
+            const hasPending = msgs.some((m) => m.id !== trackId && !m.inbound);
+            if (!hasPending) {
+              atcAutoHideRef.current = window.setTimeout(() => setAtcPanelVisible(false), 10000);
+            }
+            return msgs;
+          });
           return cur.map((tr) => tr.id === trackId ? { ...tr, atc_status: "responded" as const, atc_response: response } : tr);
         });
       }, delay);
@@ -1669,6 +1691,13 @@ export default function App() {
           sensorConfigs={sensorConfigs}
         />
       </div>
+
+      {/* ATC Comms Panel */}
+      <ATCCommsPanel
+        messages={atcCommsMessages}
+        visible={atcPanelVisible}
+        onDismiss={() => setAtcPanelVisible(false)}
+      />
 
       {/* Bottom: Event Log */}
       <EventLog
