@@ -184,6 +184,18 @@ function WheelSegments({
               e.stopPropagation();
               if (!action.disabled) onSelect(action.id);
             }}
+            onTouchStart={(e) => {
+              if (!action.disabled) {
+                onHover(action.id);
+                onPress(action.id);
+              }
+            }}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onHover(null);
+              onPress(null);
+              if (!action.disabled) onSelect(action.id);
+            }}
           >
             {/* Slice background */}
             <path
@@ -479,6 +491,7 @@ export default function RadialActionWheel({
         inset: 0,
         zIndex: 2000,
         cursor: "default",
+        touchAction: "none",
       }}
     >
       <div
@@ -583,6 +596,11 @@ export default function RadialActionWheel({
               <g
                 style={{ cursor: "pointer" }}
                 onClick={(e) => {
+                  e.stopPropagation();
+                  setSubMenu("none");
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   setSubMenu("none");
                 }}

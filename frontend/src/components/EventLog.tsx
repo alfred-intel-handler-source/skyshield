@@ -145,14 +145,15 @@ export default function EventLog({ events, hookedTracks = [], onUnhook }: Props)
           {hookedTracks.length > 0 && (
             <span style={{ marginLeft: 6, fontSize: 8, color: "#484f58", fontFamily: "'JetBrains Mono', monospace" }}>{hookedTracks.length} hooked</span>
           )}
-          <span style={{ marginLeft: 8, fontSize: 8, color: "#30363d", fontFamily: "'JetBrains Mono', monospace" }}>click track to hook</span>
+          <span className="hook-hint-mouse" style={{ marginLeft: 8, fontSize: 8, color: "#30363d", fontFamily: "'JetBrains Mono', monospace" }}>click track to hook</span>
         </div>
 
         {/* Cards row */}
         <div ref={cardsScrollRef} style={{ flex: 1, display: "flex", flexDirection: "row", overflowX: "auto", overflowY: "hidden" }}>
           {hookedTracks.length === 0 ? (
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ color: "#30363d", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>NO TRACKS HOOKED — click a bogey on the map</span>
+              <span className="hook-hint-mouse" style={{ color: "#30363d", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>NO TRACKS HOOKED — click a bogey on the map</span>
+              <span className="hook-hint-touch" style={{ color: "#30363d", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", display: "none" }}>NO TRACKS HOOKED — tap a bogey on the map</span>
             </div>
           ) : (
             hookedTracks.map((t) => (

@@ -1402,6 +1402,9 @@ export default function App() {
         gridTemplateRows: "48px 1fr 120px",
         gridTemplateColumns: "220px 1fr 360px",
         background: "#0d1117",
+        touchAction: "manipulation",
+        WebkitUserSelect: "none",
+        userSelect: "none",
       }}
     >
       {/* Header */}
@@ -1616,6 +1619,7 @@ export default function App() {
       {/* Keyboard shortcuts hint */}
       {phase === "running" && (
         <div
+          className="kb-hints"
           style={{
             position: "fixed",
             bottom: 6,
