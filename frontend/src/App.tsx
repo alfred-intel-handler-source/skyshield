@@ -282,6 +282,8 @@ export default function App() {
           const prevMap = new Map(prev.map((t) => [t.id, t]));
           return msg.tracks.map((t) => {
             const existing = prevMap.get(t.id);
+            const needsAtc = t.affiliation === "unknown" || (existing?.atc_status && existing.atc_status !== "none");
+            if (!needsAtc) return t; // reuse same object reference — no re-render
             if (t.affiliation === "unknown") {
               return {
                 ...t,
@@ -291,10 +293,7 @@ export default function App() {
               };
             }
             // Preserve ATC fields for tracks that were previously unknown
-            if (existing?.atc_status) {
-              return { ...t, atc_status: existing.atc_status, atc_response: existing.atc_response, atc_called_at: existing.atc_called_at };
-            }
-            return t;
+            return { ...t, atc_status: existing!.atc_status, atc_response: existing!.atc_response, atc_called_at: existing!.atc_called_at };
           });
         });
         setElapsed(msg.elapsed);
