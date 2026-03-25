@@ -53,7 +53,7 @@ const VALID_BASE_IDS = new Set(['small_fob', 'medium_airbase', 'large_installati
 const VALID_ACTION_NAMES = new Set([
   'confirm_track', 'identify', 'engage', 'hold_fire',
   'release_hold_fire', 'end_mission', 'slew_camera',
-  'nexus_hold', 'nexus_land_now', 'nexus_deafen',
+  'shenobi_hold', 'shenobi_land_now', 'shenobi_deafen',
   'jammer_toggle', 'jam_all', 'cease_jam', 'clear_airspace',
   'pause_mission', 'resume_mission',
 ]);
@@ -396,9 +396,9 @@ async function handleGameSession(ws: WebSocket): Promise<void> {
             sendMsgs(ws, handleReleaseHoldFire(gs, targetId, elapsed));
           } else if (actionName === 'engage') {
             const effId = msg.effector ?? '';
-            sendMsgs(ws, handleEngage(gs, targetId, effId, elapsed, msg.nexus_cm));
+            sendMsgs(ws, handleEngage(gs, targetId, effId, elapsed, msg.shenobi_cm));
             sendMsgs(ws, advanceTutorialStep(gs, 'engage', targetId, effId));
-          } else if (['nexus_hold', 'nexus_land_now', 'nexus_deafen'].includes(actionName)) {
+          } else if (['shenobi_hold', 'shenobi_land_now', 'shenobi_deafen'].includes(actionName)) {
             sendMsgs(ws, handleEngage(gs, targetId, msg.effector ?? '', elapsed, actionName));
           } else if (actionName === 'jammer_toggle') {
             sendMsgs(ws, handleJammerToggle(gs, msg.effector_id ?? '', elapsed));

@@ -105,7 +105,7 @@
 - Engagement via WOD or menu system
 - System prioritizes effectors for operator
 
-## NEXUS UI Patterns
+## Shenobi UI Patterns
 - SDR Platform Manager interface
 - Dashboard-based UI
 - Emulator system available for training

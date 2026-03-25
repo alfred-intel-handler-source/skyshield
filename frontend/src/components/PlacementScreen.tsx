@@ -81,7 +81,7 @@ const RANGE_RING_STYLES: Record<string, { color: string; dashArray?: string }> =
   eoir_camera:   { color: "#3fb950", dashArray: "2,4" },       // green, dotted
   rf_jammer:     { color: "#e3b341", dashArray: "8,4" },       // yellow, dashed
   jackal_pallet: { color: "#f85149", dashArray: "8,4" },       // red, dashed
-  nexus:       { color: "#a371f7", dashArray: "6,4" },       // purple, dashed (combined)
+  shenobi:       { color: "#a371f7", dashArray: "6,4" },       // purple, dashed (combined)
 };
 
 function getRingStyle(catalogId: string, isSensor: boolean): { color: string; dashArray?: string } {

@@ -73,10 +73,10 @@ export function createDroneFromConfig(config: DroneStartConfig): DroneState {
     frequency_band: null,
     uplink_detected: false,
     downlink_detected: false,
-    nexus_cm_active: null,
-    nexus_cm_state: null,
-    nexus_cm_time_remaining: 0,
-    nexus_cm_initial_duration: 0,
+    shenobi_cm_active: null,
+    shenobi_cm_state: null,
+    shenobi_cm_time_remaining: 0,
+    shenobi_cm_initial_duration: 0,
     display_label: '',
   };
 }

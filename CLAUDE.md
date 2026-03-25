@@ -40,7 +40,7 @@ src/game/                   ← TypeScript game engine (ported from Python)
   helpers.ts                ← Constants, effectiveness matrix, sensor/effector builders
   drone.ts                  ← 4 movement behaviors (direct, orbit, waypoint, evasive)
   jamming.ts                ← RF + PNT jamming, resistance tables, drift tick
-  nexus.ts                ← NEXUS CM state machine (pending→1/2→2/2)
+  shenobi.ts                ← Shenobi CM state machine (pending→1/2→2/2)
   jackal.ts                 ← JACKAL lifecycle (spinup→launch→midcourse→terminal)
   detection.ts              ← Multi-sensor detection with FOV, LOS, noise
   waves.ts                  ← Wave generation + ambient traffic spawning
@@ -68,7 +68,7 @@ backend/                    ← Python/FastAPI reference implementation (DO NOT 
 | EO/IR Camera | `eoir_camera` | Sensor | 8km | 15° FOV, thermal + daylight |
 | RF/PNT Jammer | `rf_jammer` | Effector | 5km | Passive area suppression, rechargeable |
 | JACKAL Pallet | `jackal_pallet` | Effector | 10km | 4 interceptors, requires Ku-Band FCS |
-| NEXUS | `nexus` | Combined | 8km/6km | RF detect + protocol manipulation |
+| Shenobi | `shenobi` | Combined | 8km/6km | RF detect + protocol manipulation |
 
 ---
 
@@ -95,10 +95,10 @@ DroneState fields added for PNT: `pnt_jammed`, `pnt_drift_magnitude`, `pnt_jamme
 
 | Scenario | Sensors | Effectors | Note |
 |----------|---------|-----------|------|
-| Tutorial | L-Band + EO/IR | RF Jammer + NEXUS | Learn basics, no JACKAL |
-| Lone Wolf | L-Band + Ku-Band + EO/IR | RF Jammer + 2× JACKAL + NEXUS | Standard loadout |
-| Swarm Attack | L-Band + Ku-Band + 2× EO/IR | 2× RF Jammer + 2× JACKAL + 2× NEXUS | High volume |
-| Recon Probe | L-Band + Ku-Band + 2× EO/IR | RF Jammer + 1× JACKAL + NEXUS | ROE discipline |
+| Tutorial | L-Band + EO/IR | RF Jammer + Shenobi | Learn basics, no JACKAL |
+| Lone Wolf | L-Band + Ku-Band + EO/IR | RF Jammer + 2× JACKAL + Shenobi | Standard loadout |
+| Swarm Attack | L-Band + Ku-Band + 2× EO/IR | 2× RF Jammer + 2× JACKAL + 2× Shenobi | High volume |
+| Recon Probe | L-Band + Ku-Band + 2× EO/IR | RF Jammer + 1× JACKAL + Shenobi | ROE discipline |
 
 ---
 
@@ -121,7 +121,7 @@ This resolves to `/` in local dev and `/skyshield/` on GitHub Pages. **Never use
 ---
 
 ## Valid Action Names
-`confirm_track`, `identify`, `engage`, `hold_fire`, `release_hold_fire`, `end_mission`, `slew_camera`, `nexus_hold`, `nexus_land_now`, `nexus_deafen`, `jammer_toggle`, `jam_all`, `cease_jam`, `clear_airspace`, `pause_mission`, `resume_mission`
+`confirm_track`, `identify`, `engage`, `hold_fire`, `release_hold_fire`, `end_mission`, `slew_camera`, `shenobi_hold`, `shenobi_land_now`, `shenobi_deafen`, `jammer_toggle`, `jam_all`, `cease_jam`, `clear_airspace`, `pause_mission`, `resume_mission`
 
 ---
 
@@ -130,7 +130,7 @@ This resolves to `/` in local dev and `/skyshield/` on GitHub Pages. **Never use
 - Renamed 2026-03-20: **OpenSentry**
 - GitHub repo stays `skyshield` (URL can't change without breaking Pages link)
 - Internal catalog ID `kurz_fcs` → `kufcs` (no trademark exposure)
-- `nexus.py` → `nexus.py`, `coyote.py` → `jackal.py` (early prototype names, fully scrubbed)
+- `shenobi.py` → `shenobi.py`, `coyote.py` → `jackal.py` (early prototype names, fully scrubbed)
 
 ---
 
@@ -161,7 +161,7 @@ pkill -f vite && cd frontend && npm run dev
 
 ## Known Issues / Open TODO
 - Intermittent stuck bogey in Lone Wolf — root cause unconfirmed
-- NEXUS `uplink_detected` — CM state 1/2 → 2/2 transition depends on detection loop correctly setting this field; verify in TypeScript port
+- Shenobi `uplink_detected` — CM state 1/2 → 2/2 transition depends on detection loop correctly setting this field; verify in TypeScript port
 - `_evasive_state` dict in drone.py is module-level (shared across connections) — blocks multiplayer, fine for single-player
 - Phase 2 features (terrain LOS, planning score, after-action replay) — deferred
 

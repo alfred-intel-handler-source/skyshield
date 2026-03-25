@@ -31,12 +31,12 @@ export interface TrackData {
   is_interceptor?: boolean;
   interceptor_target?: string | null;
   intercept_phase?: string | null;
-  // NEXUS RF track properties
+  // Shenobi RF track properties
   frequency_band?: string | null;
   uplink_detected?: boolean;
   downlink_detected?: boolean;
-  nexus_cm_active?: string | null;
-  nexus_cm_state?: string | null;  // "pending", "1/2", "2/2"
+  shenobi_cm_active?: string | null;
+  shenobi_cm_state?: string | null;  // "pending", "1/2", "2/2"
   // ATC coordination fields
   iff_status?: "confirmed" | "unknown";
   atc_called?: boolean;
@@ -172,8 +172,8 @@ export interface EngagementResultMsg {
   jammed?: boolean;
   jammed_behavior?: string;
   pnt_jammed?: boolean;
-  nexus_cm?: string;
-  nexus_cm_state?: string;
+  shenobi_cm?: string;
+  shenobi_cm_state?: string;
 }
 
 export interface DebriefMsg {
