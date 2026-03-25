@@ -6,7 +6,7 @@ interface Props {
   effectors: EffectorStatus[];
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
-  onEngage: (trackId: string, effectorId: string, shinobiCm?: string) => void;
+  onEngage: (trackId: string, effectorId: string, nexusCm?: string) => void;
   onSlewCamera?: (trackId: string) => void;
   tutorialStep?: number;
 }
@@ -32,13 +32,13 @@ const EFFECTOR_COLORS: Record<string, string> = {
   net_interceptor: "#3fb950",
   de_weapon: "#bc8cff",
   directed_energy: "#bc8cff",
-  shinobi_pm: "#a371f7",
+  nexus_pm: "#a371f7",
 };
 
-const SHINOBI_CM_OPTIONS = [
-  { id: "shinobi_hold", label: "HOLD", desc: "Freeze in place", color: "#a371f7" },
-  { id: "shinobi_land_now", label: "LAND NOW", desc: "Forced descent", color: "#f0883e" },
-  { id: "shinobi_deafen", label: "DEAFEN", desc: "Sever control link", color: "#f85149" },
+const NEXUS_CM_OPTIONS = [
+  { id: "nexus_hold", label: "HOLD", desc: "Freeze in place", color: "#a371f7" },
+  { id: "nexus_land_now", label: "LAND NOW", desc: "Forced descent", color: "#f0883e" },
+  { id: "nexus_deafen", label: "DEAFEN", desc: "Sever control link", color: "#f85149" },
 ];
 
 const CM_STATE_LABELS: Record<string, { label: string; color: string }> = {
@@ -57,7 +57,7 @@ export default function EngagementPanel({
   onSlewCamera,
   tutorialStep,
 }: Props) {
-  const [shinobiSubMenu, setShinobiSubMenu] = useState<string | null>(null);
+  const [nexusSubMenu, setNexusSubMenu] = useState<string | null>(null);
 
   if (!track) {
     return (
@@ -260,10 +260,10 @@ export default function EngagementPanel({
             </button>
           )}
 
-          {/* SHINOBI CM submenu — selecting countermeasure type */}
-          {shinobiSubMenu && (() => {
-            const shinobiEff = effectors.find((e) => e.id === shinobiSubMenu);
-            const shinobiName = shinobiEff?.name || "SHINOBI";
+          {/* NEXUS CM submenu — selecting countermeasure type */}
+          {nexusSubMenu && (() => {
+            const nexusEff = effectors.find((e) => e.id === nexusSubMenu);
+            const nexusName = nexusEff?.name || "NEXUS";
             return (
               <div>
                 <div style={{
@@ -271,10 +271,10 @@ export default function EngagementPanel({
                   marginBottom: 8,
                 }}>
                   <div style={{ fontSize: 11, color: "#a371f7", fontWeight: 600, letterSpacing: 0.5 }}>
-                    {shinobiName} — SELECT CM
+                    {nexusName} — SELECT CM
                   </div>
                   <button
-                    onClick={() => setShinobiSubMenu(null)}
+                    onClick={() => setNexusSubMenu(null)}
                     style={{
                       background: "none", border: "1px solid #30363d", borderRadius: 4,
                       color: "#8b949e", fontSize: 9, padding: "2px 8px", cursor: "pointer",
@@ -285,12 +285,12 @@ export default function EngagementPanel({
                   </button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                  {SHINOBI_CM_OPTIONS.map((cm) => (
+                  {NEXUS_CM_OPTIONS.map((cm) => (
                     <button
                       key={cm.id}
                       onClick={() => {
-                        onEngage(track.id, shinobiSubMenu, cm.id);
-                        setShinobiSubMenu(null);
+                        onEngage(track.id, nexusSubMenu, cm.id);
+                        setNexusSubMenu(null);
                       }}
                       style={{
                         width: "100%",
@@ -328,15 +328,15 @@ export default function EngagementPanel({
             );
           })()}
 
-          {/* Main effector list (hidden when SHINOBI submenu is open) */}
-          {!shinobiSubMenu && (
+          {/* Main effector list (hidden when NEXUS submenu is open) */}
+          {!nexusSubMenu && (
             <>
               <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
                 Select effector to engage
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {effectors.map((eff) => {
-                  const isShinobi = eff.type === "shinobi_pm";
+                  const isNexus = eff.type === "nexus_pm";
                   const color =
                     EFFECTOR_COLORS[eff.type || ""] ||
                     EFFECTOR_COLORS[eff.id] ||
@@ -351,8 +351,8 @@ export default function EngagementPanel({
                       key={eff.id}
                       onClick={() => {
                         if (!isReady) return;
-                        if (isShinobi) {
-                          setShinobiSubMenu(eff.id);
+                        if (isNexus) {
+                          setNexusSubMenu(eff.id);
                         } else {
                           onEngage(track.id, eff.id);
                         }
@@ -388,7 +388,7 @@ export default function EngagementPanel({
                     >
                       <span>
                         {name}
-                        {isShinobi && isReady && (
+                        {isNexus && isReady && (
                           <span style={{ fontSize: 9, marginLeft: 6, opacity: 0.7 }}>▸ CM</span>
                         )}
                       </span>
@@ -421,10 +421,10 @@ export default function EngagementPanel({
             padding: "16px 0",
           }}
         >
-          {/* SHINOBI Protocol Manipulation active */}
-          {track.shinobi_cm_active && !track.neutralized ? (() => {
-            const cmLabel = track.shinobi_cm_active.replace("shinobi_", "").replace("_", " ").toUpperCase();
-            const stateInfo = CM_STATE_LABELS[track.shinobi_cm_state || "pending"] || CM_STATE_LABELS.pending;
+          {/* NEXUS Protocol Manipulation active */}
+          {track.nexus_cm_active && !track.neutralized ? (() => {
+            const cmLabel = track.nexus_cm_active.replace("nexus_", "").replace("_", " ").toUpperCase();
+            const stateInfo = CM_STATE_LABELS[track.nexus_cm_state || "pending"] || CM_STATE_LABELS.pending;
             return (
               <>
                 <div
@@ -437,7 +437,7 @@ export default function EngagementPanel({
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
-                  SHINOBI PROTOCOL MANIPULATION
+                  NEXUS PROTOCOL MANIPULATION
                 </div>
                 <div
                   style={{
@@ -461,8 +461,8 @@ export default function EngagementPanel({
                     overflow: "hidden",
                   }}>
                     <div style={{
-                      width: track.shinobi_cm_state === "2/2" ? "100%"
-                        : track.shinobi_cm_state === "1/2" ? "50%" : "15%",
+                      width: track.nexus_cm_state === "2/2" ? "100%"
+                        : track.nexus_cm_state === "1/2" ? "50%" : "15%",
                       height: "100%",
                       background: stateInfo.color,
                       borderRadius: 2,
@@ -472,7 +472,7 @@ export default function EngagementPanel({
                   <span style={{
                     fontSize: 10, fontWeight: 700, color: stateInfo.color,
                     fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5,
-                    animation: track.shinobi_cm_state !== "2/2" ? "track-blink 1.5s ease-in-out infinite" : undefined,
+                    animation: track.nexus_cm_state !== "2/2" ? "track-blink 1.5s ease-in-out infinite" : undefined,
                   }}>
                     {stateInfo.label}
                   </span>
@@ -492,9 +492,9 @@ export default function EngagementPanel({
                 )}
 
                 <div style={{ fontSize: 10, color: "#8b949e", marginTop: 4 }}>
-                  {track.shinobi_cm_state === "2/2"
+                  {track.nexus_cm_state === "2/2"
                     ? "Full protocol control established"
-                    : track.shinobi_cm_state === "1/2"
+                    : track.nexus_cm_state === "1/2"
                       ? "Partial effect — acquiring uplink..."
                       : "Initiating protocol manipulation..."}
                 </div>

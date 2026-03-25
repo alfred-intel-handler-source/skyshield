@@ -86,10 +86,10 @@ function getRingStyleByName(name?: string, type?: string): { color: string; dash
   if (n.includes("tpq")) return { color: "#58a6ff", dashArray: "8,4" };
   if (n.includes("kufcs")) return { color: "#d29922" };
   if (n.includes("eoir") || n.includes("eo/ir") || type === "eoir") return { color: "#3fb950", dashArray: "2,4" };
-  if (n.includes("shinobi") || type === "shinobi_pm") return { color: "#a371f7", dashArray: "4,4" };  // Purple for SHINOBI
+  if (n.includes("nexus") || type === "nexus_pm") return { color: "#a371f7", dashArray: "4,4" };  // Purple for NEXUS
   if (n.includes("jammer") || type === "electronic") return { color: "#e3b341", dashArray: "8,4" };
   if (n.includes("jackal") || type === "kinetic") return { color: "#f85149", dashArray: "8,4" };
-  if (type === "rf" && n.includes("shinobi")) return { color: "#a371f7", dashArray: "4,4" };
+  if (type === "rf" && n.includes("nexus")) return { color: "#a371f7", dashArray: "4,4" };
   if (type === "radar") return { color: "#58a6ff", dashArray: "6,4" };
   return { color: "#8b949e", dashArray: "6,4" };
 }
@@ -142,7 +142,7 @@ function createTrackIcon(
     const stroke = color;
     const sw = isSelected ? 2.5 : 1.5;
 
-    // Velocity indicator line (FAAD C2 style)
+    // Velocity indicator line (GUARDIAN C2 style)
     let velocityLine = "";
     if (speedKts != null && headingDeg != null && speedKts > 0) {
       const speedMs = speedKts * 0.5144; // knots to m/s
@@ -752,9 +752,9 @@ function TrackDataBlock({
       ? `<span style="color:#d29922;font-size:7px;font-weight:700;margin-left:4px;">SPINUP T-${Math.ceil(track.spinup_remaining ?? 0)}s</span>`
       : `<span style="color:#3fb950;font-size:7px;font-weight:700;margin-left:4px;">${track.intercept_phase.toUpperCase()}</span>`
     : "";
-  const isShinobiCM = !!track.shinobi_cm_active && !track.neutralized;
-  const shinobiLabel = isShinobiCM
-    ? `<span style="color:#a371f7;font-size:7px;font-weight:700;margin-left:4px;animation:track-blink 1s ease-in-out infinite;">${track.shinobi_cm_state || "PM"}</span>`
+  const isNexusCM = !!track.nexus_cm_active && !track.neutralized;
+  const nexusLabel = isNexusCM
+    ? `<span style="color:#a371f7;font-size:7px;font-weight:700;margin-left:4px;animation:track-blink 1s ease-in-out infinite;">${track.nexus_cm_state || "PM"}</span>`
     : "";
   const freqLabel = track.frequency_band && !track.neutralized
     ? `<span style="color:#a371f7;font-size:7px;opacity:0.7;margin-left:3px;">${track.frequency_band}</span>`
@@ -803,7 +803,7 @@ function TrackDataBlock({
       background:${isSelected ? color : "#30363d"};
     "></div>
     <div style="color:${color};font-size:${isSelected ? "11px" : "10px"};font-weight:700;letter-spacing:0.5px;">
-      ${(track.display_label || track.id).toUpperCase()} <span style="color:${phaseColor};font-size:8px;font-weight:600;opacity:0.9;">${phaseChar}</span>${freqLabel}${coastLabel}${hfLabel}${jamLabel}${shinobiLabel}${interceptPhaseLabel}
+      ${(track.display_label || track.id).toUpperCase()} <span style="color:${phaseColor};font-size:8px;font-weight:600;opacity:0.9;">${phaseChar}</span>${freqLabel}${coastLabel}${hfLabel}${jamLabel}${nexusLabel}${interceptPhaseLabel}
     </div>
     ${!track.neutralized ? `
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
@@ -812,8 +812,8 @@ function TrackDataBlock({
     <div style="color:#8b949e;font-size:8px;opacity:${isSelected ? 0.9 : 0.65};">
       BRG:${Math.round(bearing)}\u00B0 | RNG:${range.toFixed(1)}km
     </div>
-    ${etaLabel}` : isShinobiCM ? `
-    <div style="color:#a371f7;font-size:8px;font-weight:600;">SHINOBI ${(track.shinobi_cm_active || "").replace("shinobi_", "").replace("_", " ").toUpperCase()} [${track.shinobi_cm_state || "?"}]</div>` : isJammed ? `
+    ${etaLabel}` : isNexusCM ? `
+    <div style="color:#a371f7;font-size:8px;font-weight:600;">NEXUS ${(track.nexus_cm_active || "").replace("nexus_", "").replace("_", " ").toUpperCase()} [${track.nexus_cm_state || "?"}]</div>` : isJammed ? `
     <div style="color:#58a6ff;font-size:8px;font-weight:600;">EW EFFECT ACTIVE</div>` : `
     <div style="color:#484f58;font-size:8px;">NEUTRALIZED</div>`}
   </div>`;

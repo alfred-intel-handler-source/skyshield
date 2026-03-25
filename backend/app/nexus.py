@@ -1,5 +1,5 @@
-"""SHINOBI Protocol Manipulation — countermeasure logic and
-drone behavior updates for SHINOBI defeats.
+"""NEXUS Protocol Manipulation — countermeasure logic and
+drone behavior updates for NEXUS defeats.
 
 Countermeasure types:
   - HOLD:     Freeze drone in place (hover lock)
@@ -35,21 +35,21 @@ DRONE_FREQUENCY_MAP: dict[str, str] = {
     "swarm": "2.4GHz",
 }
 
-# Drones that SHINOBI cannot affect (no RF control link in library)
-SHINOBI_IMMUNE_TYPES = {DroneType.BIRD, DroneType.WEATHER_BALLOON, DroneType.PASSENGER_AIRCRAFT, DroneType.MILITARY_JET}
+# Drones that NEXUS cannot affect (no RF control link in library)
+NEXUS_IMMUNE_TYPES = {DroneType.BIRD, DroneType.WEATHER_BALLOON, DroneType.PASSENGER_AIRCRAFT, DroneType.MILITARY_JET}
 
 
-def is_shinobi_vulnerable(drone: DroneState) -> bool:
-    """Check if a drone can be affected by SHINOBI protocol manipulation."""
-    if drone.drone_type in SHINOBI_IMMUNE_TYPES:
+def is_nexus_vulnerable(drone: DroneState) -> bool:
+    """Check if a drone can be affected by NEXUS protocol manipulation."""
+    if drone.drone_type in NEXUS_IMMUNE_TYPES:
         return False
     if not drone.rf_emitting:
         return False
     return True
 
 
-def pick_shinobi_cm_effectiveness(drone: DroneState, cm_type: str) -> bool:
-    """Determine if a SHINOBI countermeasure succeeds on this drone.
+def pick_nexus_cm_effectiveness(drone: DroneState, cm_type: str) -> bool:
+    """Determine if a NEXUS countermeasure succeeds on this drone.
 
     Fixed-wing UAS with autonomous navigation have a 30% chance to resist.
     All other RF-emitting types are reliably affected.
@@ -60,43 +60,43 @@ def pick_shinobi_cm_effectiveness(drone: DroneState, cm_type: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Update SHINOBI-affected drones (called each tick from game loop)
+# Update NEXUS-affected drones (called each tick from game loop)
 # ---------------------------------------------------------------------------
 
 
-def update_shinobi_drone(
+def update_nexus_drone(
     drone: DroneState,
     tick_rate: float,
     elapsed: float,
 ) -> tuple[DroneState, list[dict]]:
-    """Advance a drone under SHINOBI countermeasure effect by one tick.
+    """Advance a drone under NEXUS countermeasure effect by one tick.
 
     Returns the updated DroneState and a list of event dicts.
     """
     events: list[dict] = []
-    cm = drone.shinobi_cm_active
-    cm_state = drone.shinobi_cm_state
+    cm = drone.nexus_cm_active
+    cm_state = drone.nexus_cm_state
 
     # Decrement CM timer
-    prev_remaining = drone.shinobi_cm_time_remaining
+    prev_remaining = drone.nexus_cm_time_remaining
     remaining = max(0.0, prev_remaining - tick_rate)
-    drone = drone.model_copy(update={"shinobi_cm_time_remaining": remaining})
+    drone = drone.model_copy(update={"nexus_cm_time_remaining": remaining})
 
     # Track how long CM has been active (initial duration - remaining)
-    cm_elapsed = drone.shinobi_cm_initial_duration - remaining
+    cm_elapsed = drone.nexus_cm_initial_duration - remaining
 
     # --- State progression: pending → 1/2 → 2/2 ---
     if cm_state == "pending":
         # After ~1 second, acquire downlink (1/2)
         if cm_elapsed >= 1.0 or remaining <= 0:
             drone = drone.model_copy(update={
-                "shinobi_cm_state": "1/2",
+                "nexus_cm_state": "1/2",
                 "downlink_detected": True,
             })
             events.append({
                 "type": "event",
                 "timestamp": round(elapsed, 1),
-                "message": f"SHINOBI: {drone.id.upper()} — Downlink acquired (1/2)",
+                "message": f"NEXUS: {drone.id.upper()} — Downlink acquired (1/2)",
             })
         return drone, events
 
@@ -107,25 +107,25 @@ def update_shinobi_drone(
             import random as _random
             new_duration = _random.uniform(20.0, 40.0)
             drone = drone.model_copy(update={
-                "shinobi_cm_state": "2/2",
-                "shinobi_cm_time_remaining": new_duration,
-                "shinobi_cm_initial_duration": new_duration,
+                "nexus_cm_state": "2/2",
+                "nexus_cm_time_remaining": new_duration,
+                "nexus_cm_initial_duration": new_duration,
             })
             events.append({
                 "type": "event",
                 "timestamp": round(elapsed, 1),
-                "message": f"SHINOBI: {drone.id.upper()} — Uplink acquired (2/2) — FULL CONTROL",
+                "message": f"NEXUS: {drone.id.upper()} — Uplink acquired (2/2) — FULL CONTROL",
             })
         # 1/2 state: partial effect (reduced speed/responsiveness)
-        elif cm == "shinobi_hold":
+        elif cm == "nexus_hold":
             # Partial hold — drone slows significantly
             new_speed = max(5, drone.speed * 0.85)
             drone = drone.model_copy(update={"speed": new_speed})
-        elif cm == "shinobi_land_now":
+        elif cm == "nexus_land_now":
             # Partial land — slow descent
             new_alt = max(0, drone.altitude - 10 * tick_rate)
             drone = drone.model_copy(update={"altitude": new_alt})
-        elif cm == "shinobi_deafen":
+        elif cm == "nexus_deafen":
             # Partial deafen — intermittent link disruption (speed jitter)
             new_speed = drone.speed * random.uniform(0.7, 1.0)
             drone = drone.model_copy(update={"speed": max(0, new_speed)})
@@ -133,27 +133,27 @@ def update_shinobi_drone(
 
     # --- 2/2 state: full protocol control ---
     if cm_state == "2/2":
-        if cm == "shinobi_hold":
+        if cm == "nexus_hold":
             drone, hold_events = _apply_hold(drone, tick_rate, elapsed)
             events.extend(hold_events)
-        elif cm == "shinobi_land_now":
+        elif cm == "nexus_land_now":
             drone, land_events = _apply_land_now(drone, tick_rate, elapsed)
             events.extend(land_events)
-        elif cm == "shinobi_deafen":
+        elif cm == "nexus_deafen":
             drone, deafen_events = _apply_deafen(drone, tick_rate, elapsed)
             events.extend(deafen_events)
 
     # Check if CM effect has expired
     if remaining <= 0 and not drone.neutralized:
         drone = drone.model_copy(update={
-            "shinobi_cm_active": None,
-            "shinobi_cm_state": None,
-            "shinobi_cm_time_remaining": 0.0,
+            "nexus_cm_active": None,
+            "nexus_cm_state": None,
+            "nexus_cm_time_remaining": 0.0,
         })
         events.append({
             "type": "event",
             "timestamp": round(elapsed, 1),
-            "message": f"SHINOBI: {drone.id.upper()} — CM effect expired",
+            "message": f"NEXUS: {drone.id.upper()} — CM effect expired",
         })
 
     return drone, events
@@ -196,12 +196,12 @@ def _apply_land_now(
             "neutralized": True,
             "altitude": 0,
             "speed": 0,
-            "shinobi_cm_time_remaining": 0.0,
+            "nexus_cm_time_remaining": 0.0,
         })
         events.append({
             "type": "event",
             "timestamp": round(elapsed, 1),
-            "message": f"SHINOBI: {drone.id.upper()} — FORCED LANDING COMPLETE (grounded)",
+            "message": f"NEXUS: {drone.id.upper()} — FORCED LANDING COMPLETE (grounded)",
         })
     return drone, events
 
@@ -236,12 +236,12 @@ def _apply_deafen(
                 "neutralized": True,
                 "altitude": 0,
                 "speed": 0,
-                "shinobi_cm_time_remaining": 0.0,
+                "nexus_cm_time_remaining": 0.0,
             })
             events.append({
                 "type": "event",
                 "timestamp": round(elapsed, 1),
-                "message": f"SHINOBI: {drone.id.upper()} — LINK LOST — FAILSAFE LANDING",
+                "message": f"NEXUS: {drone.id.upper()} — LINK LOST — FAILSAFE LANDING",
             })
     else:
         # Fixed-wing / swarm: continue on last heading (no corrections)
@@ -262,12 +262,12 @@ def _apply_deafen(
         if math.sqrt(new_x ** 2 + new_y ** 2) > 10.0:
             drone = drone.model_copy(update={
                 "neutralized": True,
-                "shinobi_cm_time_remaining": 0.0,
+                "nexus_cm_time_remaining": 0.0,
             })
             events.append({
                 "type": "event",
                 "timestamp": round(elapsed, 1),
-                "message": f"SHINOBI: {drone.id.upper()} — LINK LOST — LEFT AREA",
+                "message": f"NEXUS: {drone.id.upper()} — LINK LOST — LEFT AREA",
             })
 
     return drone, events

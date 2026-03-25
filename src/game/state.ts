@@ -18,10 +18,10 @@ export type ThreatClassification =
   | 'jackal' | 'shahed' | 'military_jet';
 
 export type SensorType = 'radar' | 'rf' | 'eoir' | 'acoustic';
-export type EffectorType = 'rf_jam' | 'electronic' | 'kinetic' | 'net_interceptor' | 'directed_energy' | 'shinobi_pm';
+export type EffectorType = 'rf_jam' | 'electronic' | 'kinetic' | 'net_interceptor' | 'directed_energy' | 'nexus_pm';
 export type EffectorStatus = 'ready' | 'recharging' | 'offline' | 'depleted';
-export type ShinobiCMType = 'shinobi_hold' | 'shinobi_land_now' | 'shinobi_deafen';
-export type ShinobiCMState = 'pending' | '1/2' | '2/2';
+export type NexusCMType = 'nexus_hold' | 'nexus_land_now' | 'nexus_deafen';
+export type NexusCMState = 'pending' | '1/2' | '2/2';
 export type GamePhase = 'waiting' | 'running' | 'debrief';
 
 // --- Core game state interfaces ---
@@ -65,10 +65,10 @@ export interface DroneState {
   frequency_band: string | null;
   uplink_detected: boolean;
   downlink_detected: boolean;
-  shinobi_cm_active: string | null;
-  shinobi_cm_state: string | null;
-  shinobi_cm_time_remaining: number;
-  shinobi_cm_initial_duration: number;
+  nexus_cm_active: string | null;
+  nexus_cm_state: string | null;
+  nexus_cm_time_remaining: number;
+  nexus_cm_initial_duration: number;
   display_label: string;
 }
 
@@ -105,10 +105,10 @@ export function createDefaultDrone(overrides: Partial<DroneState> & Pick<DroneSt
     frequency_band: null,
     uplink_detected: false,
     downlink_detected: false,
-    shinobi_cm_active: null,
-    shinobi_cm_state: null,
-    shinobi_cm_time_remaining: 0,
-    shinobi_cm_initial_duration: 0,
+    nexus_cm_active: null,
+    nexus_cm_state: null,
+    nexus_cm_time_remaining: 0,
+    nexus_cm_initial_duration: 0,
     display_label: '',
     ...overrides,
   };

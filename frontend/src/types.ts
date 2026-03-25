@@ -31,12 +31,12 @@ export interface TrackData {
   is_interceptor?: boolean;
   interceptor_target?: string | null;
   intercept_phase?: string | null;
-  // SHINOBI RF track properties
+  // NEXUS RF track properties
   frequency_band?: string | null;
   uplink_detected?: boolean;
   downlink_detected?: boolean;
-  shinobi_cm_active?: string | null;
-  shinobi_cm_state?: string | null;  // "pending", "1/2", "2/2"
+  nexus_cm_active?: string | null;
+  nexus_cm_state?: string | null;  // "pending", "1/2", "2/2"
 }
 
 export interface SensorStatus {
@@ -166,8 +166,8 @@ export interface EngagementResultMsg {
   jammed?: boolean;
   jammed_behavior?: string;
   pnt_jammed?: boolean;
-  shinobi_cm?: string;
-  shinobi_cm_state?: string;
+  nexus_cm?: string;
+  nexus_cm_state?: string;
 }
 
 export interface DebriefMsg {

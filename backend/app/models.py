@@ -57,7 +57,7 @@ class EffectorType(str, Enum):
     KINETIC = "kinetic"
     NET_INTERCEPTOR = "net_interceptor"
     DIRECTED_ENERGY = "directed_energy"
-    SHINOBI_PM = "shinobi_pm"  # SHINOBI Protocol Manipulation
+    NEXUS_PM = "nexus_pm"  # NEXUS Protocol Manipulation
 
 
 class EffectorStatus(str, Enum):
@@ -66,15 +66,15 @@ class EffectorStatus(str, Enum):
     OFFLINE = "offline"
 
 
-class ShinobiCMType(str, Enum):
-    """SHINOBI Protocol Manipulation countermeasure types."""
-    HOLD = "shinobi_hold"          # Freeze drone in place
-    LAND_NOW = "shinobi_land_now"  # Forced descent to ground
-    DEAFEN = "shinobi_deafen"      # Sever control link (failsafe behavior)
+class NexusCMType(str, Enum):
+    """NEXUS Protocol Manipulation countermeasure types."""
+    HOLD = "nexus_hold"          # Freeze drone in place
+    LAND_NOW = "nexus_land_now"  # Forced descent to ground
+    DEAFEN = "nexus_deafen"      # Sever control link (failsafe behavior)
 
 
-class ShinobiCMState(str, Enum):
-    """SHINOBI countermeasure effect state progression."""
+class NexusCMState(str, Enum):
+    """NEXUS countermeasure effect state progression."""
     PENDING = "pending"      # CM command sent, waiting for effect
     HALF = "1/2"             # Downlink acquired only
     FULL = "2/2"             # Uplink active, full control
@@ -88,9 +88,9 @@ class Countermeasure(str, Enum):
     KINETIC = "kinetic"
     NET_INTERCEPTOR = "net_interceptor"
     DIRECTED_ENERGY = "directed_energy"
-    SHINOBI_HOLD = "shinobi_hold"
-    SHINOBI_LAND_NOW = "shinobi_land_now"
-    SHINOBI_DEAFEN = "shinobi_deafen"
+    NEXUS_HOLD = "nexus_hold"
+    NEXUS_LAND_NOW = "nexus_land_now"
+    NEXUS_DEAFEN = "nexus_deafen"
     OBSERVE = "observe"
     NO_ACTION = "no_action"
 
@@ -146,14 +146,14 @@ class DroneState(BaseModel):
     intercept_phase: str | None = None  # spinup, launch, midcourse, terminal, self_destruct
     spinup_remaining: float = 0.0  # seconds remaining in spinup phase
     intercept_attempts: int = 0  # track retry count for terminal intercept
-    # SHINOBI RF track properties
+    # NEXUS RF track properties
     frequency_band: str | None = None  # "2.4GHz", "5.8GHz", "430MHz", "900MHz"
-    uplink_detected: bool = False   # True when SHINOBI acquires uplink (enables full CM)
-    downlink_detected: bool = False  # True when SHINOBI acquires downlink
-    shinobi_cm_active: str | None = None  # Active SHINOBI countermeasure type
-    shinobi_cm_state: str | None = None  # "pending", "1/2", "2/2"
-    shinobi_cm_time_remaining: float = 0.0  # Seconds remaining in CM effect
-    shinobi_cm_initial_duration: float = 0.0  # Original CM duration (for elapsed calc)
+    uplink_detected: bool = False   # True when NEXUS acquires uplink (enables full CM)
+    downlink_detected: bool = False  # True when NEXUS acquires downlink
+    nexus_cm_active: str | None = None  # Active NEXUS countermeasure type
+    nexus_cm_state: str | None = None  # "pending", "1/2", "2/2"
+    nexus_cm_time_remaining: float = 0.0  # Seconds remaining in CM effect
+    nexus_cm_initial_duration: float = 0.0  # Original CM duration (for elapsed calc)
 
 
 class SensorConfig(BaseModel):
@@ -342,13 +342,13 @@ class CatalogEffector(BaseModel):
 
 
 class CatalogCombined(BaseModel):
-    """A combined sensor+effector system (e.g. SHINOBI)."""
+    """A combined sensor+effector system (e.g. NEXUS)."""
     catalog_id: str
     name: str
     description: str
     sensor_type: str       # e.g. "rf"
     sensor_range_km: float
-    effector_type: str     # e.g. "shinobi_pm"
+    effector_type: str     # e.g. "nexus_pm"
     effector_range_km: float
     fov_deg: float
     recharge_seconds: int = 0

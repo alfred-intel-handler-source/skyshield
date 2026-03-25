@@ -6,12 +6,12 @@ import type { DroneState, GameState, PlayerAction, EffectorRuntimeState } from '
 import {
   checkEffectorInRange,
   checkKuFcsTracking,
-  checkShinobiRfTracking,
+  checkNexusRfTracking,
   effectorEffectiveness,
   findEffectorConfig,
 } from './helpers.js';
 import { applyPntJamming, pickJamBehavior } from './jamming.js';
-import { isShinobiVulnerable, pickShinobiCmEffectiveness, DRONE_FREQUENCY_MAP } from './shinobi.js';
+import { isNexusVulnerable, pickNexusCmEffectiveness, DRONE_FREQUENCY_MAP } from './nexus.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,7 +135,7 @@ export function handleEngage(
   targetId: string,
   effectorId: string,
   elapsed: number,
-  shinobiCm?: string | null,
+  nexusCm?: string | null,
 ): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
 
@@ -166,10 +166,10 @@ export function handleEngage(
     }
 
     const isJammer = effState.type === 'rf_jam' || effState.type === 'electronic';
-    const isShinobi = effState.type === 'shinobi_pm';
+    const isNexus = effState.type === 'nexus_pm';
 
     // Range check
-    if (!isJammer && !isShinobi && !checkEffectorInRange(effState, d)) {
+    if (!isJammer && !isNexus && !checkEffectorInRange(effState, d)) {
       msgs.push(_event(elapsed, `ENGAGEMENT: ${effState.name} \u2014 Target out of range`));
       break;
     }
@@ -184,9 +184,9 @@ export function handleEngage(
 
     const effectiveness = effectorEffectiveness(effState.type, d.drone_type);
 
-    if (isShinobi) {
-      const cmType = shinobiCm || 'shinobi_hold';
-      msgs.push(..._engageShinobi(gs, j, d, effState, effectorId, targetId, cmType, effectiveness, elapsed));
+    if (isNexus) {
+      const cmType = nexusCm || 'nexus_hold';
+      msgs.push(..._engageNexus(gs, j, d, effState, effectorId, targetId, cmType, effectiveness, elapsed));
     } else if (isJammer) {
       msgs.push(..._engageJammer(gs, j, d, effState, effectorId, targetId, effectiveness, elapsed));
     } else if (effState.ammo_count !== null && effState.ammo_count !== undefined && effState.type === 'kinetic') {
@@ -400,8 +400,8 @@ function _engageJackal(
     pnt_jammed: false, pnt_drift_magnitude: 0, pnt_jammed_time_remaining: 0,
     intercept_attempts: 0, frequency_band: null,
     uplink_detected: false, downlink_detected: false,
-    shinobi_cm_active: null, shinobi_cm_state: null,
-    shinobi_cm_time_remaining: 0, shinobi_cm_initial_duration: 0,
+    nexus_cm_active: null, nexus_cm_state: null,
+    nexus_cm_time_remaining: 0, nexus_cm_initial_duration: 0,
     neutralized: false,
     display_label: jackalId,
   };
@@ -433,57 +433,57 @@ function _engageDirect(
   return msgs;
 }
 
-function _engageShinobi(
+function _engageNexus(
   gs: GameState, droneIdx: number, d: DroneState, effState: EffectorRuntimeState,
   effectorId: string, targetId: string, cmType: string, effectiveness: number, elapsed: number,
 ): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
 
-  if (!checkShinobiRfTracking(gs.sensor_configs, d)) {
-    msgs.push(_event(elapsed, `SHINOBI: NO RF TRACK \u2014 ${_label(gs, targetId).toUpperCase()} not detected by SHINOBI sensor`));
+  if (!checkNexusRfTracking(gs.sensor_configs, d)) {
+    msgs.push(_event(elapsed, `NEXUS: NO RF TRACK \u2014 ${_label(gs, targetId).toUpperCase()} not detected by NEXUS sensor`));
     return msgs;
   }
 
   if (!checkEffectorInRange(effState, d)) {
-    msgs.push(_event(elapsed, `SHINOBI: ${_label(gs, targetId).toUpperCase()} outside defeat range (6km)`));
+    msgs.push(_event(elapsed, `NEXUS: ${_label(gs, targetId).toUpperCase()} outside defeat range (6km)`));
     return msgs;
   }
 
-  if (!isShinobiVulnerable(d)) {
-    msgs.push(_event(elapsed, `SHINOBI: ${_label(gs, targetId).toUpperCase()} \u2014 NO PROTOCOL MATCH (not in library)`));
+  if (!isNexusVulnerable(d)) {
+    msgs.push(_event(elapsed, `NEXUS: ${_label(gs, targetId).toUpperCase()} \u2014 NO PROTOCOL MATCH (not in library)`));
     msgs.push({ type: 'engagement_result', target_id: targetId, effector: effectorId, effective: false, effectiveness: 0 });
     return msgs;
   }
 
-  if (!pickShinobiCmEffectiveness(d, cmType)) {
-    const cmLabel = cmType.replace('shinobi_', '').toUpperCase();
-    msgs.push(_event(elapsed, `SHINOBI: ${cmLabel} INEFFECTIVE \u2014 autonomous navigation (${_label(gs, targetId).toUpperCase()})`));
-    msgs.push({ type: 'engagement_result', target_id: targetId, effector: effectorId, effective: false, effectiveness: 0, shinobi_cm: cmType });
+  if (!pickNexusCmEffectiveness(d, cmType)) {
+    const cmLabel = cmType.replace('nexus_', '').toUpperCase();
+    msgs.push(_event(elapsed, `NEXUS: ${cmLabel} INEFFECTIVE \u2014 autonomous navigation (${_label(gs, targetId).toUpperCase()})`));
+    msgs.push({ type: 'engagement_result', target_id: targetId, effector: effectorId, effective: false, effectiveness: 0, nexus_cm: cmType });
     return msgs;
   }
 
   const freq = DRONE_FREQUENCY_MAP[d.drone_type] ?? '2.4GHz';
   const cmDuration = _randUniform(15.0, 30.0);
-  const cmLabel = cmType.replace('shinobi_', '').replace(/_/g, ' ').toUpperCase();
+  const cmLabel = cmType.replace('nexus_', '').replace(/_/g, ' ').toUpperCase();
 
   gs.drones[droneIdx] = {
     ...d,
     dtid_phase: 'defeated',
-    shinobi_cm_active: cmType,
-    shinobi_cm_state: 'pending',
-    shinobi_cm_time_remaining: cmDuration,
-    shinobi_cm_initial_duration: cmDuration,
+    nexus_cm_active: cmType,
+    nexus_cm_state: 'pending',
+    nexus_cm_time_remaining: cmDuration,
+    nexus_cm_initial_duration: cmDuration,
     frequency_band: freq,
     downlink_detected: true,
   };
   gs.engage_times.set(targetId, elapsed);
   gs.effector_used.set(targetId, effState.type);
   gs.actions.push({ action: 'engage', target_id: targetId, effector: effectorId, timestamp: elapsed });
-  msgs.push(_event(elapsed, `SHINOBI: ${cmLabel} command sent to ${_label(gs, targetId).toUpperCase()} on ${freq}`));
+  msgs.push(_event(elapsed, `NEXUS: ${cmLabel} command sent to ${_label(gs, targetId).toUpperCase()} on ${freq}`));
   msgs.push({
     type: 'engagement_result', target_id: targetId, effector: effectorId,
     effective: true, effectiveness: Math.round(effectiveness * 100) / 100,
-    shinobi_cm: cmType, shinobi_cm_state: 'pending',
+    nexus_cm: cmType, nexus_cm_state: 'pending',
   });
   return msgs;
 }

@@ -791,15 +791,15 @@ export default function App() {
     });
   };
 
-  const engage = (trackId: string, effectorId: string, shinobiCm?: string) => {
-    if (shinobiCm) {
-      // SHINOBI Protocol Manipulation — send specific CM action
+  const engage = (trackId: string, effectorId: string, nexusCm?: string) => {
+    if (nexusCm) {
+      // NEXUS Protocol Manipulation — send specific CM action
       send({
         type: "action",
-        action: shinobiCm,
+        action: nexusCm,
         target_id: trackId,
         effector: effectorId,
-        shinobi_cm: shinobiCm,
+        nexus_cm: nexusCm,
       });
     } else {
       send({
@@ -923,7 +923,7 @@ export default function App() {
     const isTut = scenarioId === "tutorial";
     const baseId = isTut ? "small_fob" : "medium_airbase";
 
-    // Doctrine: every scenario = L-Band + EO/IR + RF Jammer + SHINOBI baseline
+    // Doctrine: every scenario = L-Band + EO/IR + RF Jammer + NEXUS baseline
     // Ku-Band FCS always paired with JACKAL (fire control requirement)
     // Shahed threats (Swarm, Lone Wolf) need kinetic defeat — JACKAL mandatory
     const tutorialPlacement: PlacementConfig = {
@@ -936,7 +936,7 @@ export default function App() {
         { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
       ],
       combined: [
-        { catalog_id: "shinobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 
@@ -953,7 +953,7 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
       ],
       combined: [
-        { catalog_id: "shinobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 
@@ -972,8 +972,8 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
       ],
       combined: [
-        { catalog_id: "shinobi", x: 0.0, y: 0.0, facing_deg: 0 },
-        { catalog_id: "shinobi", x: 0.3, y: 0.1, facing_deg: 0 },
+        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "nexus", x: 0.3, y: 0.1, facing_deg: 0 },
       ],
     };
 
@@ -990,7 +990,7 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: 0.1, y: 0.0, facing_deg: 0 },
       ],
       combined: [
-        { catalog_id: "shinobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 

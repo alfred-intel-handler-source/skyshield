@@ -113,7 +113,7 @@ class SensorSimulator:
     ) -> dict | None:
         """RF Detection: detects RF-emitting drones only. Provides bearing.
 
-        SHINOBI RF sensors additionally return frequency band, signal metrics,
+        NEXUS RF sensors additionally return frequency band, signal metrics,
         and uplink/downlink detection flags.
         """
         if not drone.rf_emitting:
@@ -138,9 +138,9 @@ class SensorSimulator:
             "bearing_deg": round(bearing + random.gauss(0, noise_factor * 5), 1) % 360,
         }
 
-        # SHINOBI RF sensor provides extra protocol-level data
-        is_shinobi = "shinobi" in sensor.id.lower() or "shinobi" in sensor.name.lower()
-        if is_shinobi:
+        # NEXUS RF sensor provides extra protocol-level data
+        is_nexus = "nexus" in sensor.id.lower() or "nexus" in sensor.name.lower()
+        if is_nexus:
             # Assign frequency band based on drone type
             band_map = {
                 "commercial_quad": "2.4GHz",
@@ -160,7 +160,7 @@ class SensorSimulator:
                 "downlink_detected": downlink,
                 "uplink_detected": uplink,
                 "rssi_dbm": rssi_dbm,
-                "is_shinobi": True,
+                "is_nexus": True,
             })
 
         return result

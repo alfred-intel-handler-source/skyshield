@@ -47,15 +47,15 @@ All systems are fictional but specification-accurate — no real program of reco
 |--------|------|-------|-------|
 | RF/PNT Jammer | Electronic warfare | 5 km | Disrupts RF command links + GPS/PNT nav; rechargeable |
 | JACKAL Pallet | Kinetic interceptor | 10 km | 4 interceptors; 10–15s spinup; requires Ku-Band FCS |
-| SHINOBI | RF detect + Protocol Manipulation | 8km/6km | Downlink acquisition → uplink defeat (HOLD / LAND NOW / DEAFEN) |
+| NEXUS | RF detect + Protocol Manipulation | 8km/6km | Downlink acquisition → uplink defeat (HOLD / LAND NOW / DEAFEN) |
 
 ### Threats
 | Threat | RF Jam Resistance | Notes |
 |--------|------------------|-------|
-| Commercial Quad | 0% | Fully jammable; SHINOBI-vulnerable |
+| Commercial Quad | 0% | Fully jammable; NEXUS-vulnerable |
 | Micro UAS | 10% | Small RCS; hard to visually ID |
 | Fixed-Wing UAS | 40% | Faster; partially jam-resistant |
-| Improvised UAS | 50% | Unknown electronics; SHINOBI library miss likely |
+| Improvised UAS | 50% | Unknown electronics; NEXUS library miss likely |
 | Shahed-style | 100% (RF-immune) | INS-primary; **RF jamming has no effect**; kinetic defeat required |
 | Bird / Balloon | — | Ambient traffic; cannot be engaged (ROE) |
 | Passenger / Military Jet | — | ATC-clearable via CLEAR AIRSPACE |
@@ -106,7 +106,7 @@ src/game/           ← TypeScript game engine (10Hz, runs in browser)
   drone.ts          ← 4 movement behaviors
   detection.ts      ← Multi-sensor detection (FOV, LOS, noise)
   jamming.ts        ← RF + PNT jamming logic
-  shinobi.ts        ← SHINOBI protocol manipulation state machine
+  nexus.ts        ← NEXUS protocol manipulation state machine
   jackal.ts         ← JACKAL interceptor lifecycle
   waves.ts          ← Wave + ambient traffic spawning
   scoring.ts        ← Full DTID scoring engine

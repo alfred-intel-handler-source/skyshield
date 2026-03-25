@@ -448,7 +448,7 @@ export default function LoadoutScreen({ maxSensors: _maxSensors, maxEffectors: _
           </div>
         </div>
 
-        {/* Combined Systems Section (e.g. SHINOBI) */}
+        {/* Combined Systems Section (e.g. NEXUS) */}
         {catalog.combined && catalog.combined.length > 0 && (
           <div style={sectionStyle}>
             <div style={sectionTitleStyle}>COMBINED SYSTEMS</div>

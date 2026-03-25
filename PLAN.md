@@ -204,7 +204,7 @@ Before public release, migrate Python/FastAPI backend to pure TypeScript running
 - `app/actions.py` → TypeScript action handlers
 - `app/jamming.py` → TypeScript EW logic
 - `app/jackal.py` → TypeScript JACKAL lifecycle
-- `app/shinobi.py` → TypeScript SHINOBI state machine
+- `app/nexus.py` → TypeScript NEXUS state machine
 - Scoring engine
 
 **Est. effort:** 2-3 Claude Code sessions once feature set is locked.
