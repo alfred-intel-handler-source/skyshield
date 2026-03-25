@@ -292,10 +292,11 @@ export default function App() {
                 affiliation: prevTrack.affiliation === "friendly" && prevTrack.atc_response_received ? "friendly" : t.affiliation,
               };
             }
-            // Assign iff_status to new tracks: 15% chance of UNKNOWN
+            // Assign iff_status to new tracks: 15% chance of UNKNOWN, or if affiliation is already unknown/UNKNOWN
             if (!atcIffAssignedRef.current.has(t.id)) {
               atcIffAssignedRef.current.add(t.id);
-              if (!t.is_ambient && !t.is_interceptor && Math.random() < 0.15) {
+              const isUnknownAffil = t.affiliation?.toLowerCase() === "unknown";
+              if (!t.is_ambient && !t.is_interceptor && (isUnknownAffil || Math.random() < 0.15)) {
                 return {
                   ...t,
                   affiliation: "unknown" as const,
@@ -1592,6 +1593,7 @@ export default function App() {
           onSlewCamera={handleSlewCamera}
           onHoldFire={handleHoldFire}
           onReleaseHoldFire={handleReleaseHoldFire}
+          onCallATC={callATC}
           cameraTrackId={cameraTrackId}
           sensorConfigs={sensorConfigs}
           protectedArea={protectedArea}
@@ -1705,6 +1707,7 @@ export default function App() {
             onIdentify={identify}
             onEngage={engage}
             onSlewCamera={handleSlewCamera}
+            onCallATC={callATC}
             tutorialStep={isTutorial ? tutorialStep : undefined}
           />
         </div>

@@ -8,6 +8,7 @@ interface Props {
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
   onEngage: (trackId: string, effectorId: string, nexusCm?: string) => void;
   onSlewCamera?: (trackId: string) => void;
+  onCallATC?: (trackId: string) => void;
   tutorialStep?: number;
 }
 
@@ -55,6 +56,7 @@ export default function EngagementPanel({
   onIdentify,
   onEngage,
   onSlewCamera,
+  onCallATC,
   tutorialStep,
 }: Props) {
   const [nexusSubMenu, setNexusSubMenu] = useState<string | null>(null);
@@ -150,6 +152,30 @@ export default function EngagementPanel({
           >
             SLEW CAMERA
           </button>
+          {/* CALL ATC button — only for UNKNOWN IFF tracks */}
+          {track.iff_status === "unknown" && onCallATC && (
+            <button
+              onClick={() => !track.atc_called && onCallATC(track.id)}
+              disabled={!!track.atc_called}
+              style={{
+                width: "100%",
+                marginTop: 6,
+                padding: "8px 16px",
+                background: track.atc_called ? "#1a2a2a" : "rgba(34, 211, 238, 0.12)",
+                border: `1px solid ${track.atc_called ? "#30363d" : "#22d3ee55"}`,
+                borderRadius: 6,
+                color: track.atc_called ? "#484f58" : "#22d3ee",
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: "'Inter', sans-serif",
+                letterSpacing: 1,
+                cursor: track.atc_called ? "default" : "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {track.atc_response_pending ? "ATC PENDING..." : track.atc_called ? "ATC CALLED" : "📞 CALL ATC"}
+            </button>
+          )}
         </div>
       )}
 
