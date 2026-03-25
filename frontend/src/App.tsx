@@ -224,6 +224,7 @@ export default function App() {
   const tracksCriticalRef = useRef<Set<string>>(new Set());
   const engagedTracksRef = useRef<Set<string>>(new Set());
   const detectionPingedRef = useRef<Set<string>>(new Set()); // tracks that have already triggered a detection ping
+  const pendingReplayRef = useRef<string | null>(null);
 
   const handleToggleMute = useCallback(() => {
     soundEngine.init();
@@ -622,6 +623,16 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [send, handleToggleMute]);
 
+  // Replay trigger: when phase resets to "waiting" and a replay is pending, re-launch
+  useEffect(() => {
+    if (phase === "waiting" && pendingReplayRef.current) {
+      const id = pendingReplayRef.current;
+      pendingReplayRef.current = null;
+      handleScenarioLaunch(id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   // --- Flow handlers ---
 
   const handleScenarioSelect = async (
@@ -763,8 +774,12 @@ export default function App() {
 
   const handleRestart = () => {
     send({ type: "restart" });
+    const replayId = scenarioId;
     resetAllState();
     setPhase("waiting");
+    if (replayId) {
+      pendingReplayRef.current = replayId;
+    }
   };
 
   const handleMainMenu = () => {
@@ -1383,6 +1398,9 @@ export default function App() {
         onRestart={handleRestart}
         onMainMenu={handleMainMenu}
         wavesCompleted={wavesCompleted}
+        elapsed={elapsed}
+        events={events}
+        tracks={tracks}
       />
     );
   }

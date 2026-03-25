@@ -1,4 +1,5 @@
-import type { ScoreBreakdown } from "../types";
+import type { EventEntry, ScoreBreakdown, TrackData } from "../types";
+import "../styles/debrief.css";
 
 interface Props {
   score: ScoreBreakdown;
@@ -7,6 +8,9 @@ interface Props {
   onRestart: () => void;
   onMainMenu: () => void;
   wavesCompleted?: number;
+  elapsed?: number;
+  events?: EventEntry[];
+  tracks?: TrackData[];
 }
 
 const GRADE_COLORS: Record<string, string> = {
@@ -17,69 +21,108 @@ const GRADE_COLORS: Record<string, string> = {
   F: "#f85149",
 };
 
-interface BarProps {
-  label: string;
-  score: number;
-  detail: string;
-}
-
-function ScoreBar({ label, score, detail }: BarProps) {
+function ScoreBar({ label, score, detail }: { label: string; score: number; detail: string }) {
   const color =
     score >= 80 ? "#3fb950" : score >= 50 ? "#d29922" : "#f85149";
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 4,
-          fontSize: 12,
-        }}
-      >
-        <span style={{ color: "#e6edf3", letterSpacing: 0.5, fontWeight: 500 }}>
-          {label}
-        </span>
-        <span
-          style={{
-            color,
-            fontWeight: 700,
-            fontFamily: "'JetBrains Mono', monospace",
-          }}
-        >
+    <div className="debrief-bar">
+      <div className="debrief-bar-header">
+        <span className="debrief-bar-label">{label}</span>
+        <span className="debrief-bar-score" style={{ color }}>
           {score.toFixed(0)}
         </span>
       </div>
-      <div
-        style={{
-          height: 6,
-          background: "#1c2333",
-          borderRadius: 3,
-          overflow: "hidden",
-        }}
-      >
+      <div className="debrief-bar-track">
         <div
+          className="debrief-bar-fill"
           style={{
             width: `${Math.min(score, 100)}%`,
-            height: "100%",
             background: color,
-            borderRadius: 3,
             boxShadow: `0 0 8px ${color}44`,
-            transition: "width 1s ease-out",
           }}
         />
       </div>
-      {detail && (
-        <div
-          style={{
-            fontSize: 10,
-            color: "#8b949e",
-            marginTop: 3,
-          }}
-        >
-          {detail}
-        </div>
-      )}
+      {detail && <div className="debrief-bar-detail">{detail}</div>}
+    </div>
+  );
+}
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function computeStats(events: EventEntry[], tracks: TrackData[]) {
+  let shotsFired = 0;
+  let confirmedKills = 0;
+  let misses = 0;
+  let roeViolations = 0;
+  let firstShotTime: number | null = null;
+  let atcCalls = 0;
+  let atcFriendly = 0;
+
+  for (const evt of events) {
+    const msg = evt.message;
+
+    // Count engagements from ENGAGEMENT event messages
+    if (msg.startsWith("ENGAGEMENT:")) {
+      shotsFired++;
+      if (msg.includes("EFFECTIVE")) {
+        confirmedKills++;
+      } else if (msg.includes("INEFFECTIVE")) {
+        misses++;
+      }
+      if (firstShotTime === null) {
+        firstShotTime = evt.timestamp;
+      }
+    }
+
+    // ROE violations
+    if (msg.includes("ROE VIOLATION") || msg.includes("blue-on-blue") || msg.includes("FRIENDLY FIRE")) {
+      roeViolations++;
+    }
+
+    // ATC calls
+    if (msg.includes("ATC") || msg.includes("RADIO") || msg.includes("airspace cleared") || msg.includes("clear_airspace")) {
+      atcCalls++;
+      if (msg.includes("FRIENDLY") || msg.includes("friendly")) {
+        atcFriendly++;
+      }
+    }
+  }
+
+  // Count threats: non-ambient, non-interceptor tracks
+  const allTracks = tracks.filter(
+    (t) => !t.is_ambient && !t.is_interceptor
+  );
+  const totalThreats = allTracks.length;
+  const detectedThreats = allTracks.filter(
+    (t) => t.dtid_phase !== "detected" || t.sensors_detecting.length > 0 || t.neutralized
+  ).length;
+
+  const accuracy = shotsFired > 0 ? Math.round((confirmedKills / shotsFired) * 100) : 0;
+
+  return {
+    shotsFired,
+    confirmedKills,
+    misses,
+    accuracy,
+    roeViolations,
+    firstShotTime,
+    totalThreats,
+    detectedThreats,
+    atcCalls,
+    atcFriendly,
+  };
+}
+
+function Stat({ label, value, colorClass }: { label: string; value: string; colorClass?: string }) {
+  return (
+    <div className="debrief-stat">
+      <span className="debrief-stat-label">{label}</span>
+      <span className={`debrief-stat-value ${colorClass ?? ""}`}>{value}</span>
     </div>
   );
 }
@@ -91,55 +134,23 @@ export default function DebriefScreen({
   onRestart,
   onMainMenu,
   wavesCompleted,
+  elapsed = 0,
+  events = [],
+  tracks = [],
 }: Props) {
   const gradeColor = GRADE_COLORS[score.grade] || "#8b949e";
   const hasPlacement =
     score.placement_score !== null && score.placement_score !== undefined;
 
+  const stats = computeStats(events, tracks);
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "#0d1117",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-        overflowY: "auto",
-      }}
-    >
-      <div
-        style={{
-          background: "#161b22",
-          border: "1px solid #30363d",
-          borderRadius: 8,
-          padding: 32,
-          maxWidth: 520,
-          width: "90%",
-          margin: "32px auto",
-        }}
-      >
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: "#8b949e",
-              letterSpacing: 2,
-              marginBottom: 6,
-              fontWeight: 600,
-            }}
-          >
-            MISSION DEBRIEF
-          </div>
-          <div
-            style={{
-              fontSize: 13,
-              color: "#e6edf3",
-              marginBottom: 16,
-              fontWeight: 500,
-            }}
-          >
+    <div className="debrief-overlay">
+      <div className="debrief-card">
+        {/* --- Header --- */}
+        <div className="debrief-header">
+          <div className="debrief-label">MISSION DEBRIEF</div>
+          <div className="debrief-scenario">
             {scenarioName}
             {wavesCompleted != null && wavesCompleted > 1 && (
               <span style={{ marginLeft: 8, color: "#58a6ff", fontSize: 11 }}>
@@ -149,77 +160,65 @@ export default function DebriefScreen({
           </div>
 
           {droneReachedBase && (
-            <div
-              style={{
-                color: "#f85149",
-                fontSize: 12,
-                fontWeight: 700,
-                padding: "8px 16px",
-                border: "1px solid #f8514944",
-                borderRadius: 6,
-                background: "#f8514911",
-                marginBottom: 16,
-                letterSpacing: 1,
-              }}
-            >
-              BASE COMPROMISED
-            </div>
+            <div className="debrief-base-compromised">BASE COMPROMISED</div>
           )}
 
-          <div
-            style={{
-              fontSize: 72,
-              fontWeight: 700,
-              color: gradeColor,
-              lineHeight: 1,
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
+          <div className="debrief-grade" style={{ color: gradeColor }}>
             {score.grade}
           </div>
-          <div
-            style={{
-              fontSize: 22,
-              color: gradeColor,
-              marginTop: 4,
-              fontFamily: "'JetBrains Mono', monospace",
-              fontWeight: 600,
-            }}
-          >
+          <div className="debrief-total" style={{ color: gradeColor }}>
             {score.total_score.toFixed(0)} / 100
           </div>
 
           {score.completion_multiplier < 1.0 && (
-            <div
-              style={{
-                color: "#d29922",
-                fontSize: 11,
-                fontWeight: 600,
-                padding: "6px 14px",
-                border: "1px solid #d2992244",
-                borderRadius: 6,
-                background: "#d2992211",
-                marginTop: 12,
-                letterSpacing: 0.5,
-              }}
-            >
-              {score.time_bonus_detail}
-            </div>
+            <div className="debrief-time-bonus">{score.time_bonus_detail}</div>
           )}
         </div>
 
-        {/* Execution scores */}
-        <div
-          style={{
-            fontSize: 10,
-            color: "#8b949e",
-            letterSpacing: 1.5,
-            fontWeight: 600,
-            marginBottom: 12,
-          }}
-        >
-          EXECUTION
+        {/* --- Mission Stats --- */}
+        <div className="debrief-section-label">MISSION STATS</div>
+        <div className="debrief-stats-grid">
+          <Stat label="TIME ELAPSED" value={formatTime(elapsed)} colorClass="debrief-stat-value--cyan" />
+          <Stat
+            label="THREATS"
+            value={`${stats.detectedThreats} / ${stats.totalThreats}`}
+            colorClass={stats.detectedThreats >= stats.totalThreats ? "debrief-stat-value--green" : "debrief-stat-value--yellow"}
+          />
+          <Stat label="SHOTS FIRED" value={String(stats.shotsFired)} />
+          <Stat
+            label="CONFIRMED KILLS"
+            value={String(stats.confirmedKills)}
+            colorClass={stats.confirmedKills > 0 ? "debrief-stat-value--green" : undefined}
+          />
+          <Stat label="MISSES" value={String(stats.misses)} colorClass={stats.misses > 0 ? "debrief-stat-value--red" : undefined} />
+          <Stat
+            label="ACCURACY"
+            value={stats.shotsFired > 0 ? `${stats.accuracy}%` : "N/A"}
+            colorClass={stats.accuracy >= 75 ? "debrief-stat-value--green" : stats.accuracy >= 50 ? "debrief-stat-value--yellow" : stats.shotsFired > 0 ? "debrief-stat-value--red" : undefined}
+          />
+          <Stat
+            label="ROE VIOLATIONS"
+            value={String(stats.roeViolations)}
+            colorClass={stats.roeViolations > 0 ? "debrief-stat-value--red" : "debrief-stat-value--green"}
+          />
+          <Stat
+            label="TIME TO FIRST SHOT"
+            value={stats.firstShotTime !== null ? `${stats.firstShotTime.toFixed(1)}s` : "N/A"}
+          />
+          {stats.atcCalls > 0 && (
+            <>
+              <Stat label="ATC CALLS" value={String(stats.atcCalls)} colorClass="debrief-stat-value--cyan" />
+              <Stat
+                label="ATC RESOLVED FRIENDLY"
+                value={String(stats.atcFriendly)}
+                colorClass={stats.atcFriendly > 0 ? "debrief-stat-value--green" : undefined}
+              />
+            </>
+          )}
         </div>
+
+        {/* --- Execution Scores --- */}
+        <div className="debrief-section-label">EXECUTION</div>
 
         <ScoreBar
           label="DETECTION AWARENESS (12%)"
@@ -252,21 +251,10 @@ export default function DebriefScreen({
           detail={score.details.roe || ""}
         />
 
-        {/* Placement scores */}
+        {/* --- Placement Scores --- */}
         {hasPlacement && score.placement_details && (
           <>
-            <div
-              style={{
-                fontSize: 10,
-                color: "#8b949e",
-                letterSpacing: 1.5,
-                fontWeight: 600,
-                marginTop: 20,
-                marginBottom: 12,
-                paddingTop: 16,
-                borderTop: "1px solid #30363d",
-              }}
-            >
+            <div className="debrief-section-label debrief-section-label--border">
               DEFENSE PLANNING
             </div>
 
@@ -277,86 +265,33 @@ export default function DebriefScreen({
             />
             <ScoreBar
               label="APPROACH COVERAGE (40%)"
-              score={
-                parseScoreFromDetail(score.placement_details.coverage)
-              }
+              score={parseScoreFromDetail(score.placement_details.coverage)}
               detail={score.placement_details.coverage || ""}
             />
             <ScoreBar
               label="SENSOR OVERLAP (25%)"
-              score={
-                parseScoreFromDetail(score.placement_details.overlap)
-              }
+              score={parseScoreFromDetail(score.placement_details.overlap)}
               detail={score.placement_details.overlap || ""}
             />
             <ScoreBar
               label="EFFECTOR REACH (25%)"
-              score={
-                parseScoreFromDetail(score.placement_details.effector_reach)
-              }
+              score={parseScoreFromDetail(score.placement_details.effector_reach)}
               detail={score.placement_details.effector_reach || ""}
             />
             <ScoreBar
               label="LOS MANAGEMENT (10%)"
-              score={
-                parseScoreFromDetail(score.placement_details.los)
-              }
+              score={parseScoreFromDetail(score.placement_details.los)}
               detail={score.placement_details.los || ""}
             />
           </>
         )}
 
-        <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-          <button
-            onClick={onRestart}
-            style={{
-              flex: 1,
-              padding: 14,
-              background: "#58a6ff18",
-              border: "1px solid #58a6ff55",
-              borderRadius: 6,
-              color: "#58a6ff",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: 1,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#58a6ff30";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#58a6ff18";
-            }}
-          >
-            NEW MISSION
+        {/* --- Action Buttons --- */}
+        <div className="debrief-buttons">
+          <button className="debrief-btn debrief-btn--primary" onClick={onRestart}>
+            REPLAY
           </button>
-          <button
-            onClick={onMainMenu}
-            style={{
-              flex: 1,
-              padding: 14,
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: 1,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#8b949e";
-              (e.currentTarget as HTMLElement).style.color = "#e6edf3";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#30363d";
-              (e.currentTarget as HTMLElement).style.color = "#8b949e";
-            }}
-          >
+          <button className="debrief-btn debrief-btn--secondary" onClick={onMainMenu}>
             MAIN MENU
           </button>
         </div>
@@ -367,14 +302,12 @@ export default function DebriefScreen({
 
 function parseScoreFromDetail(detail: string | undefined): number {
   if (!detail) return 0;
-  // Extract fraction like "3/5" and convert to percentage
   const match = detail.match(/(\d+)\/(\d+)/);
   if (match) {
     const num = parseInt(match[1], 10);
     const den = parseInt(match[2], 10);
     return den > 0 ? (num / den) * 100 : 0;
   }
-  // Extract percentage like "85%"
   const pctMatch = detail.match(/(\d+)%/);
   if (pctMatch) {
     return parseInt(pctMatch[1], 10);

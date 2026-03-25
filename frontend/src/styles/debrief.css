@@ -1,0 +1,254 @@
+/*
+ * Debrief Scorecard — dark tactical theme
+ * Issue #33 — post-scenario debrief screen styles
+ */
+
+.debrief-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0d1117;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.debrief-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 32px;
+  max-width: 640px;
+  width: 92%;
+  margin: 32px auto;
+}
+
+.debrief-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.debrief-label {
+  font-size: 10px;
+  color: #8b949e;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.debrief-scenario {
+  font-size: 13px;
+  color: #e6edf3;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.debrief-base-compromised {
+  color: #f85149;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border: 1px solid #f8514944;
+  border-radius: 6px;
+  background: #f8514911;
+  margin-bottom: 16px;
+  letter-spacing: 1px;
+}
+
+.debrief-grade {
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.debrief-total {
+  font-size: 22px;
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.debrief-time-bonus {
+  color: #d29922;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid #d2992244;
+  border-radius: 6px;
+  background: #d2992211;
+  margin-top: 12px;
+  letter-spacing: 0.5px;
+}
+
+/* --- Stats Grid --- */
+.debrief-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+}
+
+.debrief-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.debrief-stat-label {
+  font-size: 9px;
+  color: #484f58;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.debrief-stat-value {
+  font-size: 16px;
+  color: #e6edf3;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.debrief-stat-value--green {
+  color: #3fb950;
+}
+
+.debrief-stat-value--yellow {
+  color: #d29922;
+}
+
+.debrief-stat-value--red {
+  color: #f85149;
+}
+
+.debrief-stat-value--cyan {
+  color: #58a6ff;
+}
+
+/* --- Section Headers --- */
+.debrief-section-label {
+  font-size: 10px;
+  color: #8b949e;
+  letter-spacing: 1.5px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.debrief-section-label--border {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #30363d;
+}
+
+/* --- Buttons --- */
+.debrief-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.debrief-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.debrief-btn--primary {
+  background: #58a6ff18;
+  border: 1px solid #58a6ff55;
+  color: #58a6ff;
+}
+
+.debrief-btn--primary:hover {
+  background: #58a6ff30;
+}
+
+.debrief-btn--secondary {
+  background: transparent;
+  border: 1px solid #30363d;
+  color: #8b949e;
+}
+
+.debrief-btn--secondary:hover {
+  border-color: #8b949e;
+  color: #e6edf3;
+}
+
+/* --- Score Bars --- */
+.debrief-bar {
+  margin-bottom: 16px;
+}
+
+.debrief-bar-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.debrief-bar-label {
+  color: #e6edf3;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.debrief-bar-score {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.debrief-bar-track {
+  height: 6px;
+  background: #1c2333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.debrief-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease-out;
+}
+
+.debrief-bar-detail {
+  font-size: 10px;
+  color: #8b949e;
+  margin-top: 3px;
+}
+
+/* --- Tablet/iPad responsive --- */
+@media (max-width: 1023px) {
+  .debrief-card {
+    padding: 24px 20px;
+    max-width: 95%;
+  }
+
+  .debrief-stats-grid {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .debrief-stat-value {
+    font-size: 14px;
+  }
+}
+
+@media (pointer: coarse) {
+  .debrief-btn {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
