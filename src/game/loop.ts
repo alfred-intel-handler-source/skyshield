@@ -62,6 +62,7 @@ export function initGameState(
   terrain: TerrainFeature[],
 ): GameState {
   const gs = createGameState(scenario, sensorConfigs, effectorConfigsList, placementConfig, baseTemplate, terrain);
+  gs.endless_mode = scenario.endless_mode ?? false;
 
   // Spawn initial drones (apply spawn variance for randomization)
   for (const droneCfg of scenario.drones) {

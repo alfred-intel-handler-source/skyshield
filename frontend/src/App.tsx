@@ -193,6 +193,9 @@ export default function App() {
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialFeedback, setTutorialFeedback] = useState<string | null>(null);
 
+  // Endless mode
+  const [endlessMode, setEndlessMode] = useState(false);
+
   // Pause state
   const [paused, setPaused] = useState(false);
   const [notes, setNotes] = useState<string[]>([]);
@@ -729,6 +732,7 @@ export default function App() {
       baseId,
       placement,
       scorePlacement: true,
+      endlessMode,
     });
   };
 
@@ -759,6 +763,7 @@ export default function App() {
     setNotes([]);
     setWaveNumber(1);
     setShowRoeOverlay(false);
+    setEndlessMode(false);
   };
 
   const handleRestart = () => {
@@ -913,6 +918,14 @@ export default function App() {
       accent: "#d29922",
       duration: "12 min",
     },
+    {
+      id: "open_skies",
+      name: "OPEN SKIES",
+      description: "All threats. No script. 20 minutes of escalating chaos — or go endless.",
+      difficulty: "EXPERT",
+      accent: "#a371f7",
+      duration: "20 min",
+    },
   ];
 
   // --- Scenario Launch handler (replaces handleTutorialStart + handleQuickStart) ---
@@ -994,11 +1007,32 @@ export default function App() {
       ],
     };
 
+    const openSkiesPlacement: PlacementConfig = {
+      base_id: "medium_airbase",
+      sensors: [
+        { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
+        { catalog_id: "eoir_camera", x: 0.4, y: -0.2, facing_deg: 180 },
+      ],
+      effectors: [
+        { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
+        { catalog_id: "rf_jammer", x: -0.2, y: -0.1, facing_deg: 0 },
+        { catalog_id: "jackal_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
+        { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
+      ],
+      combined: [
+        { catalog_id: "shinobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shinobi", x: 0.3, y: 0.1, facing_deg: 0 },
+      ],
+    };
+
     const placementMap: Record<string, PlacementConfig> = {
       tutorial: tutorialPlacement,
       lone_wolf: loneWolfPlacement,
       swarm_attack: swarmPlacement,
       recon_probe: reconPlacement,
+      open_skies: openSkiesPlacement,
     };
     const placement = placementMap[scenarioId] ?? loneWolfPlacement;
 
@@ -1044,7 +1078,7 @@ export default function App() {
         setPlacementConfig(placement);
         setWaveNumber(1);
 
-        connect({ scenarioId, baseId, placement });
+        connect({ scenarioId, baseId, placement, endlessMode });
       };
       setPhase("roe_briefing");
     } catch {
@@ -1334,6 +1368,9 @@ export default function App() {
       <ROEBriefing
         scenarioName={roeScenarioName}
         roeBriefing={roeBriefing}
+        showEndlessToggle={scenarioId === "open_skies"}
+        endlessMode={endlessMode}
+        onEndlessModeChange={setEndlessMode}
         onConfirm={() => {
           const launch = pendingRoeLaunchRef.current;
           pendingRoeLaunchRef.current = null;
@@ -1341,6 +1378,7 @@ export default function App() {
         }}
         onBack={() => {
           pendingRoeLaunchRef.current = null;
+          setEndlessMode(false);
           setPhase("waiting");
         }}
       />

@@ -3,9 +3,12 @@ interface Props {
   roeBriefing: string[];
   onConfirm: () => void;
   onBack: () => void;
+  showEndlessToggle?: boolean;
+  endlessMode?: boolean;
+  onEndlessModeChange?: (enabled: boolean) => void;
 }
 
-export default function ROEBriefing({ scenarioName, roeBriefing, onConfirm, onBack }: Props) {
+export default function ROEBriefing({ scenarioName, roeBriefing, onConfirm, onBack, showEndlessToggle, endlessMode, onEndlessModeChange }: Props) {
   return (
     <div
       style={{
@@ -119,6 +122,59 @@ export default function ROEBriefing({ scenarioName, roeBriefing, onConfirm, onBa
             </div>
           ))}
         </div>
+
+        {/* Endless Mode Toggle */}
+        {showEndlessToggle && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+              marginBottom: 32,
+              padding: "14px 20px",
+              background: endlessMode ? "rgba(163, 113, 247, 0.08)" : "#161b22",
+              border: `1px solid ${endlessMode ? "rgba(163, 113, 247, 0.4)" : "#30363d"}`,
+              borderRadius: 8,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+            onClick={() => onEndlessModeChange?.(!endlessMode)}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 10,
+                background: endlessMode ? "#a371f7" : "#30363d",
+                position: "relative",
+                transition: "background 0.15s",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "#e6edf3",
+                  position: "absolute",
+                  top: 2,
+                  left: endlessMode ? 18 : 2,
+                  transition: "left 0.15s",
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: endlessMode ? "#a371f7" : "#8b949e", letterSpacing: 1 }}>
+                ENDLESS MODE
+              </div>
+              <div style={{ fontSize: 11, color: "#8b949e", marginTop: 2 }}>
+                Scenario continues past time limit at max intensity until you click END MISSION
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Buttons */}
         <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>

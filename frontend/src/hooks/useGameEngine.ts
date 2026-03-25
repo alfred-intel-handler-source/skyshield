@@ -50,6 +50,8 @@ export interface ConnectOptions {
   placement?: PlacementConfig;
   /** When true, placement is scored in debrief (custom mission with PlacementScreen). */
   scorePlacement?: boolean;
+  /** When true, scenario continues past time limit at max intensity. */
+  endlessMode?: boolean;
 }
 
 type MessageHandler = (msg: ServerMessage) => void;
@@ -99,6 +101,8 @@ export function useGameEngine(onMessage: MessageHandler) {
           typeof connectOpts === "string" ? undefined : connectOpts.placement;
         const scorePlacement =
           typeof connectOpts === "string" ? false : (connectOpts.scorePlacement ?? false);
+        const endlessMode =
+          typeof connectOpts === "string" ? false : (connectOpts.endlessMode ?? false);
 
         // Load scenario JSON
         const scenarioRes = await fetch(
@@ -146,6 +150,11 @@ export function useGameEngine(onMessage: MessageHandler) {
             }),
           ),
         };
+
+        // Apply endless mode override from connect options
+        if (endlessMode) {
+          scenario.endless_mode = true;
+        }
 
         // Load base template if specified
         let baseTemplate: BaseTemplate | null = null;
@@ -237,7 +246,7 @@ export function useGameEngine(onMessage: MessageHandler) {
           const timeRemaining = Math.max(0, g.max_duration - elapsed);
 
           // Time's up
-          if (timeRemaining <= 0) {
+          if (timeRemaining <= 0 && !g.endless_mode) {
             g.phase = "debrief";
             dispatch(buildDebrief(g, catalogRef.current ?? undefined));
             if (intervalRef.current) {

@@ -205,6 +205,7 @@ export interface ScenarioConfig {
   tutorial_prompts: Array<{ trigger: string; message: string }> | null;
   no_ambient: boolean;
   waves_enabled?: boolean;
+  endless_mode?: boolean;
 }
 
 export interface PlayerAction {
@@ -431,6 +432,7 @@ export interface GameState {
   paused: boolean;
   pause_start_time: number;
   total_paused_seconds: number;
+  endless_mode: boolean;
 }
 
 export function createGameState(
@@ -492,5 +494,6 @@ export function createGameState(
     paused: false,
     pause_start_time: 0,
     total_paused_seconds: 0,
+    endless_mode: false,
   };
 }

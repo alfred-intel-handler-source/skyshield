@@ -22,5 +22,11 @@
     "name": "Tutorial",
     "description": "A guided walkthrough of the DTID kill chain. A single slow-moving quadcopter approaches while step-by-step instructions guide you through detection, tracking, identification, and defeat.",
     "difficulty": "Tutorial"
+  },
+  {
+    "id": "open_skies",
+    "name": "Open Skies",
+    "description": "All threats. No script. 20 minutes of escalating chaos \u2014 or go endless. Quadcopters, fixed-wing UAS, Shaheds, birds, and friendly jets. Three phases of increasing intensity test every skill in the DTID kill chain.",
+    "difficulty": "Expert"
   }
 ]

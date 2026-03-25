@@ -165,6 +165,11 @@ export function handleEngage(
       break;
     }
 
+    // Bird engagement = ROE violation (still allow the engage to proceed for scoring)
+    if (d.drone_type === 'bird') {
+      msgs.push(_event(elapsed, `BIRD STRIKE \u2014 ROE VIOLATION: Engaged ${(d.display_label || d.id).toUpperCase()} (bird)`));
+    }
+
     const isJammer = effState.type === 'rf_jam' || effState.type === 'electronic';
     const isNexus = effState.type === 'nexus_pm';
 
