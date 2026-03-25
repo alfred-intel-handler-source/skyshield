@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING
 from app.helpers import (
     check_effector_in_range,
     check_ku_fcs_tracking,
-    check_shinobi_rf_tracking,
+    check_nexus_rf_tracking,
     effector_effectiveness,
     find_effector_config,
 )
 from app.jamming import apply_pnt_jamming, pick_jam_behavior
-from app.shinobi import is_shinobi_vulnerable, pick_shinobi_cm_effectiveness, DRONE_FREQUENCY_MAP
+from app.nexus import is_nexus_vulnerable, pick_nexus_cm_effectiveness, DRONE_FREQUENCY_MAP
 from app.models import (
     Affiliation,
     DroneState,
@@ -154,12 +154,12 @@ def handle_engage(
     target_id: str,
     effector_id: str,
     elapsed: float,
-    shinobi_cm: str | None = None,
+    nexus_cm: str | None = None,
 ) -> list[dict]:
     """Attempt to engage *target_id* with *effector_id*.
 
-    For SHINOBI Protocol Manipulation, *shinobi_cm* specifies the countermeasure
-    type: ``"shinobi_hold"``, ``"shinobi_land_now"``, or ``"shinobi_deafen"``.
+    For NEXUS Protocol Manipulation, *nexus_cm* specifies the countermeasure
+    type: ``"nexus_hold"``, ``"nexus_land_now"``, or ``"nexus_deafen"``.
 
     Returns a list of event / engagement_result messages.
     """
@@ -193,10 +193,10 @@ def handle_engage(
             break
 
         is_jammer = eff_state["type"] in ("rf_jam", "electronic")
-        is_shinobi = eff_state["type"] == "shinobi_pm"
+        is_nexus = eff_state["type"] == "nexus_pm"
 
-        # Range check (jammers can activate regardless; SHINOBI checked separately)
-        if not is_jammer and not is_shinobi and not check_effector_in_range(eff_state, d):
+        # Range check (jammers can activate regardless; NEXUS checked separately)
+        if not is_jammer and not is_nexus and not check_effector_in_range(eff_state, d):
             msgs.append(_event(elapsed,
                 f"ENGAGEMENT: {eff_state['name']} — Target out of range"))
             break
@@ -213,10 +213,10 @@ def handle_engage(
             eff_state["type"], d.drone_type.value
         )
 
-        # --- SHINOBI Protocol Manipulation path ---
-        if is_shinobi:
-            cm_type = shinobi_cm or "shinobi_hold"
-            msgs += _engage_shinobi(gs, j, d, eff_state, effector_id,
+        # --- NEXUS Protocol Manipulation path ---
+        if is_nexus:
+            cm_type = nexus_cm or "nexus_hold"
+            msgs += _engage_nexus(gs, j, d, eff_state, effector_id,
                                     target_id, cm_type, effectiveness, elapsed)
         # --- EW Jammer path ---
         elif is_jammer:
@@ -524,7 +524,7 @@ def _engage_direct(
     return msgs
 
 
-def _engage_shinobi(
+def _engage_nexus(
     gs: GameState,
     drone_idx: int,
     d: DroneState,
@@ -535,25 +535,25 @@ def _engage_shinobi(
     effectiveness: float,
     elapsed: float,
 ) -> list[dict]:
-    """SHINOBI Protocol Manipulation engagement."""
+    """NEXUS Protocol Manipulation engagement."""
     msgs: list[dict] = []
 
-    # SHINOBI requires its own RF sensor to have the target
-    if not check_shinobi_rf_tracking(gs.sensor_configs, d):
+    # NEXUS requires its own RF sensor to have the target
+    if not check_nexus_rf_tracking(gs.sensor_configs, d):
         msgs.append(_event(elapsed,
-            f"SHINOBI: NO RF TRACK — {target_id.upper()} not detected by SHINOBI sensor"))
+            f"NEXUS: NO RF TRACK — {target_id.upper()} not detected by NEXUS sensor"))
         return msgs
 
     # Range check — defeat range is shorter than detect range
     if not check_effector_in_range(eff_state, d):
         msgs.append(_event(elapsed,
-            f"SHINOBI: {target_id.upper()} outside defeat range (6km)"))
+            f"NEXUS: {target_id.upper()} outside defeat range (6km)"))
         return msgs
 
-    # Check if target is vulnerable to SHINOBI
-    if not is_shinobi_vulnerable(d):
+    # Check if target is vulnerable to NEXUS
+    if not is_nexus_vulnerable(d):
         msgs.append(_event(elapsed,
-            f"SHINOBI: {target_id.upper()} — NO PROTOCOL MATCH (not in library)"))
+            f"NEXUS: {target_id.upper()} — NO PROTOCOL MATCH (not in library)"))
         msgs.append({
             "type": "engagement_result",
             "target_id": target_id, "effector": effector_id,
@@ -562,29 +562,29 @@ def _engage_shinobi(
         return msgs
 
     # Check CM success (fixed-wing can resist)
-    if not pick_shinobi_cm_effectiveness(d, cm_type):
+    if not pick_nexus_cm_effectiveness(d, cm_type):
         msgs.append(_event(elapsed,
-            f"SHINOBI: {cm_type.replace('shinobi_', '').upper()} INEFFECTIVE — "
+            f"NEXUS: {cm_type.replace('nexus_', '').upper()} INEFFECTIVE — "
             f"autonomous navigation ({target_id.upper()})"))
         msgs.append({
             "type": "engagement_result",
             "target_id": target_id, "effector": effector_id,
             "effective": False, "effectiveness": 0.0,
-            "shinobi_cm": cm_type,
+            "nexus_cm": cm_type,
         })
         return msgs
 
-    # Apply SHINOBI countermeasure
+    # Apply NEXUS countermeasure
     freq = DRONE_FREQUENCY_MAP.get(d.drone_type.value, "2.4GHz")
-    cm_duration = random.uniform(15.0, 30.0)  # SHINOBI effects last longer than broadband jam
-    cm_label = cm_type.replace("shinobi_", "").replace("_", " ").upper()
+    cm_duration = random.uniform(15.0, 30.0)  # NEXUS effects last longer than broadband jam
+    cm_label = cm_type.replace("nexus_", "").replace("_", " ").upper()
 
     gs.drones[drone_idx] = d.model_copy(update={
         "dtid_phase": DTIDPhase.DEFEATED,
-        "shinobi_cm_active": cm_type,
-        "shinobi_cm_state": "pending",
-        "shinobi_cm_time_remaining": cm_duration,
-        "shinobi_cm_initial_duration": cm_duration,
+        "nexus_cm_active": cm_type,
+        "nexus_cm_state": "pending",
+        "nexus_cm_time_remaining": cm_duration,
+        "nexus_cm_initial_duration": cm_duration,
         "frequency_band": freq,
         "downlink_detected": True,
     })
@@ -595,12 +595,12 @@ def _engage_shinobi(
         effector=effector_id, timestamp=elapsed,
     ))
     msgs.append(_event(elapsed,
-        f"SHINOBI: {cm_label} command sent to {target_id.upper()} on {freq}"))
+        f"NEXUS: {cm_label} command sent to {target_id.upper()} on {freq}"))
     msgs.append({
         "type": "engagement_result",
         "target_id": target_id, "effector": effector_id,
         "effective": True, "effectiveness": round(effectiveness, 2),
-        "shinobi_cm": cm_type, "shinobi_cm_state": "pending",
+        "nexus_cm": cm_type, "nexus_cm_state": "pending",
     })
     return msgs
 

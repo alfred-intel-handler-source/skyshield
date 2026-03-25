@@ -6,7 +6,7 @@ Read CLAUDE.md for full project context, then implement these two focused featur
 
 ## Feature 1: EO/IR Camera Tracking Cone on Tactical Map
 
-When the operator slews the camera to a track, show a **triangular FOV cone** on the Leaflet tactical map originating from the camera's position and pointing toward the slewed track. This mirrors real FAAD C2 and Medusa behavior.
+When the operator slews the camera to a track, show a **triangular FOV cone** on the Leaflet tactical map originating from the camera's position and pointing toward the slewed track. This mirrors real GUARDIAN C2 and Cerberus behavior.
 
 **Behavior:**
 - When `slew_camera` is active (a track is being viewed in CameraPanel), draw a cone on the map from the EO/IR camera device position toward the slewed track

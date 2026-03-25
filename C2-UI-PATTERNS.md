@@ -1,6 +1,6 @@
 # C2 UI Patterns — Extracted from JCU Operator Course Materials
 
-## FAAD C2 UI Patterns
+## GUARDIAN C2 UI Patterns
 
 ### Hook Bubbles (Track Data Blocks)
 - Left-click a track to "hook" it — Hook Bubble Summary appears in upper left of display
@@ -56,12 +56,12 @@
 - SFEW node begins "radiating" when engaged
 - Redirect option: input MGRS coordinate to redirect EW
 
-## MEDUSA C2 UI Patterns
+## CERBERUS C2 UI Patterns
 
 ### HMI Overview
 - Android OS-based — works on tablets, monitors, laptops
 - Army Globe Engine (AGE) — 3D mapping (like Google Earth) with 3D objects
-- Video on Demand (VOD) for camera streaming through Medusa
+- Video on Demand (VOD) for camera streaming through Cerberus
 - Tool Tray at bottom of screen with selectable buttons
 
 ### Wheel of Death (WOD) — 3 Types
@@ -105,7 +105,7 @@
 - Engagement via WOD or menu system
 - System prioritizes effectors for operator
 
-## SHINOBI UI Patterns
+## NEXUS UI Patterns
 - SDR Platform Manager interface
 - Dashboard-based UI
 - Emulator system available for training
@@ -116,7 +116,7 @@
 ### HIGH PRIORITY (directly improves realism)
 1. **FAAD-style Hook Bubbles** — ALREADY ADDED (track data blocks)
 2. **Wheel of Death** — ALREADY ADDED (radial action wheel)
-3. **3 Types of WOD** (Medusa) — Add Device WOD for sensors/effectors, not just tracks
+3. **3 Types of WOD** (Cerberus) — Add Device WOD for sensors/effectors, not just tracks
 4. **Track Coasting** — When drone leaves sensor range, show faded/stippled icon extrapolating position
 5. **Hold Fire indicator** — HF dashed box around tracks under hold fire
 6. **Protected Area overlay** — Purple perimeter with ETA calculation

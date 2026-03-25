@@ -320,9 +320,9 @@ export function useGameEngine(onMessage: MessageHandler) {
           dispatchAll(advanceTutorialStep(gs, "engage", targetId, data.effector as string));
           break;
 
-        case "shinobi_hold":
-        case "shinobi_land_now":
-        case "shinobi_deafen":
+        case "nexus_hold":
+        case "nexus_land_now":
+        case "nexus_deafen":
           msgs = handleEngage(
             gs,
             targetId,

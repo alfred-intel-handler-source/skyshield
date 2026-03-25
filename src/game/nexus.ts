@@ -1,6 +1,6 @@
 /**
- * SHINOBI Protocol Manipulation — countermeasure logic and
- * drone behavior updates for SHINOBI defeats.
+ * NEXUS Protocol Manipulation — countermeasure logic and
+ * drone behavior updates for NEXUS defeats.
  *
  * Countermeasure types:
  *   - HOLD:     Freeze drone in place (hover lock)
@@ -11,7 +11,7 @@
  *   - 1/2 (downlink only): Partial effect — drone responds sluggishly
  *   - 2/2 (uplink acquired): Full protocol control — immediate effect
  *
- * Direct port of backend/app/shinobi.py to TypeScript.
+ * Direct port of backend/app/nexus.py to TypeScript.
  */
 
 import type { DroneState, DroneType } from './state';
@@ -28,8 +28,8 @@ export const DRONE_FREQUENCY_MAP: Record<string, string> = {
   swarm: '2.4GHz',
 };
 
-// Drones that SHINOBI cannot affect (no RF control link in library)
-export const SHINOBI_IMMUNE_TYPES: Set<DroneType> = new Set<DroneType>([
+// Drones that NEXUS cannot affect (no RF control link in library)
+export const NEXUS_IMMUNE_TYPES: Set<DroneType> = new Set<DroneType>([
   'bird',
   'weather_balloon',
   'passenger_aircraft',
@@ -40,20 +40,20 @@ export const SHINOBI_IMMUNE_TYPES: Set<DroneType> = new Set<DroneType>([
 // Vulnerability / effectiveness checks
 // ---------------------------------------------------------------------------
 
-/** Check if a drone can be affected by SHINOBI protocol manipulation. */
-export function isShinobiVulnerable(drone: DroneState): boolean {
-  if (SHINOBI_IMMUNE_TYPES.has(drone.drone_type)) return false;
+/** Check if a drone can be affected by NEXUS protocol manipulation. */
+export function isNexusVulnerable(drone: DroneState): boolean {
+  if (NEXUS_IMMUNE_TYPES.has(drone.drone_type)) return false;
   if (!drone.rf_emitting) return false;
   return true;
 }
 
 /**
- * Determine if a SHINOBI countermeasure succeeds on this drone.
+ * Determine if a NEXUS countermeasure succeeds on this drone.
  *
  * Fixed-wing UAS with autonomous navigation have a 30% chance to resist.
  * All other RF-emitting types are reliably affected.
  */
-export function pickShinobiCmEffectiveness(
+export function pickNexusCmEffectiveness(
   drone: DroneState,
   _cmType: string,
 ): boolean {
@@ -67,37 +67,37 @@ export function pickShinobiCmEffectiveness(
 // Event helper type
 // ---------------------------------------------------------------------------
 
-interface ShinobiEvent {
+interface NexusEvent {
   type: string;
   timestamp: number;
   message: string;
 }
 
 // ---------------------------------------------------------------------------
-// Update SHINOBI-affected drones (called each tick from game loop)
+// Update NEXUS-affected drones (called each tick from game loop)
 // ---------------------------------------------------------------------------
 
 /**
- * Advance a drone under SHINOBI countermeasure effect by one tick.
+ * Advance a drone under NEXUS countermeasure effect by one tick.
  *
  * Returns a tuple of [updatedDrone, events].
  */
-export function updateShinobiDrone(
+export function updateNexusDrone(
   drone: DroneState,
   tickRate: number,
   elapsed: number,
-): [DroneState, ShinobiEvent[]] {
-  const events: ShinobiEvent[] = [];
-  const cm = drone.shinobi_cm_active;
-  const cmState = drone.shinobi_cm_state;
+): [DroneState, NexusEvent[]] {
+  const events: NexusEvent[] = [];
+  const cm = drone.nexus_cm_active;
+  const cmState = drone.nexus_cm_state;
 
   // Decrement CM timer
-  const prevRemaining = drone.shinobi_cm_time_remaining;
+  const prevRemaining = drone.nexus_cm_time_remaining;
   const remaining = Math.max(0.0, prevRemaining - tickRate);
-  drone = { ...drone, shinobi_cm_time_remaining: remaining };
+  drone = { ...drone, nexus_cm_time_remaining: remaining };
 
   // Track how long CM has been active (initial duration - remaining)
-  const cmElapsed = drone.shinobi_cm_initial_duration - remaining;
+  const cmElapsed = drone.nexus_cm_initial_duration - remaining;
 
   // --- State progression: pending -> 1/2 -> 2/2 ---
   if (cmState === 'pending') {
@@ -105,13 +105,13 @@ export function updateShinobiDrone(
     if (cmElapsed >= 1.0 || remaining <= 0) {
       drone = {
         ...drone,
-        shinobi_cm_state: '1/2',
+        nexus_cm_state: '1/2',
         downlink_detected: true,
       };
       events.push({
         type: 'event',
         timestamp: Math.round(elapsed * 10) / 10,
-        message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — Downlink acquired (1/2)`,
+        message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — Downlink acquired (1/2)`,
       });
     }
     return [drone, events];
@@ -124,24 +124,24 @@ export function updateShinobiDrone(
       const newDuration = 20.0 + Math.random() * 20.0;
       drone = {
         ...drone,
-        shinobi_cm_state: '2/2',
-        shinobi_cm_time_remaining: newDuration,
-        shinobi_cm_initial_duration: newDuration,
+        nexus_cm_state: '2/2',
+        nexus_cm_time_remaining: newDuration,
+        nexus_cm_initial_duration: newDuration,
       };
       events.push({
         type: 'event',
         timestamp: Math.round(elapsed * 10) / 10,
-        message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — Uplink acquired (2/2) — FULL CONTROL`,
+        message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — Uplink acquired (2/2) — FULL CONTROL`,
       });
-    } else if (cm === 'shinobi_hold') {
+    } else if (cm === 'nexus_hold') {
       // Partial hold — drone slows significantly
       const newSpeed = Math.max(5, drone.speed * 0.85);
       drone = { ...drone, speed: newSpeed };
-    } else if (cm === 'shinobi_land_now') {
+    } else if (cm === 'nexus_land_now') {
       // Partial land — slow descent
       const newAlt = Math.max(0, drone.altitude - 10 * tickRate);
       drone = { ...drone, altitude: newAlt };
-    } else if (cm === 'shinobi_deafen') {
+    } else if (cm === 'nexus_deafen') {
       // Partial deafen — intermittent link disruption (speed jitter)
       const newSpeed = drone.speed * (0.7 + Math.random() * 0.3);
       drone = { ...drone, speed: Math.max(0, newSpeed) };
@@ -151,15 +151,15 @@ export function updateShinobiDrone(
 
   // --- 2/2 state: full protocol control ---
   if (cmState === '2/2') {
-    if (cm === 'shinobi_hold') {
+    if (cm === 'nexus_hold') {
       const [holdDrone, holdEvents] = applyHold(drone, tickRate, elapsed);
       drone = holdDrone;
       events.push(...holdEvents);
-    } else if (cm === 'shinobi_land_now') {
+    } else if (cm === 'nexus_land_now') {
       const [landDrone, landEvents] = applyLandNow(drone, tickRate, elapsed);
       drone = landDrone;
       events.push(...landEvents);
-    } else if (cm === 'shinobi_deafen') {
+    } else if (cm === 'nexus_deafen') {
       const [deafenDrone, deafenEvents] = applyDeafen(drone, tickRate, elapsed);
       drone = deafenDrone;
       events.push(...deafenEvents);
@@ -170,14 +170,14 @@ export function updateShinobiDrone(
   if (remaining <= 0 && !drone.neutralized) {
     drone = {
       ...drone,
-      shinobi_cm_active: null,
-      shinobi_cm_state: null,
-      shinobi_cm_time_remaining: 0,
+      nexus_cm_active: null,
+      nexus_cm_state: null,
+      nexus_cm_time_remaining: 0,
     };
     events.push({
       type: 'event',
       timestamp: Math.round(elapsed * 10) / 10,
-      message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — CM effect expired`,
+      message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — CM effect expired`,
     });
   }
 
@@ -193,8 +193,8 @@ function applyHold(
   drone: DroneState,
   tickRate: number,
   _elapsed: number,
-): [DroneState, ShinobiEvent[]] {
-  const events: ShinobiEvent[] = [];
+): [DroneState, NexusEvent[]] {
+  const events: NexusEvent[] = [];
   if (drone.speed > 1) {
     // Rapid deceleration to hover
     const newSpeed = Math.max(0, drone.speed - 20 * tickRate);
@@ -211,8 +211,8 @@ function applyLandNow(
   drone: DroneState,
   tickRate: number,
   elapsed: number,
-): [DroneState, ShinobiEvent[]] {
-  const events: ShinobiEvent[] = [];
+): [DroneState, NexusEvent[]] {
+  const events: NexusEvent[] = [];
   const descentRate = 100.0; // feet per second
   const newAlt = Math.max(0, drone.altitude - descentRate * tickRate);
   const newSpeed = Math.max(0, drone.speed * 0.9); // Also decelerating
@@ -224,12 +224,12 @@ function applyLandNow(
       neutralized: true,
       altitude: 0,
       speed: 0,
-      shinobi_cm_time_remaining: 0,
+      nexus_cm_time_remaining: 0,
     };
     events.push({
       type: 'event',
       timestamp: Math.round(elapsed * 10) / 10,
-      message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — FORCED LANDING COMPLETE (grounded)`,
+      message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — FORCED LANDING COMPLETE (grounded)`,
     });
   }
   return [drone, events];
@@ -246,8 +246,8 @@ function applyDeafen(
   drone: DroneState,
   tickRate: number,
   elapsed: number,
-): [DroneState, ShinobiEvent[]] {
-  const events: ShinobiEvent[] = [];
+): [DroneState, NexusEvent[]] {
+  const events: NexusEvent[] = [];
 
   if (
     drone.drone_type === ('commercial_quad' as DroneType) ||
@@ -268,12 +268,12 @@ function applyDeafen(
         neutralized: true,
         altitude: 0,
         speed: 0,
-        shinobi_cm_time_remaining: 0,
+        nexus_cm_time_remaining: 0,
       };
       events.push({
         type: 'event',
         timestamp: Math.round(elapsed * 10) / 10,
-        message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — LINK LOST — FAILSAFE LANDING`,
+        message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — LINK LOST — FAILSAFE LANDING`,
       });
     }
   } else {
@@ -293,12 +293,12 @@ function applyDeafen(
       drone = {
         ...drone,
         neutralized: true,
-        shinobi_cm_time_remaining: 0,
+        nexus_cm_time_remaining: 0,
       };
       events.push({
         type: 'event',
         timestamp: Math.round(elapsed * 10) / 10,
-        message: `SHINOBI: ${(drone.display_label || drone.id).toUpperCase()} — LINK LOST — LEFT AREA`,
+        message: `NEXUS: ${(drone.display_label || drone.id).toUpperCase()} — LINK LOST — LEFT AREA`,
       });
     }
   }

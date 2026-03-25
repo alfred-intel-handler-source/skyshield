@@ -43,7 +43,7 @@ _EFFECTIVENESS_MATRIX: dict[str, dict[str, float]] = {
         "micro": 0.95,
         "swarm": 0.8,
     },
-    "shinobi_pm": {
+    "nexus_pm": {
         "commercial_quad": 0.95,
         "fixed_wing": 0.3,   # Many fixed-wing use autonomous nav
         "micro": 0.9,
@@ -126,8 +126,8 @@ def check_ku_fcs_tracking(sensor_configs: list[SensorConfig], drone: DroneState)
     return False
 
 
-def check_shinobi_rf_tracking(sensor_configs: list[SensorConfig], drone: DroneState) -> bool:
-    """Check if any SHINOBI RF sensor has the drone in detection range and
+def check_nexus_rf_tracking(sensor_configs: list[SensorConfig], drone: DroneState) -> bool:
+    """Check if any NEXUS RF sensor has the drone in detection range and
     the drone is RF-emitting (library match required)."""
     if not drone.rf_emitting:
         return False
@@ -135,7 +135,7 @@ def check_shinobi_rf_tracking(sensor_configs: list[SensorConfig], drone: DroneSt
     for s in sensor_configs:
         if s.type != SensorType.RF:
             continue
-        if "shinobi" not in s.id.lower() and "shinobi" not in s.name.lower():
+        if "nexus" not in s.id.lower() and "nexus" not in s.name.lower():
             continue
         dist = math.sqrt((drone.x - s.x) ** 2 + (drone.y - s.y) ** 2)
         if dist <= s.range_km:
@@ -151,7 +151,7 @@ def check_shinobi_rf_tracking(sensor_configs: list[SensorConfig], drone: DroneSt
 def build_sensors_from_placement(placement, catalog_sensors, catalog_combined=None):
     """Build SensorConfig list from player's placement choices.
 
-    Also generates sensor configs from combined placements (e.g. SHINOBI).
+    Also generates sensor configs from combined placements (e.g. NEXUS).
     """
     from app.models import SensorConfig, SensorType
 
@@ -174,7 +174,7 @@ def build_sensors_from_placement(placement, catalog_sensors, catalog_combined=No
             requires_los=cat.requires_los,
         ))
 
-    # Combined systems (e.g. SHINOBI) — auto-create sensor at same position
+    # Combined systems (e.g. NEXUS) — auto-create sensor at same position
     if catalog_combined:
         for i, placed in enumerate(placement.combined):
             cat = catalog_combined.get(placed.catalog_id)
@@ -200,7 +200,7 @@ def build_sensors_from_placement(placement, catalog_sensors, catalog_combined=No
 def build_effectors_from_placement(placement, catalog_effectors, catalog_combined=None):
     """Build EffectorConfig list from player's placement choices.
 
-    Also generates effector configs from combined placements (e.g. SHINOBI).
+    Also generates effector configs from combined placements (e.g. NEXUS).
     """
     from app.models import EffectorConfig, EffectorType
 
@@ -227,7 +227,7 @@ def build_effectors_from_placement(placement, catalog_effectors, catalog_combine
             ammo_remaining=cat.ammo_count,
         ))
 
-    # Combined systems (e.g. SHINOBI) — auto-create effector at same position
+    # Combined systems (e.g. NEXUS) — auto-create effector at same position
     if catalog_combined:
         for i, placed in enumerate(placement.combined):
             cat = catalog_combined.get(placed.catalog_id)

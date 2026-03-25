@@ -111,7 +111,7 @@ export interface RfReading {
   downlink_detected?: boolean;
   uplink_detected?: boolean;
   rssi_dbm?: number;
-  is_shinobi?: boolean;
+  is_nexus?: boolean;
 }
 
 export interface EoirReading {
@@ -175,10 +175,10 @@ export class SensorSimulator {
       sensor_id: sensor.id,
       bearing_deg: Math.round(((bearing + gauss(0, noiseFactor * 5)) % 360 + 360) % 360 * 10) / 10,
     };
-    const isShinobi =
-      sensor.id.toLowerCase().includes('shinobi') ||
-      sensor.name.toLowerCase().includes('shinobi');
-    if (isShinobi) {
+    const isNexus =
+      sensor.id.toLowerCase().includes('nexus') ||
+      sensor.name.toLowerCase().includes('nexus');
+    if (isNexus) {
       const bandMap: Record<string, string> = {
         commercial_quad: '2.4GHz',
         micro: '5.8GHz',
@@ -193,7 +193,7 @@ export class SensorSimulator {
       result.downlink_detected = downlink;
       result.uplink_detected = uplink;
       result.rssi_dbm = rssiDbm;
-      result.is_shinobi = true;
+      result.is_nexus = true;
     }
     return result;
   }

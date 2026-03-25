@@ -45,7 +45,7 @@ from app.helpers import (
     threat_level,
 )
 from app.jamming import apply_pnt_jamming, pick_jam_behavior, update_jammed_drone, update_pnt_jammed_drone
-from app.shinobi import update_shinobi_drone
+from app.nexus import update_nexus_drone
 from app.models import (
     Affiliation,
     BaseTemplate,
@@ -74,7 +74,7 @@ VALID_BASE_IDS = {"small_fob", "medium_airbase", "large_installation"}
 VALID_ACTION_NAMES = {
     "confirm_track", "identify", "engage", "hold_fire",
     "release_hold_fire", "end_mission", "slew_camera",
-    "shinobi_hold", "shinobi_land_now", "shinobi_deafen",
+    "nexus_hold", "nexus_land_now", "nexus_deafen",
     "jammer_toggle", "jam_all", "cease_jam", "clear_airspace",
     "pause_mission", "resume_mission",
 }
@@ -434,7 +434,7 @@ def _tick_passive_jamming(gs: GameState, elapsed: float) -> list[dict]:
         for i, drone in enumerate(gs.drones):
             if drone.neutralized or drone.is_interceptor:
                 continue
-            if drone.shinobi_cm_active:
+            if drone.nexus_cm_active:
                 continue
             dist = math.sqrt((drone.x - eff_x) ** 2 + (drone.y - eff_y) ** 2)
             if dist > range_km:
@@ -539,9 +539,9 @@ def _tick_drones(gs: GameState, elapsed: float) -> list[dict]:
             # but position was already perturbed by update_pnt_jammed_drone.
             drone = gs.drones[i]
 
-        # --- SHINOBI countermeasure active ---
-        if drone.shinobi_cm_active:
-            updated, nevents = update_shinobi_drone(drone, gs.tick_rate, elapsed)
+        # --- NEXUS countermeasure active ---
+        if drone.nexus_cm_active:
+            updated, nevents = update_nexus_drone(drone, gs.tick_rate, elapsed)
             gs.drones[i] = updated
             events.extend(nevents)
             continue
@@ -586,15 +586,15 @@ def _run_sensors_for_drone(gs: GameState, i: int, elapsed: float) -> list[dict]:
     dist = distance_to_base(drone)
     confidence = calculate_confidence(detecting_ids, dist)
 
-    # Propagate SHINOBI RF data to drone state
-    shinobi_updates: dict = {}
+    # Propagate NEXUS RF data to drone state
+    nexus_updates: dict = {}
     for reading in readings:
-        if reading.get("is_shinobi"):
-            shinobi_updates["frequency_band"] = reading.get("frequency_band")
-            shinobi_updates["downlink_detected"] = reading.get("downlink_detected", False)
-            shinobi_updates["uplink_detected"] = reading.get("uplink_detected", False)
-    if shinobi_updates:
-        gs.drones[i] = gs.drones[i].model_copy(update=shinobi_updates)
+        if reading.get("is_nexus"):
+            nexus_updates["frequency_band"] = reading.get("frequency_band")
+            nexus_updates["downlink_detected"] = reading.get("downlink_detected", False)
+            nexus_updates["uplink_detected"] = reading.get("uplink_detected", False)
+    if nexus_updates:
+        gs.drones[i] = gs.drones[i].model_copy(update=nexus_updates)
         drone = gs.drones[i]
 
     # First detection time
@@ -605,11 +605,11 @@ def _run_sensors_for_drone(gs: GameState, i: int, elapsed: float) -> list[dict]:
     prev = gs.previously_detected.get(drone.id, set())
     new_sensors = set(detecting_ids) - prev
     if not prev and detecting_ids:
-        # Determine if SHINOBI detected it (use "RF" label) vs radar
-        has_shinobi = any(r.get("is_shinobi") for r in readings)
-        detect_label = "SHINOBI RF" if has_shinobi and not any(
+        # Determine if NEXUS detected it (use "RF" label) vs radar
+        has_nexus = any(r.get("is_nexus") for r in readings)
+        detect_label = "NEXUS RF" if has_nexus and not any(
             "radar" in sid.lower() or "tpq" in sid.lower() or "kufcs" in sid.lower()
-            for sid in detecting_ids if not ("shinobi" in sid.lower())
+            for sid in detecting_ids if not ("nexus" in sid.lower())
         ) else "RADAR"
         events.append({
             "type": "event", "timestamp": round(elapsed, 1),
@@ -758,8 +758,8 @@ def _build_state_msg(gs: GameState, elapsed: float, time_remaining: float) -> di
                 "frequency_band": drone.frequency_band,
                 "uplink_detected": drone.uplink_detected,
                 "downlink_detected": drone.downlink_detected,
-                "shinobi_cm_active": drone.shinobi_cm_active,
-                "shinobi_cm_state": drone.shinobi_cm_state,
+                "nexus_cm_active": drone.nexus_cm_active,
+                "nexus_cm_state": drone.nexus_cm_state,
                 "drone_type": drone.drone_type.value if hasattr(drone.drone_type, "value") else drone.drone_type,
                 "spinup_remaining": round(drone.spinup_remaining, 1),
             })
@@ -1188,14 +1188,14 @@ async def game_websocket(ws: WebSocket):
                         effector_id = msg.get("effector", "")
                         await _send_msgs(ws, handle_engage(
                             gs, target_id, effector_id, elapsed,
-                            shinobi_cm=msg.get("shinobi_cm"),
+                            nexus_cm=msg.get("nexus_cm"),
                         ))
                         await _send_msgs(ws, _advance_tutorial_step(
                             gs, "engage", target_id, effector_id=effector_id))
-                    elif action_name in ("shinobi_hold", "shinobi_land_now", "shinobi_deafen"):
+                    elif action_name in ("nexus_hold", "nexus_land_now", "nexus_deafen"):
                         await _send_msgs(ws, handle_engage(
                             gs, target_id, msg.get("effector", ""), elapsed,
-                            shinobi_cm=action_name,
+                            nexus_cm=action_name,
                         ))
                     elif action_name == "jammer_toggle":
                         await _send_msgs(ws, handle_jammer_toggle(
