@@ -1992,7 +1992,7 @@ export default function TacticalMap({
             onHoldFire={onHoldFire}
             onReleaseHoldFire={onReleaseHoldFire}
             onCallATC={onCallATC}
-            iffStatus={wheelTrack.iff_status}
+            iffStatus={wheelTrack.iff_status ?? (wheelTrack.affiliation?.toLowerCase() === "unknown" ? "unknown" : undefined)}
             atcCalled={wheelTrack.atc_called}
             onClose={() => setWheelState(null)}
           />
