@@ -1,0 +1,59 @@
+{
+  "id": "open_skies",
+  "name": "OPEN SKIES",
+  "description": "Unscripted free-play. Three escalating threat phases then endless chaos.",
+  "difficulty": "Variable",
+  "duration_seconds": 1200,
+  "base_radius_km": 0.1,
+  "waves_enabled": true,
+  "free_play": true,
+  "endless_after_seconds": 1200,
+  "unknown_spawn_rate": 0.15,
+  "phases": [
+    {
+      "name": "RECON",
+      "start_seconds": 0,
+      "end_seconds": 300,
+      "max_active": 2,
+      "spawn_interval": 45,
+      "threat_types": ["commercial_quad", "micro", "bird"]
+    },
+    {
+      "name": "BUILDUP",
+      "start_seconds": 300,
+      "end_seconds": 720,
+      "max_active": 4,
+      "spawn_interval": 30,
+      "threat_types": ["commercial_quad", "micro", "fixed_wing", "improvised", "bird", "weather_balloon"]
+    },
+    {
+      "name": "OVERWHELM",
+      "start_seconds": 720,
+      "end_seconds": 1200,
+      "max_active": 8,
+      "spawn_interval": 15,
+      "threat_types": ["commercial_quad", "micro", "fixed_wing", "improvised", "shahed", "bird", "weather_balloon"]
+    }
+  ],
+  "location": {
+    "lat": 36.0,
+    "lng": -79.0,
+    "zoom": 13
+  },
+  "roe_briefing": [
+    "Positive identification required before any engagement",
+    "Do not engage tracks classified as FRIENDLY or CIVILIAN",
+    "Electronic countermeasures authorized against confirmed hostile UAS",
+    "Kinetic engagement authorized only when electronic defeat is ineffective or unavailable",
+    "All engagements must occur within the weapon engagement zone (WEZ)",
+    "Free-play mode — end mission at your discretion"
+  ],
+  "engagement_zones": {
+    "detection_range_km": 5.0,
+    "identification_range_km": 1.5,
+    "engagement_range_km": 2.5
+  },
+  "sensors": [],
+  "effectors": [],
+  "drones": []
+}

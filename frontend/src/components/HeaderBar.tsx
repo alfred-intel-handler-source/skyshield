@@ -21,6 +21,8 @@ interface Props {
   effectors?: EffectorStatus[];
   ambientSuppressedUntil?: number;
   onShowRoe?: () => void;
+  freePlayPhase?: string | null;
+  isEndless?: boolean;
 }
 
 const THREAT_COLORS: Record<ThreatLevel, string> = {
@@ -51,6 +53,8 @@ export default function HeaderBar({
   effectors = [],
   ambientSuppressedUntil = 0,
   onShowRoe,
+  freePlayPhase = null,
+  isEndless = false,
 }: Props) {
   const threatColor = THREAT_COLORS[threatLevel];
   const allJammersActive = effectors.filter(
@@ -112,21 +116,39 @@ export default function HeaderBar({
         >
           {scenarioName}
         </span>
-        <span
-          style={{
-            padding: "2px 10px",
-            borderRadius: 10,
-            background: "rgba(88, 166, 255, 0.15)",
-            border: "1px solid rgba(88, 166, 255, 0.4)",
-            color: "#58a6ff",
-            fontSize: 11,
-            fontWeight: 700,
-            fontFamily: "'JetBrains Mono', monospace",
-            letterSpacing: 1,
-          }}
-        >
-          WAVE {waveNumber}
-        </span>
+        {freePlayPhase ? (
+          <span
+            style={{
+              padding: "2px 10px",
+              borderRadius: 10,
+              background: isEndless ? "rgba(248, 81, 73, 0.15)" : "rgba(88, 166, 255, 0.15)",
+              border: `1px solid ${isEndless ? "rgba(248, 81, 73, 0.4)" : "rgba(88, 166, 255, 0.4)"}`,
+              color: isEndless ? "#f85149" : "#58a6ff",
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: 1,
+            }}
+          >
+            {freePlayPhase}
+          </span>
+        ) : (
+          <span
+            style={{
+              padding: "2px 10px",
+              borderRadius: 10,
+              background: "rgba(88, 166, 255, 0.15)",
+              border: "1px solid rgba(88, 166, 255, 0.4)",
+              color: "#58a6ff",
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: 1,
+            }}
+          >
+            WAVE {waveNumber}
+          </span>
+        )}
         <span
           style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -233,10 +255,10 @@ export default function HeaderBar({
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 14,
               fontWeight: 600,
-              color: "#e6edf3",
+              color: isEndless ? "#f85149" : "#e6edf3",
             }}
           >
-            {mins}:{secs.toString().padStart(2, "0")}
+            {isEndless ? "ENDLESS" : `${mins}:${secs.toString().padStart(2, "0")}`}
           </span>
         </div>
 

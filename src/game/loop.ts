@@ -224,6 +224,125 @@ export function tickSpawns(gs: GameState, elapsed: number): Msg[] {
   return events;
 }
 
+// ---------------------------------------------------------------------------
+// Free-play phase-based spawning
+// ---------------------------------------------------------------------------
+
+/** Drone templates for free-play phase spawning, keyed by threat type string. */
+const _FREE_PLAY_TEMPLATES: Record<string, Omit<DroneStartConfig, 'id' | 'start_x' | 'start_y' | 'heading' | 'spawn_delay'>> = {
+  commercial_quad: {
+    drone_type: 'commercial_quad', altitude: 150, speed: 35, behavior: 'direct_approach',
+    rf_emitting: true, should_engage: true,
+    correct_classification: 'commercial_quad', correct_affiliation: 'hostile',
+    optimal_effectors: ['electronic'], acceptable_effectors: ['electronic', 'kinetic'], roe_violations: [],
+  },
+  micro: {
+    drone_type: 'micro', altitude: 80, speed: 25, behavior: 'evasive',
+    rf_emitting: true, should_engage: true,
+    correct_classification: 'micro', correct_affiliation: 'hostile',
+    optimal_effectors: ['electronic', 'kinetic'], acceptable_effectors: ['electronic', 'kinetic'], roe_violations: [],
+  },
+  fixed_wing: {
+    drone_type: 'fixed_wing', altitude: 300, speed: 60, behavior: 'direct_approach',
+    rf_emitting: false, should_engage: true,
+    correct_classification: 'fixed_wing', correct_affiliation: 'hostile',
+    optimal_effectors: ['kinetic'], acceptable_effectors: ['kinetic', 'electronic'], roe_violations: [],
+  },
+  improvised: {
+    drone_type: 'improvised', altitude: 100, speed: 30, behavior: 'direct_approach',
+    rf_emitting: true, should_engage: true,
+    correct_classification: 'improvised', correct_affiliation: 'hostile',
+    optimal_effectors: ['electronic', 'kinetic'], acceptable_effectors: ['electronic', 'kinetic'], roe_violations: [],
+  },
+  shahed: {
+    drone_type: 'shahed', altitude: 200, speed: 80, behavior: 'direct_approach',
+    rf_emitting: false, should_engage: true,
+    correct_classification: 'shahed', correct_affiliation: 'hostile',
+    optimal_effectors: ['kinetic'], acceptable_effectors: ['kinetic'], roe_violations: [],
+  },
+  bird: {
+    drone_type: 'bird', altitude: 150, speed: 30, behavior: 'evasive',
+    rf_emitting: false, should_engage: false,
+    correct_classification: 'bird', correct_affiliation: 'neutral',
+    optimal_effectors: [], acceptable_effectors: [], roe_violations: ['electronic', 'kinetic', 'rf_jam', 'directed_energy', 'net_interceptor'],
+  },
+  balloon: {
+    drone_type: 'weather_balloon', altitude: 800, speed: 3, behavior: 'waypoint_path',
+    rf_emitting: false, should_engage: false,
+    correct_classification: 'weather_balloon', correct_affiliation: 'neutral',
+    optimal_effectors: [], acceptable_effectors: [], roe_violations: ['electronic', 'kinetic', 'rf_jam', 'directed_energy', 'net_interceptor'],
+  },
+};
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function tickFreePlaySpawns(gs: GameState, elapsed: number): Msg[] {
+  const events: Msg[] = [];
+  const phases = gs.scenario.phases;
+  if (!phases || !gs.scenario.free_play) return events;
+
+  // Determine current phase (use last phase for endless mode)
+  let currentPhase = phases[phases.length - 1];
+  for (const p of phases) {
+    if (elapsed >= p.start_seconds && elapsed < p.end_seconds) {
+      currentPhase = p;
+      break;
+    }
+  }
+
+  // Check spawn interval
+  if (elapsed - gs.free_play_last_spawn_time < currentPhase.spawn_interval) return events;
+
+  // Check max_active (non-neutralized, non-ambient threats)
+  const activeThreatCount = gs.drones.filter(d => !d.is_ambient && !d.neutralized).length;
+  if (activeThreatCount >= currentPhase.max_active) return events;
+
+  // Pick random threat type from phase
+  const types = currentPhase.threat_types;
+  const chosenType = types[Math.floor(Math.random() * types.length)];
+  const template = _FREE_PLAY_TEMPLATES[chosenType];
+  if (!template) return events;
+
+  gs.free_play_spawn_counter += 1;
+  const angle = Math.random() * 2 * Math.PI;
+  const dist = 3.5 + Math.random() * 1.5;
+  const startX = dist * Math.cos(angle);
+  const startY = dist * Math.sin(angle);
+  const heading = ((Math.atan2(-startY, -startX) * 180) / Math.PI + 360) % 360;
+
+  const cfg: DroneStartConfig = {
+    id: `fp-${gs.free_play_spawn_counter}`,
+    ...template,
+    start_x: round2(startX),
+    start_y: round2(startY),
+    heading,
+    altitude: template.altitude + Math.floor(Math.random() * 60 - 30),
+    speed: template.speed + Math.floor(Math.random() * 10 - 5),
+    spawn_delay: 0,
+  };
+
+  // For balloons, add a waypoint
+  if (chosenType === 'balloon') {
+    cfg.waypoints = [[round2(startX + (Math.random() - 0.5)), round2(startY + (Math.random() - 0.5))]];
+  }
+
+  gs.drone_configs.set(cfg.id, cfg);
+  const label = nextTrackLabel(gs);
+  const drone = { ...createDroneFromConfig(cfg), wave_number: gs.current_wave, display_label: label };
+  gs.drones.push(drone);
+  gs.behaviors.set(cfg.id, cfg.behavior);
+  gs.free_play_last_spawn_time = elapsed;
+
+  events.push({
+    type: 'event', timestamp: Math.round(elapsed * 10) / 10,
+    message: `RADAR: New contact emerging \u2014 ${label}`,
+  });
+
+  return events;
+}
+
 export function tickWaves(gs: GameState, elapsed: number): Msg[] {
   const events: Msg[] = [];
   if (gs.scenario.waves_enabled === false) return events;

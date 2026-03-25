@@ -189,6 +189,9 @@ export default function App() {
   // Track which tracks have already auto-opened the camera (so we only do it once)
   const autoOpenedCameraRef = useRef<Set<string>>(new Set());
 
+  // Free-play state
+  const [isFreePlay, setIsFreePlay] = useState(false);
+
   // Tutorial state
   const [isTutorial, setIsTutorial] = useState(false);
   const [tutorialMessage, setTutorialMessage] = useState<string | null>(null);
@@ -814,6 +817,7 @@ export default function App() {
       detectionPingedRef.current.clear();
     setTutorialMessage(null);
     setIsTutorial(false);
+    setIsFreePlay(false);
     setTutorialStep(0);
     setTutorialFeedback(null);
     setPaused(false);
@@ -850,6 +854,7 @@ export default function App() {
     setPlacementConfig(null);
     setTutorialMessage(null);
     setIsTutorial(false);
+    setIsFreePlay(false);
     setTutorialStep(0);
     setTutorialFeedback(null);
     setPaused(false);
@@ -1100,6 +1105,15 @@ export default function App() {
       accent: "#d29922",
       duration: "12 min",
     },
+    {
+      id: "open_skies",
+      name: "OPEN SKIES",
+      subtitle: "Free Play",
+      description: "Unscripted free-play. Three escalating phases then endless chaos. End when done.",
+      difficulty: "VARIABLE",
+      accent: "#8b949e",
+      duration: "20+ min",
+    },
   ];
 
   // --- Scenario Launch handler (replaces handleTutorialStart + handleQuickStart) ---
@@ -1181,11 +1195,33 @@ export default function App() {
       ],
     };
 
+    // Open Skies gets the full swarm loadout (heavy threat environment)
+    const openSkiesPlacement: PlacementConfig = {
+      base_id: "medium_airbase",
+      sensors: [
+        { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
+        { catalog_id: "eoir_camera", x: 0.4, y: -0.2, facing_deg: 180 },
+      ],
+      effectors: [
+        { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
+        { catalog_id: "rf_jammer", x: -0.2, y: -0.1, facing_deg: 0 },
+        { catalog_id: "jackal_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
+        { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
+      ],
+      combined: [
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.3, y: 0.1, facing_deg: 0 },
+      ],
+    };
+
     const placementMap: Record<string, PlacementConfig> = {
       tutorial: tutorialPlacement,
       lone_wolf: loneWolfPlacement,
       swarm_attack: swarmPlacement,
       recon_probe: reconPlacement,
+      open_skies: openSkiesPlacement,
     };
     const placement = placementMap[scenarioId] ?? loneWolfPlacement;
 
@@ -1225,6 +1261,7 @@ export default function App() {
         detectionPingedRef.current.clear();
         setTutorialMessage(null);
         setIsTutorial(isTut);
+        setIsFreePlay(scenarioId === "open_skies");
         setTutorialStep(0);
         setTutorialFeedback(null);
         setPaused(false);
@@ -1338,16 +1375,23 @@ export default function App() {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#e6edf3",
-                      letterSpacing: 1.5,
-                      fontFamily: "'Inter', sans-serif",
-                    }}
-                  >
-                    {sc.name}
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: "#e6edf3",
+                        letterSpacing: 1.5,
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    >
+                      {sc.name}
+                    </span>
+                    {"subtitle" in sc && (
+                      <span style={{ fontSize: 10, color: "#8b949e", fontWeight: 500, letterSpacing: 0.5 }}>
+                        {String(sc.subtitle)}
+                      </span>
+                    )}
                   </div>
                   <span
                     style={{
@@ -1621,6 +1665,8 @@ export default function App() {
         effectors={effectors}
         ambientSuppressedUntil={ambientSuppressedUntil}
         onShowRoe={() => setShowRoeOverlay(true)}
+        freePlayPhase={isFreePlay ? (elapsed >= 1200 ? "ENDLESS" : elapsed >= 720 ? "OVERWHELM" : elapsed >= 300 ? "BUILDUP" : "RECON") : null}
+        isEndless={isFreePlay && elapsed >= 1200}
       />
 
       {/* Left sidebar */}
