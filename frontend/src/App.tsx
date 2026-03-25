@@ -915,7 +915,7 @@ export default function App() {
     });
   };
 
-  const engage = (trackId: string, effectorId: string, nexusCm?: string) => {
+  const engage = (trackId: string, effectorId: string, shenobiCm?: string) => {
     // BLUE-ON-BLUE check: engaging UNKNOWN track without ATC response
     const engTrack = tracks.find((t) => t.id === trackId);
     if (engTrack?.iff_status === "unknown" && !engTrack.atc_response_received) {
@@ -927,14 +927,14 @@ export default function App() {
         { timestamp: elapsed, message: `BLUE-ON-BLUE: Engagement on unverified track ${label.toUpperCase()} — ATC not consulted! Score penalty applied.` },
       ]);
     }
-    if (nexusCm) {
-      // NEXUS Protocol Manipulation — send specific CM action
+    if (shenobiCm) {
+      // Shenobi Protocol Manipulation — send specific CM action
       send({
         type: "action",
-        action: nexusCm,
+        action: shenobiCm,
         target_id: trackId,
         effector: effectorId,
-        nexus_cm: nexusCm,
+        shenobi_cm: shenobiCm,
       });
     } else {
       send({
@@ -1110,7 +1110,7 @@ export default function App() {
     const isTut = scenarioId === "tutorial";
     const baseId = isTut ? "small_fob" : "medium_airbase";
 
-    // Doctrine: every scenario = L-Band + EO/IR + RF Jammer + NEXUS baseline
+    // Doctrine: every scenario = L-Band + EO/IR + RF Jammer + Shenobi baseline
     // Ku-Band FCS always paired with JACKAL (fire control requirement)
     // Shahed threats (Swarm, Lone Wolf) need kinetic defeat — JACKAL mandatory
     const tutorialPlacement: PlacementConfig = {
@@ -1123,7 +1123,7 @@ export default function App() {
         { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
       ],
       combined: [
-        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 
@@ -1140,7 +1140,7 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
       ],
       combined: [
-        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 
@@ -1159,8 +1159,8 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: -0.15, y: 0.0, facing_deg: 180 },
       ],
       combined: [
-        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
-        { catalog_id: "nexus", x: 0.3, y: 0.1, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.3, y: 0.1, facing_deg: 0 },
       ],
     };
 
@@ -1177,7 +1177,7 @@ export default function App() {
         { catalog_id: "jackal_pallet", x: 0.1, y: 0.0, facing_deg: 0 },
       ],
       combined: [
-        { catalog_id: "nexus", x: 0.0, y: 0.0, facing_deg: 0 },
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
       ],
     };
 

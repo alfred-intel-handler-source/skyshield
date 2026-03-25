@@ -105,7 +105,7 @@
 - Engagement via WOD or menu system
 - System prioritizes effectors for operator
 
-## NEXUS UI Patterns
+## Shenobi UI Patterns
 - SDR Platform Manager interface
 - Dashboard-based UI
 - Emulator system available for training
@@ -138,3 +138,4 @@
 18. **JACKAL intercept visualization** — Show interceptor track with waypoints
 19. **Track coasting timer** — 24-26 second extrapolation before track drops
 20. **Situational Awareness objects** — Player-created map annotations
+

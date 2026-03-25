@@ -58,7 +58,7 @@ const EFFECTIVENESS_MATRIX: Record<string, Record<string, number>> = {
     micro: 0.95,
     swarm: 0.8,
   },
-  nexus_pm: {
+  shenobi_pm: {
     commercial_quad: 0.95,
     fixed_wing: 0.3,
     micro: 0.9,
@@ -149,7 +149,7 @@ export function checkKuFcsTracking(
 }
 
 /**
- * Check if any NEXUS RF sensor has the drone in detection range
+ * Check if any Shenobi RF sensor has the drone in detection range
  * and the drone is RF-emitting (library match required).
  */
 export function checkNexusRfTracking(
@@ -160,8 +160,8 @@ export function checkNexusRfTracking(
   for (const s of sensorConfigs) {
     if (s.type !== ('rf' as SensorType)) continue;
     if (
-      !s.id.toLowerCase().includes('nexus') &&
-      !s.name.toLowerCase().includes('nexus')
+      !s.id.toLowerCase().includes('shenobi') &&
+      !s.name.toLowerCase().includes('shenobi')
     )
       continue;
     const dist = Math.sqrt((drone.x - s.x) ** 2 + (drone.y - s.y) ** 2);
@@ -176,7 +176,7 @@ export function checkNexusRfTracking(
 
 /**
  * Build SensorConfig list from player's placement choices.
- * Also generates sensor configs from combined placements (e.g. NEXUS).
+ * Also generates sensor configs from combined placements (e.g. Shenobi).
  */
 export function buildSensorsFromPlacement(
   placement: PlacementConfig,
@@ -203,7 +203,7 @@ export function buildSensorsFromPlacement(
     });
   }
 
-  // Combined systems (e.g. NEXUS) — auto-create sensor at same position
+  // Combined systems (e.g. Shenobi) — auto-create sensor at same position
   if (catalogCombined) {
     for (let i = 0; i < placement.combined.length; i++) {
       const placed = placement.combined[i];
@@ -229,7 +229,7 @@ export function buildSensorsFromPlacement(
 
 /**
  * Build EffectorConfig list from player's placement choices.
- * Also generates effector configs from combined placements (e.g. NEXUS).
+ * Also generates effector configs from combined placements (e.g. Shenobi).
  */
 export function buildEffectorsFromPlacement(
   placement: PlacementConfig,
@@ -260,7 +260,7 @@ export function buildEffectorsFromPlacement(
     });
   }
 
-  // Combined systems (e.g. NEXUS) — auto-create effector at same position
+  // Combined systems (e.g. Shenobi) — auto-create effector at same position
   if (catalogCombined) {
     for (let i = 0; i < placement.combined.length; i++) {
       const placed = placement.combined[i];

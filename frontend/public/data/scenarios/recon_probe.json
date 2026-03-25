@@ -70,7 +70,7 @@
   "acceptable_effectors": [
     "electronic",
     "kinetic",
-    "nexus_pm"
+    "shenobi_pm"
   ],
   "roe_violations": [],
   "drones": [
@@ -184,7 +184,7 @@
       "acceptable_effectors": [
         "electronic",
         "kinetic",
-        "nexus_pm"
+        "shenobi_pm"
       ],
       "roe_violations": [],
       "should_engage": true,

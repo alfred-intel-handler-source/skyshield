@@ -19,7 +19,7 @@ interface Props {
   holdFire?: boolean;
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
-  onEngage: (trackId: string, effectorId: string, nexusCm?: string) => void;
+  onEngage: (trackId: string, effectorId: string, shenobiCm?: string) => void;
   onSlewCamera: (trackId: string) => void;
   onHoldFire?: (trackId: string) => void;
   onReleaseHoldFire?: (trackId: string) => void;
@@ -49,13 +49,13 @@ const EFFECTOR_COLORS: Record<string, string> = {
   net_interceptor: "#3fb950",
   de_weapon: "#bc8cff",
   directed_energy: "#bc8cff",
-  nexus_pm: "#a371f7",  // Purple for NEXUS
+  shenobi_pm: "#a371f7",  // Purple for Shenobi
 };
 
-const NEXUS_CM_OPTIONS = [
-  { id: "nexus_hold", label: "HOLD", icon: "\u23F8", color: "#a371f7", desc: "Freeze in place" },
-  { id: "nexus_land_now", label: "LAND NOW", icon: "\u2B07", color: "#f0883e", desc: "Force descent" },
-  { id: "nexus_deafen", label: "DEAFEN", icon: "\u{1F507}", color: "#f85149", desc: "Sever link" },
+const Shenobi_CM_OPTIONS = [
+  { id: "shenobi_hold", label: "HOLD", icon: "\u23F8", color: "#a371f7", desc: "Freeze in place" },
+  { id: "shenobi_land_now", label: "LAND NOW", icon: "\u2B07", color: "#f0883e", desc: "Force descent" },
+  { id: "shenobi_deafen", label: "DEAFEN", icon: "\u{1F507}", color: "#f85149", desc: "Sever link" },
 ];
 
 // Phase accent colors for center hub ring
@@ -66,7 +66,7 @@ const PHASE_COLORS: Record<DTIDPhase, string> = {
   defeated: "#3fb950",   // green
 };
 
-type SubMenu = "none" | "identify" | "engage" | "nexus_cm";
+type SubMenu = "none" | "identify" | "engage" | "shenobi_cm";
 
 function getActionsForPhase(dtidPhase: DTIDPhase, holdFire?: boolean, iffStatus?: string, atcCalled?: boolean): WheelAction[] {
   switch (dtidPhase) {
@@ -397,11 +397,11 @@ export default function RadialActionWheel({
 
   const handleEngage = useCallback(
     (effectorId: string) => {
-      // Check if this is a NEXUS effector — show CM submenu
+      // Check if this is a Shenobi effector — show CM submenu
       const eff = effectors.find((e) => e.id === effectorId);
-      if (eff && eff.type === "nexus_pm") {
+      if (eff && eff.type === "shenobi_pm") {
         setSelectedNexusEffector(effectorId);
-        setSubMenu("nexus_cm");
+        setSubMenu("shenobi_cm");
         return;
       }
       onEngage(trackId, effectorId);
@@ -440,18 +440,18 @@ export default function RadialActionWheel({
     subActions = effectors.map((eff) => {
       const color = EFFECTOR_COLORS[eff.id] || EFFECTOR_COLORS[eff.type || ""] || "#58a6ff";
       const isReady = eff.status === "ready";
-      const isNexus = eff.type === "nexus_pm";
+      const isShenobi = eff.type === "shenobi_pm";
       return {
         id: eff.id,
         label: (eff.name || eff.id).toUpperCase().slice(0, 10),
-        icon: isNexus ? "\u{1F977}" : isReady ? "\u25C6" : "\u25C7",
+        icon: isShenobi ? "\u{1F977}" : isReady ? "\u25C6" : "\u25C7",
         color: isReady ? color : "#484f58",
         disabled: !isReady,
         statusText: eff.status.toUpperCase(),
       };
     });
-  } else if (subMenu === "nexus_cm") {
-    subActions = NEXUS_CM_OPTIONS.map((cm) => ({
+  } else if (subMenu === "shenobi_cm") {
+    subActions = Shenobi_CM_OPTIONS.map((cm) => ({
       id: cm.id,
       label: cm.label,
       icon: cm.icon,
@@ -466,7 +466,7 @@ export default function RadialActionWheel({
       if (cls) handleClassify(cls);
     } else if (subMenu === "engage") {
       handleEngage(id);
-    } else if (subMenu === "nexus_cm") {
+    } else if (subMenu === "shenobi_cm") {
       handleNexusCM(id);
     }
   };
@@ -705,7 +705,7 @@ export default function RadialActionWheel({
                 userSelect: "none",
               }}
             >
-              {subMenu === "identify" ? "CLASSIFY" : subMenu === "nexus_cm" ? "NEXUS CM" : "SELECT EFFECTOR"}
+              {subMenu === "identify" ? "CLASSIFY" : subMenu === "shenobi_cm" ? "Shenobi CM" : "SELECT EFFECTOR"}
             </text>
           )}
         </svg>

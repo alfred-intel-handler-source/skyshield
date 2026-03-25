@@ -11,7 +11,7 @@ import { createGameState } from './state.js';
 import { KTS_TO_KMS, threatLevel } from './helpers.js';
 import { createDroneFromConfig, moveDrone, distanceToBase } from './drone.js';
 import { updateJammedDrone, updatePntJammedDrone, pickJamBehavior, applyPntJamming } from './jamming.js';
-import { updateNexusDrone } from './nexus.js';
+import { updateShenobiDrone } from './shenobi.js';
 import { updateJackal } from './jackal.js';
 import { updateSensors, calculateConfidence } from './detection.js';
 import { generateWaveDrones, generateAmbientObject, initialAmbientSchedule, AMBIENT_INTERVALS } from './waves.js';
@@ -289,7 +289,7 @@ export function tickPassiveJamming(gs: GameState, elapsed: number): Msg[] {
     for (let i = 0; i < gs.drones.length; i++) {
       const drone = gs.drones[i];
       if (drone.neutralized || drone.is_interceptor) continue;
-      if (drone.nexus_cm_active) continue;
+      if (drone.shenobi_cm_active) continue;
       const dist = Math.sqrt((drone.x - effX) ** 2 + (drone.y - effY) ** 2);
       if (dist > rangeKm) continue;
 
@@ -397,9 +397,9 @@ export function tickDrones(gs: GameState, elapsed: number): Msg[] {
       events.push(...pevents);
     }
 
-    // NEXUS CM active
-    if (gs.drones[i].nexus_cm_active) {
-      const [updated, nevents] = updateNexusDrone(gs.drones[i], gs.tick_rate, elapsed);
+    // Shenobi CM active
+    if (gs.drones[i].shenobi_cm_active) {
+      const [updated, nevents] = updateShenobiDrone(gs.drones[i], gs.tick_rate, elapsed);
       gs.drones[i] = updated;
       events.push(...nevents);
       continue;
@@ -450,18 +450,18 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
   const dist = distanceToBase(drone);
   const confidence = calculateConfidence(detectingIds, dist);
 
-  // NEXUS RF data
-  const nexusUpdates: Partial<DroneState> = {};
+  // Shenobi RF data
+  const shenobiUpdates: Partial<DroneState> = {};
   for (const reading of readings) {
     const r = reading as unknown as Record<string, unknown>;
-    if (r.is_nexus) {
-      nexusUpdates.frequency_band = r.frequency_band as string;
-      nexusUpdates.downlink_detected = r.downlink_detected as boolean;
-      nexusUpdates.uplink_detected = r.uplink_detected as boolean;
+    if (r.is_shenobi) {
+      shenobiUpdates.frequency_band = r.frequency_band as string;
+      shenobiUpdates.downlink_detected = r.downlink_detected as boolean;
+      shenobiUpdates.uplink_detected = r.uplink_detected as boolean;
     }
   }
-  if (Object.keys(nexusUpdates).length > 0) {
-    gs.drones[i] = { ...gs.drones[i], ...nexusUpdates };
+  if (Object.keys(shenobiUpdates).length > 0) {
+    gs.drones[i] = { ...gs.drones[i], ...shenobiUpdates };
     drone = gs.drones[i];
   }
 
@@ -474,12 +474,12 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
   const prev = gs.previously_detected.get(drone.id) ?? new Set<string>();
   const newSensors = new Set(detectingIds.filter(id => !prev.has(id)));
   if (prev.size === 0 && detectingIds.length > 0) {
-    const hasNexus = readings.some(r => (r as unknown as Record<string, unknown>).is_nexus);
+    const hasNexus = readings.some(r => (r as unknown as Record<string, unknown>).is_shenobi);
     const hasNonNexusRadar = detectingIds.some(sid =>
-      !sid.toLowerCase().includes('nexus') &&
+      !sid.toLowerCase().includes('shenobi') &&
       (sid.toLowerCase().includes('radar') || sid.toLowerCase().includes('tpq') || sid.toLowerCase().includes('kufcs'))
     );
-    const detectLabel = hasNexus && !hasNonNexusRadar ? 'NEXUS RF' : 'RADAR';
+    const detectLabel = hasNexus && !hasNonNexusRadar ? 'Shenobi RF' : 'RADAR';
     events.push({
       type: 'event', timestamp: Math.round(elapsed * 10) / 10,
       message: `${detectLabel}: New contact detected \u2014 ${(drone.display_label || drone.id).toUpperCase()}`,
@@ -641,8 +641,8 @@ export function buildStateMsg(gs: GameState, elapsed: number, timeRemaining: num
         frequency_band: drone.frequency_band,
         uplink_detected: drone.uplink_detected,
         downlink_detected: drone.downlink_detected,
-        nexus_cm_active: drone.nexus_cm_active,
-        nexus_cm_state: drone.nexus_cm_state,
+        shenobi_cm_active: drone.shenobi_cm_active,
+        shenobi_cm_state: drone.shenobi_cm_state,
         drone_type: drone.drone_type,
         spinup_remaining: Math.round(drone.spinup_remaining * 10) / 10,
       });
