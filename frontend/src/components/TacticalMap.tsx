@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   MapContainer,
   TileLayer,
@@ -1972,12 +1973,13 @@ export default function TacticalMap({
         </div>
       )}
 
-      {/* Radial action wheel (track WOD) */}
+      {/* Radial action wheel (track WOD) — rendered via portal to escape overflow:hidden */}
       {wheelState && onConfirmTrack && onIdentify && onEngage && onSlewCamera && (() => {
         const wheelTrack = tracks.find((t) => t.id === wheelState.trackId);
         if (!wheelTrack || wheelTrack.neutralized) return null;
-        return (
+        return createPortal(
           <RadialActionWheel
+            key={wheelState.trackId}
             trackId={wheelTrack.id}
             dtidPhase={wheelTrack.dtid_phase}
             screenX={wheelState.screenX}
@@ -1991,7 +1993,8 @@ export default function TacticalMap({
             onHoldFire={onHoldFire}
             onReleaseHoldFire={onReleaseHoldFire}
             onClose={() => setWheelState(null)}
-          />
+          />,
+          document.body
         );
       })()}
 
