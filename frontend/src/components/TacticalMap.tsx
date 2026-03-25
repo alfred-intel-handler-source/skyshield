@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   MapContainer,
   TileLayer,
@@ -856,7 +855,6 @@ export default function TacticalMap({
 }: Props) {
   const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
-  const markerJustClickedRef = useRef(false); // WHEELFIXV2
   const [deviceWheelState, setDeviceWheelState] = useState<DeviceWheelState | null>(null);
   const [showRangeRings, setShowRangeRings] = useState(true);
   const [hiddenRings, setHiddenRings] = useState<Set<string>>(new Set());
@@ -989,10 +987,6 @@ export default function TacticalMap({
   // Map-level click handler with disambiguation
   const handleMapClick = useCallback(
     (e: L.LeafletMouseEvent) => {
-      if (markerJustClickedRef.current) {
-        markerJustClickedRef.current = false;
-        return;
-      }
       setBullseyeContextMenu(null);
       const sx = e.originalEvent.clientX;
       const sy = e.originalEvent.clientY;
@@ -1667,7 +1661,6 @@ export default function TacticalMap({
                 eventHandlers={{
                   click: (e) => {
                     L.DomEvent.stopPropagation(e.originalEvent);
-                    markerJustClickedRef.current = true;
                     onSelectTrack(track.id);
                     setWheelState({
                       trackId: track.id,
@@ -1973,13 +1966,12 @@ export default function TacticalMap({
         </div>
       )}
 
-      {/* Radial action wheel (track WOD) — rendered via portal to escape overflow:hidden */}
+      {/* Radial action wheel (track WOD) */}
       {wheelState && onConfirmTrack && onIdentify && onEngage && onSlewCamera && (() => {
         const wheelTrack = tracks.find((t) => t.id === wheelState.trackId);
         if (!wheelTrack || wheelTrack.neutralized) return null;
-        return createPortal(
+        return (
           <RadialActionWheel
-            key={wheelState.trackId}
             trackId={wheelTrack.id}
             dtidPhase={wheelTrack.dtid_phase}
             screenX={wheelState.screenX}
@@ -1993,8 +1985,7 @@ export default function TacticalMap({
             onHoldFire={onHoldFire}
             onReleaseHoldFire={onReleaseHoldFire}
             onClose={() => setWheelState(null)}
-          />,
-          document.body
+          />
         );
       })()}
 
@@ -2069,4 +2060,3 @@ export default function TacticalMap({
     </div>
   );
 }
-// cache-bust-1774414086
