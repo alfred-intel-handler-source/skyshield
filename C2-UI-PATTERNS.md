@@ -1,4 +1,4 @@
-# C2 UI Patterns — Extracted from JCU Operator Course Materials
+# C2 UI Patterns
 
 ## GUARDIAN C2 UI Patterns
 
