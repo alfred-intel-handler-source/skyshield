@@ -11,13 +11,17 @@ export default function ROEBriefing({ scenarioName, roeBriefing, onConfirm, onBa
       style={{
         width: "100vw",
         height: "100vh",
+        overflowY: "auto",
         background: "#0d1117",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-start",
+        paddingTop: 40,
+        paddingBottom: 40,
         fontFamily: "'Inter', sans-serif",
         color: "#e6edf3",
+        boxSizing: "border-box",
       }}
     >
       <div

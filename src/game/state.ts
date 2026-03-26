@@ -185,6 +185,15 @@ export interface DroneStartConfig {
   spawn_variance?: SpawnVariance | null;
 }
 
+export interface ScenarioPhase {
+  name: string;
+  start_seconds: number;
+  end_seconds: number;
+  max_active: number;
+  spawn_interval: number;
+  threat_types: string[];
+}
+
 export interface ScenarioConfig {
   id: string;
   name: string;
@@ -205,6 +214,9 @@ export interface ScenarioConfig {
   tutorial_prompts: Array<{ trigger: string; message: string }> | null;
   no_ambient: boolean;
   waves_enabled?: boolean;
+  free_play?: boolean;
+  endless_after_seconds?: number;
+  phases?: ScenarioPhase[];
 }
 
 export interface PlayerAction {
@@ -431,6 +443,9 @@ export interface GameState {
   paused: boolean;
   pause_start_time: number;
   total_paused_seconds: number;
+
+  free_play_spawn_counter: number;
+  free_play_last_spawn_time: number;
 }
 
 export function createGameState(
@@ -492,5 +507,7 @@ export function createGameState(
     paused: false,
     pause_start_time: 0,
     total_paused_seconds: 0,
+    free_play_spawn_counter: 0,
+    free_play_last_spawn_time: -30,
   };
 }

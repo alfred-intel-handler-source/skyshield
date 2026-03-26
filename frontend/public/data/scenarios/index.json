@@ -22,5 +22,11 @@
     "name": "Tutorial",
     "description": "A guided walkthrough of the DTID kill chain. A single slow-moving quadcopter approaches while step-by-step instructions guide you through detection, tracking, identification, and defeat.",
     "difficulty": "Tutorial"
+  },
+  {
+    "id": "thermopylae",
+    "name": "THERMOPYLAE",
+    "description": "Unscripted free-play. Three escalating threat phases then endless chaos. End when done.",
+    "difficulty": "Variable"
   }
 ]

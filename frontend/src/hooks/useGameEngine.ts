@@ -22,6 +22,7 @@ import {
   buildDebrief,
   tickSpawns,
   tickWaves,
+  tickFreePlaySpawns,
   tickEffectorRecharge,
   tickPassiveJamming,
   tickDrones,
@@ -234,10 +235,11 @@ export function useGameEngine(onMessage: MessageHandler) {
 
           const elapsed =
             Date.now() / 1000 - g.start_time - g.total_paused_seconds;
+          const isFreePlay = g.scenario.free_play === true;
           const timeRemaining = Math.max(0, g.max_duration - elapsed);
 
-          // Time's up
-          if (timeRemaining <= 0) {
+          // Time's up — but free_play scenarios keep going
+          if (timeRemaining <= 0 && !isFreePlay) {
             g.phase = "debrief";
             dispatch(buildDebrief(g, catalogRef.current ?? undefined));
             if (intervalRef.current) {
@@ -250,6 +252,7 @@ export function useGameEngine(onMessage: MessageHandler) {
           // Run all tick functions
           dispatchAll(tickSpawns(g, elapsed));
           dispatchAll(tickWaves(g, elapsed));
+          if (isFreePlay) dispatchAll(tickFreePlaySpawns(g, elapsed));
           dispatchAll(tickEffectorRecharge(g, elapsed));
           dispatchAll(tickPassiveJamming(g, elapsed));
           dispatchAll(tickDrones(g, elapsed));

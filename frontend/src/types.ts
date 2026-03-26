@@ -308,11 +308,23 @@ export interface EquipmentCatalog {
   combined: CatalogCombined[];
 }
 
+export interface ScenarioPhase {
+  name: string;
+  start_seconds: number;
+  end_seconds: number;
+  max_active: number;
+  spawn_interval: number;
+  threat_types: string[];
+}
+
 export interface ScenarioInfo {
   id: string;
   name: string;
   description: string;
   difficulty: string;
+  free_play?: boolean;
+  endless_after_seconds?: number;
+  phases?: ScenarioPhase[];
 }
 
 export interface BaseInfo {
