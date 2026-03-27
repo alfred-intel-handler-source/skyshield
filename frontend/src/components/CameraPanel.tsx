@@ -111,8 +111,8 @@ function drawCommercialQuad(ctx: CanvasRenderingContext2D, s: number, time: numb
   ctx.translate(0, wobbleY);
   ctx.rotate(wobbleRot);
 
-  const bodyW = 22 * s;   // wider than tall — bulky rectangular body
-  const bodyH = 14 * s;
+  const bodyW = 24 * s;   // wider than tall — bulky rectangular body
+  const bodyH = 16 * s;
   const armLen = 24 * s;
   const rotorR = 13 * s;
   const rotorSpeed = 22;
@@ -140,7 +140,7 @@ function drawCommercialQuad(ctx: CanvasRenderingContext2D, s: number, time: numb
   });
 
   // ── Large bulky rectangular/rounded body ──
-  const br = 4 * s; // corner radius
+  const br = 6 * s; // corner radius — chunky Phantom housing
   ctx.beginPath();
   ctx.moveTo(-bodyW / 2 + br, -bodyH / 2);
   ctx.lineTo(bodyW / 2 - br, -bodyH / 2);
@@ -163,30 +163,27 @@ function drawCommercialQuad(ctx: CanvasRenderingContext2D, s: number, time: numb
   ctx.fill();
   ctx.restore();
 
-  // ── 4 landing gear legs hanging down from body (spider-like) ──
+  // ── 4 landing gear legs splayed in 4 distinct directions (top-down view) ──
   ctx.lineWidth = Math.max(1.5, 2 * s);
-  const legOffsets = [
-    { bx: -bodyW * 0.4, by: bodyH / 2 },
-    { bx: bodyW * 0.4, by: bodyH / 2 },
-    { bx: -bodyW * 0.4, by: bodyH / 2 },
-    { bx: bodyW * 0.4, by: bodyH / 2 },
-  ];
-  // Front two legs splay forward slightly, rear two splay back
-  const legEnds = [
-    { ex: -bodyW * 0.55, ey: bodyH / 2 + 14 * s },
-    { ex: bodyW * 0.55, ey: bodyH / 2 + 14 * s },
-    { ex: -bodyW * 0.55, ey: bodyH / 2 + 14 * s },
-    { ex: bodyW * 0.55, ey: bodyH / 2 + 14 * s },
+  const legs = [
+    // Front-left: attach at front-left of body, splay forward-left
+    { bx: -bodyW * 0.4, by: -bodyH / 2, ex: -bodyW * 0.5, ey: -bodyH / 2 - 13 * s },
+    // Front-right: attach at front-right, splay forward-right
+    { bx: bodyW * 0.4, by: -bodyH / 2, ex: bodyW * 0.5, ey: -bodyH / 2 - 13 * s },
+    // Rear-left: attach at rear-left, splay backward-left
+    { bx: -bodyW * 0.4, by: bodyH / 2, ex: -bodyW * 0.5, ey: bodyH / 2 + 15 * s },
+    // Rear-right: attach at rear-right, splay backward-right
+    { bx: bodyW * 0.4, by: bodyH / 2, ex: bodyW * 0.5, ey: bodyH / 2 + 15 * s },
   ];
   for (let i = 0; i < 4; i++) {
     ctx.beginPath();
-    ctx.moveTo(legOffsets[i].bx, legOffsets[i].by);
-    ctx.lineTo(legEnds[i].ex, legEnds[i].ey);
+    ctx.moveTo(legs[i].bx, legs[i].by);
+    ctx.lineTo(legs[i].ex, legs[i].ey);
     ctx.stroke();
     // Foot bar
     ctx.beginPath();
-    ctx.moveTo(legEnds[i].ex - 3 * s, legEnds[i].ey);
-    ctx.lineTo(legEnds[i].ex + 3 * s, legEnds[i].ey);
+    ctx.moveTo(legs[i].ex - 3 * s, legs[i].ey);
+    ctx.lineTo(legs[i].ex + 3 * s, legs[i].ey);
     ctx.stroke();
   }
 
@@ -218,7 +215,7 @@ function drawCommercialQuad(ctx: CanvasRenderingContext2D, s: number, time: numb
 
     // Rotor disc blur (spinning effect)
     ctx.save();
-    ctx.globalAlpha = 0.13;
+    ctx.globalAlpha = 0.18;
     ctx.beginPath();
     ctx.arc(arm.ex, arm.ey, rotorR, 0, Math.PI * 2);
     ctx.fill();
@@ -726,52 +723,59 @@ function drawImprovised(ctx: CanvasRenderingContext2D, s: number, time: number) 
   const propR = 8 * s;
 
   // ── Exposed carbon fiber X-frame (thin arm tubes) ──
+  const stackW = 8 * s;
+  const stackH = 10 * s;
   const armAngles = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
   const armEnds = armAngles.map(a => ({
     x: Math.cos(a) * armLen,
     y: Math.sin(a) * armLen,
   }));
   ctx.lineWidth = Math.max(1.5, 2 * s);
-  armEnds.forEach(end => {
+  armEnds.forEach((end, i) => {
+    // Start each arm at the edge of the center stack, not from (0,0)
+    const angle = armAngles[i];
+    const startDist = Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))
+      ? stackW / 2 / Math.abs(Math.cos(angle))
+      : stackH / 2 / Math.abs(Math.sin(angle));
+    const sx = Math.cos(angle) * startDist;
+    const sy = Math.sin(angle) * startDist;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
+    ctx.moveTo(sx, sy);
     ctx.lineTo(end.x, end.y);
     ctx.stroke();
   });
 
   // ── Compact aggressive squarish center stack (FC, ESC, battery) ──
-  const stackW = 8 * s;
-  const stackH = 10 * s;
   ctx.fillRect(-stackW / 2, -stackH / 2, stackW, stackH);
 
   // Battery pack on bottom (slightly wider)
   ctx.fillRect(-stackW * 0.65, stackH * 0.1, stackW * 1.3, 4 * s);
 
-  // ── Front-facing FPV camera at ~35° angle on nose ──
+  // ── Front-facing FPV camera at ~35° angle on front center of frame ──
   ctx.save();
-  ctx.translate(stackW / 2 + 2 * s, -stackH / 2 + 1 * s);
+  ctx.translate(0, -stackH / 2 - 1 * s);
   ctx.rotate(-0.6); // ~35° tilt up
-  ctx.fillRect(-1.5 * s, -2 * s, 3 * s, 4 * s);
+  ctx.fillRect(-2 * s, -2.5 * s, 4 * s, 5 * s);
   // Lens
   ctx.save();
   ctx.globalAlpha = 0.6;
   ctx.fillStyle = "#ff6666";
   ctx.beginPath();
-  ctx.arc(1.5 * s, 0, 1.5 * s, 0, Math.PI * 2);
+  ctx.arc(0, -1.5 * s, 1.5 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   ctx.restore();
 
-  // ── Action camera (GoPro style box) mounted on top ──
-  const camW = 6 * s;
-  const camH = 5 * s;
+  // ── Action camera (GoPro style box) mounted on top — prominent ──
+  const camW = 8 * s;
+  const camH = 6 * s;
   ctx.fillRect(-camW / 2, -stackH / 2 - camH - 1 * s, camW, camH);
   // Camera lens (front face)
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = "#58a6ff";
   ctx.beginPath();
-  ctx.arc(0, -stackH / 2 - camH / 2 - 1 * s, 2 * s, 0, Math.PI * 2);
+  ctx.arc(0, -stackH / 2 - camH / 2 - 1 * s, 2.5 * s, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
