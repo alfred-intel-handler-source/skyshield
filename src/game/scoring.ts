@@ -79,11 +79,13 @@ function _scoreDroneComponents(
     }
     details['detection_awareness'] = `Detected contact in ${timeToFirstClick.toFixed(1)}s`;
 
-    // Weight by threat urgency: faster drones closing on base are more urgent
-    const urgencyProxy = droneSpeed * timeToFirstClick;
-    if (urgencyProxy > 2.0) {
+    // Weight by threat urgency: fast-closing drones demand faster operator response.
+    // Penalty applies when the drone is fast (>40 kt) AND the operator was slow (>8s).
+    const isHighSpeed = droneSpeed > 40;
+    const isSlowResponse = timeToFirstClick > 8.0;
+    if (isHighSpeed && isSlowResponse) {
       scores['detection_awareness'] = Math.max(0, scores['detection_awareness'] - 10);
-      details['detection_awareness'] += ' (high threat urgency)';
+      details['detection_awareness'] += ' (slow response to fast threat)';
     }
   } else {
     scores['detection_awareness'] = 0;

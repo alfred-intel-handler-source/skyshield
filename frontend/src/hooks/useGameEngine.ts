@@ -154,9 +154,13 @@ export function useGameEngine(onMessage: MessageHandler) {
         if (resolvedBaseId) {
           try {
             const baseRes = await fetch(`${import.meta.env.BASE_URL}data/bases/${resolvedBaseId}.json`);
-            if (baseRes.ok) baseTemplate = await baseRes.json();
-          } catch {
-            // Base not found — proceed without it
+            if (baseRes.ok) {
+              baseTemplate = await baseRes.json();
+            } else {
+              console.warn(`[OpenSentry Engine] Base template not found: ${resolvedBaseId}`);
+            }
+          } catch (err) {
+            console.warn(`[OpenSentry Engine] Failed to load base template:`, err);
           }
         }
 
@@ -164,9 +168,13 @@ export function useGameEngine(onMessage: MessageHandler) {
         let catalog: EquipmentCatalog | null = null;
         try {
           const catRes = await fetch(`${import.meta.env.BASE_URL}data/equipment/catalog.json`);
-          if (catRes.ok) catalog = await catRes.json();
-        } catch {
-          // Proceed without catalog
+          if (catRes.ok) {
+            catalog = await catRes.json();
+          } else {
+            console.warn("[OpenSentry Engine] Equipment catalog not found — placement scoring unavailable");
+          }
+        } catch (err) {
+          console.warn("[OpenSentry Engine] Failed to load equipment catalog:", err);
         }
         catalogRef.current = catalog;
 

@@ -15,17 +15,15 @@ import { KTS_TO_KMS } from './helpers';
 const MAX_TRAIL_LENGTH = 20;
 
 // ---------------------------------------------------------------------------
-// Evasive state (module-level — shared across connections, same as Python)
+// Evasive state type (stored per-GameState, not module-level)
 // ---------------------------------------------------------------------------
 
-interface EvasiveState {
+export interface EvasiveState {
   offset_rad: number;
   alt_offset: number;
   next_jink: number;
   tick_counter: number;
 }
-
-const _evasiveState: Map<string, EvasiveState> = new Map();
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -86,6 +84,8 @@ export interface MoveDroneOptions {
   orbit_radius?: number;
   orbit_center?: number[] | null;
   detected_by_player?: boolean;
+  /** Per-game evasive state map (from GameState.evasive_states). */
+  evasive_states?: Map<string, EvasiveState>;
 }
 
 /** Update a drone's position for one tick. Returns a new DroneState (immutable). */
@@ -102,6 +102,7 @@ export function moveDrone(
     orbit_radius = 1.5,
     orbit_center = null,
     detected_by_player = false,
+    evasive_states,
   } = options;
 
   switch (behavior) {
@@ -112,7 +113,7 @@ export function moveDrone(
     case 'waypoint_path':
       return _waypointPath(drone, dt, waypoints ?? []);
     case 'evasive':
-      return _evasive(drone, dt, detected_by_player);
+      return _evasive(drone, dt, detected_by_player, evasive_states);
     default:
       return _directApproach(drone, dt);
   }
@@ -265,13 +266,17 @@ function _evasive(
   drone: DroneState,
   dt: number,
   detected_by_player: boolean,
+  evasive_states?: Map<string, EvasiveState>,
 ): DroneState {
   // Until detected, fly straight in
   if (!detected_by_player) return _directApproach(drone, dt);
 
+  // Use provided per-game state map (falls back to a local map for backwards compat)
+  const stateMap = evasive_states ?? new Map<string, EvasiveState>();
+
   // Initialise evasive state on first call
-  if (!_evasiveState.has(drone.id)) {
-    _evasiveState.set(drone.id, {
+  if (!stateMap.has(drone.id)) {
+    stateMap.set(drone.id, {
       offset_rad: 0.0,
       alt_offset: 0.0,
       next_jink: 0.0,
@@ -279,7 +284,7 @@ function _evasive(
     });
   }
 
-  const state = _evasiveState.get(drone.id)!;
+  const state = stateMap.get(drone.id)!;
   state.tick_counter += dt;
 
   // Time for a new jink?

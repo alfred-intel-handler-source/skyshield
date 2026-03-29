@@ -127,6 +127,21 @@ export function updateJammedDrone(
   };
   const jb = d.jammed_behavior;
 
+  // Guard: if jammed=true but no behavior assigned, clear the jam state
+  if (jb === null || jb === undefined) {
+    const cleared: DroneState = {
+      ...d,
+      jammed: false,
+      jammed_time_remaining: 0,
+    };
+    events.push({
+      type: 'event',
+      timestamp: Math.round(elapsed * 10) / 10,
+      message: `TRACK: ${(d.display_label || d.id).toUpperCase()} — JAM STATE CLEARED (no behavior assigned)`,
+    });
+    return [cleared, events];
+  }
+
   if (jb === 'loss_of_control') {
     const speedKms = d.speed * KTS_TO_KMS * 0.5;
     const headingRad = (d.heading * Math.PI) / 180;

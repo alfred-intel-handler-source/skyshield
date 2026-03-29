@@ -184,13 +184,14 @@ export function handleEngage(
 
     const effectiveness = effectorEffectiveness(effState.type, d.drone_type);
 
-    if (isShenobi) {
+    // Dispatch by explicit effector type to avoid ordering ambiguity
+    if (effState.type === 'kinetic') {
+      msgs.push(..._engageJackal(gs, d, effState, effectorId, targetId, elapsed));
+    } else if (isShenobi) {
       const cmType = shenobiCm || 'shenobi_hold';
       msgs.push(..._engageNexus(gs, j, d, effState, effectorId, targetId, cmType, effectiveness, elapsed));
     } else if (isJammer) {
       msgs.push(..._engageJammer(gs, j, d, effState, effectorId, targetId, effectiveness, elapsed));
-    } else if (effState.ammo_count !== null && effState.ammo_count !== undefined && effState.type === 'kinetic') {
-      msgs.push(..._engageJackal(gs, d, effState, effectorId, targetId, elapsed));
     } else {
       msgs.push(..._engageDirect(gs, j, d, effState, effectorId, targetId, effectiveness, elapsed));
     }
@@ -376,6 +377,16 @@ function _engageJackal(
   effectorId: string, targetId: string, elapsed: number,
 ): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
+
+  // Prevent launching multiple interceptors at the same target
+  const existingJackal = gs.drones.find(
+    dd => dd.is_interceptor && !dd.neutralized && dd.interceptor_target === targetId && dd.intercept_phase !== 'self_destruct',
+  );
+  if (existingJackal) {
+    msgs.push(_event(elapsed, `JACKAL: BLOCKED — ${(existingJackal.display_label || existingJackal.id).toUpperCase()} already engaging ${_label(gs, targetId).toUpperCase()}`));
+    return msgs;
+  }
+
   const jackalCount = gs.drones.filter(dd => dd.is_interceptor).length;
   const jackalId = `JKIL-${String(jackalCount + 1).padStart(2, '0')}`;
   const effX = effState.x ?? 0;

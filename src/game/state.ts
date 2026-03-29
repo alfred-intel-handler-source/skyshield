@@ -446,6 +446,9 @@ export interface GameState {
 
   free_play_spawn_counter: number;
   free_play_last_spawn_time: number;
+
+  /** Per-drone evasive maneuver state (moved from module-level to support multiple game instances). */
+  evasive_states: Map<string, { offset_rad: number; alt_offset: number; next_jink: number; tick_counter: number }>;
 }
 
 export function createGameState(
@@ -509,5 +512,6 @@ export function createGameState(
     total_paused_seconds: 0,
     free_play_spawn_counter: 0,
     free_play_last_spawn_time: -30,
+    evasive_states: new Map(),
   };
 }

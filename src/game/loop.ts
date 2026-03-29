@@ -538,6 +538,7 @@ export function tickDrones(gs: GameState, elapsed: number): Msg[] {
           orbit_radius: cfg.orbit_radius ?? 1.5,
           orbit_center: cfg.orbit_center ?? undefined,
           detected_by_player: gs.drones[i].detected,
+          evasive_states: gs.evasive_states,
         });
       }
     }
@@ -582,8 +583,17 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
     }
   }
   if (Object.keys(shenobiUpdates).length > 0) {
+    // Log event when uplink is first detected (enables Shenobi 1/2 → 2/2 transition)
+    const prevUplink = gs.drones[i].uplink_detected;
     gs.drones[i] = { ...gs.drones[i], ...shenobiUpdates };
     drone = gs.drones[i];
+    if (!prevUplink && shenobiUpdates.uplink_detected) {
+      events.push({
+        type: 'event',
+        timestamp: Math.round(elapsed * 10) / 10,
+        message: `Shenobi: ${(drone.display_label || drone.id).toUpperCase()} — UPLINK DETECTED (protocol acquisition possible)`,
+      });
+    }
   }
 
   // First detection time
