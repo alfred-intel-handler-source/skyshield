@@ -42,6 +42,16 @@ const _WAVE_DRONE_TEMPLATES: WaveDroneTemplate[] = [
   },
 ];
 
+// Combat-hardened FPV with FHSS — same silhouette as improvised
+const _HARDENED_FPV_TEMPLATE: WaveDroneTemplate = {
+  drone_type: 'improvised_hardened', altitude: 100, speed: 55, behavior: 'direct_approach', rf_emitting: true,
+  correct_classification: 'improvised', correct_affiliation: 'hostile',
+  optimal_effectors: ['kinetic'], acceptable_effectors: ['kinetic', 'electronic'], roe_violations: [],
+};
+
+// Scenario IDs that may spawn hardened FPVs (swarm/hard scenarios only)
+const _HARDENED_FPV_SCENARIOS = new Set(['swarm_attack']);
+
 // --- Helpers ---
 
 /** Random integer in [min, max] inclusive. */
@@ -72,15 +82,21 @@ function round2(n: number): number {
 export function generateWaveDrones(
   waveNumber: number,
   waveDroneCounter: number,
+  scenarioId?: string,
 ): [DroneStartConfig[], number] {
   if (waveNumber === 1) return [[], waveDroneCounter];
 
   const count = waveNumber === 2 ? randInt(2, 3) : randInt(4, 5);
   const configs: DroneStartConfig[] = [];
 
+  // Build template pool — include hardened FPV only for qualifying scenarios
+  const pool = scenarioId && _HARDENED_FPV_SCENARIOS.has(scenarioId)
+    ? [..._WAVE_DRONE_TEMPLATES, _HARDENED_FPV_TEMPLATE]
+    : _WAVE_DRONE_TEMPLATES;
+
   for (let i = 0; i < count; i++) {
     waveDroneCounter += 1;
-    const template = choice(_WAVE_DRONE_TEMPLATES);
+    const template = choice(pool);
 
     const angle = uniform(0, 2 * Math.PI);
     const dist = uniform(3.5, 5.0);

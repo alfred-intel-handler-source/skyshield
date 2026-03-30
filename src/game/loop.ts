@@ -360,7 +360,7 @@ export function tickWaves(gs: GameState, elapsed: number): Msg[] {
       gs.current_wave++;
       gs.wave_all_neutralized_time = null;
       gs.wave_pause_seconds = 30 + Math.random() * 30;
-      const [newCfgs, newCounter] = generateWaveDrones(gs.current_wave, gs.wave_drone_counter);
+      const [newCfgs, newCounter] = generateWaveDrones(gs.current_wave, gs.wave_drone_counter, gs.scenario.id);
       gs.wave_drone_counter = newCounter;
       for (const wcfg of newCfgs) {
         gs.drone_configs.set(wcfg.id, wcfg);
@@ -989,10 +989,22 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
   score.completion_multiplier = completion_multiplier;
   score.time_bonus_detail = time_bonus_detail;
 
+  // Debrief notes for hardened FPV EW saturation
+  const debriefNotes: string[] = [];
+  for (const d of gs.drones) {
+    if (d.drone_type !== 'improvised_hardened') continue;
+    const jamAttempts = gs.actions.filter(a => a.action === 'engage' && a.target_id === d.id && a.effector).length;
+    if (jamAttempts >= 3) {
+      debriefNotes.push('EW saturation on hardened FPV \u2014 consider kinetic defeat on frequency-hop targets');
+      break;
+    }
+  }
+
   return {
     type: 'debrief',
     score,
     drone_reached_base: gs.drone_reached_base,
     waves_completed: gs.current_wave,
+    debrief_notes: debriefNotes.length > 0 ? debriefNotes : undefined,
   };
 }
