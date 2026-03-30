@@ -10,7 +10,7 @@ export type Affiliation = 'unknown' | 'hostile' | 'friendly' | 'neutral';
 export type DroneType =
   | 'commercial_quad' | 'fixed_wing' | 'micro' | 'swarm'
   | 'bird' | 'passenger_aircraft' | 'military_jet'
-  | 'weather_balloon' | 'jackal' | 'shahed' | 'improvised';
+  | 'weather_balloon' | 'jackal' | 'shahed' | 'improvised' | 'improvised_hardened';
 
 export type ThreatClassification =
   | 'commercial_quad' | 'fixed_wing' | 'micro' | 'bird'
@@ -70,6 +70,7 @@ export interface DroneState {
   shenobi_cm_time_remaining: number;
   shenobi_cm_initial_duration: number;
   display_label: string;
+  last_jam_attempt_ts?: number;
 }
 
 export function createDefaultDrone(overrides: Partial<DroneState> & Pick<DroneState, 'id' | 'drone_type' | 'x' | 'y' | 'altitude' | 'speed' | 'heading'>): DroneState {
