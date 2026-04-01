@@ -235,11 +235,17 @@ export function generateAmbientObject(
     };
   } else if (objType === 'bird') {
     ambId = `TRN-${String(ambientCounter).padStart(3, '0')}`;
-    const angle = uniform(0, 2 * Math.PI);
-    const startDist = uniform(2.0, 5.0);
-    const startX = startDist * Math.cos(angle);
-    const startY = startDist * Math.sin(angle);
-    const heading = uniform(0, 360);
+    // Spawn on one edge, fly through toward the opposite side and exit the map
+    const entryAngle = uniform(0, 2 * Math.PI);
+    const startDist = uniform(3.0, 6.0);
+    const startX = startDist * Math.cos(entryAngle);
+    const startY = startDist * Math.sin(entryAngle);
+    // Exit point: roughly opposite side, off-map (>10km)
+    const exitAngle = entryAngle + Math.PI + uniform(-0.6, 0.6);
+    const exitDist = uniform(8.0, 11.0);
+    const exitX = exitDist * Math.cos(exitAngle);
+    const exitY = exitDist * Math.sin(exitAngle);
+    const heading = ((Math.atan2(exitX - startX, exitY - startY) * 180 / Math.PI) + 360) % 360;
 
     cfg = {
       id: ambId,
@@ -249,7 +255,7 @@ export function generateAmbientObject(
       altitude: randInt(50, 500),
       speed: randInt(20, 40),
       heading,
-      behavior: 'evasive',
+      behavior: 'waypoint_path',
       rf_emitting: false,
       spawn_delay: 0.0,
       correct_classification: 'bird',
@@ -258,6 +264,7 @@ export function generateAmbientObject(
       acceptable_effectors: [],
       roe_violations: _ALL_ROE_VIOLATIONS,
       should_engage: false,
+      waypoints: [[round2(exitX), round2(exitY)]],
     };
   } else if (objType === 'weather_balloon') {
     ambId = `TRN-${String(ambientCounter).padStart(3, '0')}`;

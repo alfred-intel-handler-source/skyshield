@@ -71,6 +71,7 @@ export interface DroneState {
   shenobi_cm_initial_duration: number;
   display_label: string;
   last_jam_attempt_ts?: number;
+  jam_cooldown: number;
 }
 
 export function createDefaultDrone(overrides: Partial<DroneState> & Pick<DroneState, 'id' | 'drone_type' | 'x' | 'y' | 'altitude' | 'speed' | 'heading'>): DroneState {
@@ -111,6 +112,7 @@ export function createDefaultDrone(overrides: Partial<DroneState> & Pick<DroneSt
     shenobi_cm_time_remaining: 0,
     shenobi_cm_initial_duration: 0,
     display_label: '',
+    jam_cooldown: 0,
     ...overrides,
   };
 }

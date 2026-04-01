@@ -431,6 +431,7 @@ function _engageJackal(
     shenobi_cm_time_remaining: 0, shenobi_cm_initial_duration: 0,
     neutralized: false,
     display_label: jackalId,
+    jam_cooldown: 0,
   };
 
   gs.drones.push(jackalDrone);
@@ -493,9 +494,10 @@ function _engageNexus(
   const cmDuration = _randUniform(15.0, 30.0);
   const cmLabel = cmType.replace('shenobi_', '').replace(/_/g, ' ').toUpperCase();
 
+  // Do NOT set dtid_phase: 'defeated' here — drone is still active.
+  // defeated is set by shenobi.ts when neutralized=true is resolved.
   gs.drones[droneIdx] = {
     ...d,
-    dtid_phase: 'defeated',
     shenobi_cm_active: cmType,
     shenobi_cm_state: 'pending',
     shenobi_cm_time_remaining: cmDuration,

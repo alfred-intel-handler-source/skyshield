@@ -411,6 +411,7 @@ export function tickPassiveJamming(gs: GameState, elapsed: number): Msg[] {
       const drone = gs.drones[i];
       if (drone.neutralized || drone.is_interceptor) continue;
       if (drone.shenobi_cm_active) continue;
+      if ((drone.jam_cooldown ?? 0) > 0) continue;
       const dist = Math.sqrt((drone.x - effX) ** 2 + (drone.y - effY) ** 2);
       if (dist > rangeKm) continue;
 
@@ -431,7 +432,8 @@ export function tickPassiveJamming(gs: GameState, elapsed: number): Msg[] {
           }
         } else {
           const jamDuration = 5 + Math.random() * 5;
-          updateFields.dtid_phase = 'defeated';
+          // Don't mark defeated at jam start — drone is still flying/visible.
+          // defeated is set when neutralized=true resolves in jamming.ts tick.
           updateFields.jammed = true;
           updateFields.jammed_behavior = behavior;
           updateFields.jammed_time_remaining = jamDuration;
@@ -503,6 +505,14 @@ export function tickDrones(gs: GameState, elapsed: number): Msg[] {
       continue;
     }
 
+    // Shenobi CM active — highest priority, overrides RF/PNT jam movement
+    if (gs.drones[i].shenobi_cm_active) {
+      const [updated, nevents] = updateShenobiDrone(gs.drones[i], gs.tick_rate, elapsed);
+      gs.drones[i] = updated;
+      events.push(...nevents);
+      continue;
+    }
+
     // RF-jammed drone
     if (drone.jammed) {
       const [updated, jevents] = updateJammedDrone(drone, gs.tick_rate, elapsed);
@@ -516,14 +526,12 @@ export function tickDrones(gs: GameState, elapsed: number): Msg[] {
       const [updated, pevents] = updatePntJammedDrone(drone, gs.tick_rate, elapsed);
       gs.drones[i] = updated;
       events.push(...pevents);
+      continue;
     }
 
-    // Shenobi CM active
-    if (gs.drones[i].shenobi_cm_active) {
-      const [updated, nevents] = updateShenobiDrone(gs.drones[i], gs.tick_rate, elapsed);
-      gs.drones[i] = updated;
-      events.push(...nevents);
-      continue;
+    // Decrement jam cooldown (post-atti_mode lockout)
+    if ((gs.drones[i].jam_cooldown ?? 0) > 0) {
+      gs.drones[i] = { ...gs.drones[i], jam_cooldown: Math.max(0, gs.drones[i].jam_cooldown - gs.tick_rate) };
     }
 
     // Tutorial gate
