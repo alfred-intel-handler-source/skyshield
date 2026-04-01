@@ -182,6 +182,7 @@ export default function App() {
   const [scenarioName, setScenarioName] = useState("");
   const [score, setScore] = useState<ScoreBreakdown | null>(null);
   const [droneReachedBase, setDroneReachedBase] = useState(false);
+  const [baseBreached, setBaseBreached] = useState(false);
   const [engagementZones, setEngagementZones] =
     useState<EngagementZones | null>(null);
   const [protectedArea, setProtectedArea] = useState<ProtectedAreaInfo | null>(null);
@@ -485,6 +486,15 @@ export default function App() {
 
       case "tutorial_feedback":
         setTutorialFeedback(msg.message);
+        break;
+
+      case "base_breach":
+        setBaseBreached(true);
+        soundEngine.play("critical_alarm");
+        setEvents((prev) => [
+          ...prev,
+          { timestamp: msg.timestamp, message: msg.message || "\u26a0 BASE PERIMETER BREACHED" },
+        ]);
         break;
 
       case "debrief":
@@ -856,6 +866,7 @@ export default function App() {
     setCameraTrackId(null);
     autoOpenedCameraRef.current.clear();
       detectionPingedRef.current.clear();
+    setBaseBreached(false);
     setPlacementConfig(null);
     setTutorialMessage(null);
     setIsTutorial(false);
@@ -1791,9 +1802,11 @@ export default function App() {
           trackBlinkStates={trackBlinkStates}
           newContactBanner={newContactBanner}
           baseAssets={baseTemplate?.protected_assets}
+          baseBoundary={placementConfig?.boundary ?? baseTemplate?.boundary}
           activeJammers={activeJammers}
           activeIntercepts={activeIntercepts}
           onJammerToggle={handleJammerToggle}
+          baseBreached={baseBreached}
         />
 
         {/* Tutorial overlay banner */}

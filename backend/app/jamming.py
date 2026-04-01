@@ -28,7 +28,7 @@ PNT_VULNERABILITY: dict[DroneType, float] = {
     DroneType.MICRO: 0.006,            # Small GPS receiver — moderate drift
     DroneType.FIXED_WING: 0.004,       # May have basic autopilot — light drift
     DroneType.IMPROVISED: 0.005,       # Unknown GPS dependency — moderate drift
-    DroneType.SHAHED: 0.003,           # INS-primary but still GPS-aided — minor drift
+    DroneType.SHAHED: 0.0,             # INS-primary — fully immune to PNT/GPS jamming
 }
 # Default for unlisted types (ambient traffic, birds, etc.)
 _DEFAULT_PNT_VULNERABILITY = 0.0  # Don't jam ambient/non-threat types

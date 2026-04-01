@@ -163,6 +163,13 @@ export interface EventMsg {
   message: string;
 }
 
+export interface BaseBreachMsg {
+  type: "base_breach";
+  timestamp: number;
+  drone_id: string;
+  message: string;
+}
+
 export interface EngagementResultMsg {
   type: "engagement_result";
   target_id: string;
@@ -193,6 +200,7 @@ export type ServerMessage =
   | GameStartMsg
   | StateMsg
   | EventMsg
+  | BaseBreachMsg
   | EngagementResultMsg
   | DebriefMsg
   | TutorialMsg

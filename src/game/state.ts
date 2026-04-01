@@ -452,6 +452,12 @@ export interface GameState {
 
   /** Per-drone evasive maneuver state (moved from module-level to support multiple game instances). */
   evasive_states: Map<string, { offset_rad: number; alt_offset: number; next_jink: number; tick_counter: number }>;
+
+  /** Boundary polygon for polygon-accurate breach checks (game XY km coords). */
+  boundary_polygon: [number, number][];
+
+  /** One-shot event flags (e.g. per-drone breach deduplication). */
+  event_flags: Set<string>;
 }
 
 export function createGameState(
@@ -516,5 +522,7 @@ export function createGameState(
     free_play_spawn_counter: 0,
     free_play_last_spawn_time: -30,
     evasive_states: new Map(),
+    boundary_polygon: [],
+    event_flags: new Set(),
   };
 }

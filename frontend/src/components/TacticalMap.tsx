@@ -43,9 +43,11 @@ interface Props {
   trackBlinkStates?: Record<string, string>;
   newContactBanner?: string | null;
   baseAssets?: ProtectedAsset[];
+  baseBoundary?: number[][];
   activeJammers?: Record<string, number>;
   activeIntercepts?: InterceptAnimationData[];
   onJammerToggle?: (effectorId: string) => void;
+  baseBreached?: boolean;
 }
 
 export interface InterceptAnimationData {
@@ -851,9 +853,11 @@ export default function TacticalMap({
   trackBlinkStates = {},
   newContactBanner,
   baseAssets = [],
+  baseBoundary,
   activeJammers = {},
   activeIntercepts = [],
   onJammerToggle,
+  baseBreached = false,
 }: Props) {
   const baseCenter: [number, number] = [baseLat ?? 33.0, baseLng ?? 44.5];
   const [wheelState, setWheelState] = useState<WheelState | null>(null);
@@ -862,6 +866,17 @@ export default function TacticalMap({
   const [hiddenRings, setHiddenRings] = useState<Set<string>>(new Set());
   const [selectionList, setSelectionList] = useState<SelectionListState | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+
+  // Breach flash state
+  const [breachFlash, setBreachFlash] = useState(false);
+  useEffect(() => {
+    if (!baseBreached) {
+      setBreachFlash(false);
+      return;
+    }
+    const interval = setInterval(() => setBreachFlash((v) => !v), 500);
+    return () => clearInterval(interval);
+  }, [baseBreached]);
 
   // Bulls-eye overlay state
   const [showBullseye, setShowBullseye] = useState(true);
@@ -1111,8 +1126,23 @@ export default function TacticalMap({
           </>
         )}
 
-        {/* Protected Area overlay (purple) */}
-        {protectedArea && (() => {
+        {/* Custom base boundary polygon */}
+        {baseBoundary && baseBoundary.length >= 3 && (
+          <Polygon
+            positions={baseBoundary.map(([x, y]) => gameXYToLatLng(x, y, baseLat, baseLng))}
+            pathOptions={{
+              color: baseBreached ? (breachFlash ? "#f85149" : "#d29922") : "#d29922",
+              fillColor: baseBreached && breachFlash ? "#f85149" : "#d29922",
+              fillOpacity: baseBreached && breachFlash ? 0.12 : 0.05,
+              weight: 2,
+              dashArray: "8,4",
+              opacity: 0.8,
+            }}
+          />
+        )}
+
+        {/* Protected Area overlay (purple) — hidden when a custom boundary polygon is shown */}
+        {protectedArea && !baseBoundary && (() => {
           const paCenter = gameXYToLatLng(
             protectedArea.center_x, protectedArea.center_y, baseLat, baseLng
           );
@@ -1150,17 +1180,19 @@ export default function TacticalMap({
                 })}
                 interactive={false}
               />
-              {/* Protected Area (inner, purple) */}
+              {/* Protected Area (inner, purple — flashes red on breach) */}
               <Circle
                 center={paCenter}
                 radius={protectedArea.radius_km * 1000}
                 pathOptions={{
-                  color: anyWithin30s ? "#da3633" : "#bc8cff",
-                  fillColor: "#bc8cff",
-                  fillOpacity: 0.06,
-                  weight: anyWithin30s ? 2.5 : 2,
-                  opacity: anyWithin30s ? 0.9 : 0.7,
-                  dashArray: anyWithin30s ? undefined : "4,4",
+                  color: baseBreached
+                    ? (breachFlash ? "#f85149" : "#bc8cff")
+                    : (anyWithin30s ? "#da3633" : "#bc8cff"),
+                  fillColor: baseBreached && breachFlash ? "#f85149" : "#bc8cff",
+                  fillOpacity: baseBreached && breachFlash ? 0.15 : 0.06,
+                  weight: anyWithin30s || baseBreached ? 2.5 : 2,
+                  opacity: anyWithin30s || baseBreached ? 0.9 : 0.7,
+                  dashArray: (anyWithin30s || baseBreached) ? undefined : "4,4",
                   className: anyWithin30s ? "protected-area-pulse" : undefined,
                 }}
               />
@@ -2047,6 +2079,32 @@ export default function TacticalMap({
           />
         );
       })()}
+
+      {/* BASE COMPROMISED banner */}
+      {baseBreached && (
+        <div style={{
+          position: "absolute",
+          top: 16,
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 1000,
+          background: "rgba(248, 81, 73, 0.15)",
+          border: "1px solid #f85149",
+          borderRadius: 6,
+          padding: "8px 20px",
+          fontFamily: "JetBrains Mono, monospace",
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#f85149",
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          backdropFilter: "blur(4px)",
+          pointerEvents: "none",
+          animation: "breach-pulse 1s ease-in-out infinite",
+        }}>
+          {"\u26a0"} BASE COMPROMISED {"\u2014"} HOSTILE INSIDE WIRE
+        </div>
+      )}
 
       {/* Selection disambiguation list */}
       {selectionList && (

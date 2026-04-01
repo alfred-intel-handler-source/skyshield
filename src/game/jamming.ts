@@ -29,7 +29,7 @@ export const PNT_VULNERABILITY: Record<string, number> = {
   fixed_wing: 0.004,
   improvised: 0.005,
   improvised_hardened: 0.001,
-  shahed: 0.003,
+  shahed: 0.0, // INS-primary — fully immune to PNT/GPS jamming
 };
 const _DEFAULT_PNT_VULNERABILITY = 0.0;
 

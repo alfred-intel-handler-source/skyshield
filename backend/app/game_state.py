@@ -93,6 +93,12 @@ class GameState:
     protected_area_radius: float = 0.3
     warning_area_radius: float = 0.45
 
+    # Boundary polygon (for polygon breach checks)
+    boundary_polygon: list[tuple[float, float]] = field(default_factory=list)
+
+    # Event flags (for deduplicating one-shot events like breach)
+    event_flags: dict[str, bool] = field(default_factory=dict)
+
     # Passive jamming — track which drones have already had resist notification
     jam_resist_notified: set[str] = field(default_factory=set)
 

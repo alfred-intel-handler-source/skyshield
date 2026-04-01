@@ -2,6 +2,22 @@
  * Game loop tick logic — ported from main.py tick functions + tutorial logic.
  */
 
+/** Ray-casting point-in-polygon test (game XY coords). */
+function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
+  const n = polygon.length;
+  let inside = false;
+  let j = n - 1;
+  for (let i = 0; i < n; i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+    j = i;
+  }
+  return inside;
+}
+
 import type {
   DroneState, GameState, DroneStartConfig, ScenarioConfig,
   SensorConfig, EffectorConfig, PlacementConfig, BaseTemplate,
@@ -99,6 +115,14 @@ export function initGameState(
 
   // Ambient traffic schedule
   gs.next_ambient_times = new Map(Object.entries(initialAmbientSchedule()));
+
+  // Load boundary polygon for polygon-accurate breach checks
+  // Placement config boundary (custom drawn polygon) takes priority over base template default
+  if (placementConfig && (placementConfig as any).boundary && (placementConfig as any).boundary.length >= 3) {
+    gs.boundary_polygon = (placementConfig as any).boundary.map((p: number[]) => [p[0], p[1]] as [number, number]);
+  } else if (baseTemplate && baseTemplate.boundary && baseTemplate.boundary.length >= 3) {
+    gs.boundary_polygon = baseTemplate.boundary.map(p => [p[0], p[1]] as [number, number]);
+  }
 
   // Protected area
   if (baseTemplate && baseTemplate.protected_assets.length > 0) {
@@ -551,9 +575,25 @@ export function tickDrones(gs: GameState, elapsed: number): Msg[] {
       }
     }
 
-    // Base proximity
-    if (!gs.drones[i].is_ambient && distanceToBase(gs.drones[i]) < gs.scenario.base_radius_km) {
-      gs.drone_reached_base = true;
+    // Base proximity — polygon check if available, radial fallback
+    if (!gs.drones[i].is_ambient) {
+      const drone = gs.drones[i];
+      const inBase = gs.boundary_polygon.length >= 3
+        ? pointInPolygon(drone.x, drone.y, gs.boundary_polygon)
+        : distanceToBase(drone) < gs.scenario.base_radius_km;
+      if (inBase) {
+        gs.drone_reached_base = true;
+        const breachKey = `breach_${drone.id}`;
+        if (!gs.event_flags.has(breachKey)) {
+          gs.event_flags.add(breachKey);
+          events.push({
+            type: 'base_breach',
+            timestamp: Math.round(elapsed * 10) / 10,
+            drone_id: drone.id,
+            message: `\u26a0 BASE PERIMETER BREACHED \u2014 ${drone.drone_type.toUpperCase()} INSIDE WIRE`,
+          });
+        }
+      }
     }
 
     // Remove ambient objects that leave the map
@@ -966,7 +1006,11 @@ export function buildDebrief(gs: GameState, catalog?: EquipmentCatalog): Msg {
     );
   } else {
     const dronesReached = new Set(
-      gs.drones.filter(d => !d.is_ambient && distanceToBase(d) < gs.scenario.base_radius_km).map(d => d.id)
+      gs.drones.filter(d => !d.is_ambient && (
+        gs.boundary_polygon.length >= 3
+          ? pointInPolygon(d.x, d.y, gs.boundary_polygon)
+          : distanceToBase(d) < gs.scenario.base_radius_km
+      )).map(d => d.id)
     );
     score = calculateScoreMulti(
       gs.scenario, scorableCfgs, gs.actions,

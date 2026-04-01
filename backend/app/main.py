@@ -58,6 +58,21 @@ from app.models import (
     ThreatClassification,
 )
 from app.scenario import list_scenarios, load_scenario
+
+
+def _point_in_polygon(x: float, y: float, polygon: list[tuple[float, float]]) -> bool:
+    """Ray-casting algorithm for point-in-polygon test."""
+    n = len(polygon)
+    inside = False
+    px, py = x, y
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i]
+        xj, yj = polygon[j]
+        if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
 from app.scoring import calculate_score, calculate_score_multi
 from app.waves import (
     generate_ambient_object,
@@ -232,6 +247,10 @@ def _init_game_state(
 
     # Ambient traffic schedule
     gs.next_ambient_times = initial_ambient_schedule()
+
+    # Load base template boundary polygon for polygon-accurate breach checks
+    if base_template and base_template.boundary and len(base_template.boundary) >= 3:
+        gs.boundary_polygon = [(p[0], p[1]) for p in base_template.boundary]
 
     # Protected area
     if base_template and base_template.protected_assets:
@@ -562,8 +581,24 @@ def _tick_drones(gs: GameState, elapsed: float) -> list[dict]:
             )
 
         # Base proximity check
-        if not gs.drones[i].is_ambient and distance_to_base(gs.drones[i]) < gs.scenario.base_radius_km:
-            gs.drone_reached_base = True
+        if not gs.drones[i].is_ambient:
+            drone = gs.drones[i]
+            if gs.boundary_polygon:
+                in_base = _point_in_polygon(drone.x, drone.y, gs.boundary_polygon)
+            else:
+                in_base = distance_to_base(drone) < gs.scenario.base_radius_km
+            if in_base:
+                gs.drone_reached_base = True
+                # Emit breach event on first detection per drone
+                breach_key = f"breach_{drone.id}"
+                if breach_key not in gs.event_flags:
+                    gs.event_flags[breach_key] = True
+                    events.append({
+                        "type": "base_breach",
+                        "timestamp": round(elapsed, 1),
+                        "drone_id": drone.id,
+                        "message": f"\u26a0 BASE PERIMETER BREACHED \u2014 {drone.drone_type.value.upper()} INSIDE WIRE",
+                    })
 
         # Remove ambient objects that leave the map
         if gs.drones[i].is_ambient:
@@ -938,7 +973,10 @@ def _build_debrief(gs: GameState) -> dict:
     else:
         drones_reached = {
             d.id for d in gs.drones
-            if not d.is_ambient and distance_to_base(d) < gs.scenario.base_radius_km
+            if not d.is_ambient and (
+                _point_in_polygon(d.x, d.y, gs.boundary_polygon) if gs.boundary_polygon
+                else distance_to_base(d) < gs.scenario.base_radius_km
+            )
         }
         score = calculate_score_multi(
             scenario=gs.scenario, drone_configs=scorable_cfgs,
@@ -1093,6 +1131,7 @@ async def game_websocket(ws: WebSocket):
                 half_diag = _math.sqrt(w**2 + h**2) / 2.0
                 gs.protected_area_radius = max(half_diag, 0.2)
                 gs.warning_area_radius = gs.protected_area_radius * 1.5
+                gs.boundary_polygon = [(p[0], p[1]) for p in pts]
 
         # Send game_start
         await ws.send_json(_build_game_start_msg(gs))
