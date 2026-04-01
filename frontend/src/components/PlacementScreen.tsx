@@ -5,7 +5,6 @@ import {
   Circle,
   Polygon,
   Polyline,
-  Rectangle,
   Marker,
   useMap,
   useMapEvents,
@@ -232,8 +231,21 @@ function createCornerHandle(): L.DivIcon {
   });
 }
 
-// Create perimeter dimension label
-function createPerimeterLabel(text: string): L.DivIcon {
+// Create midpoint handle for polygon vertex insertion
+function createMidpointHandle(): L.DivIcon {
+  const svg = `<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="5" cy="5" r="4" fill="#d29922" stroke="#ffb800" stroke-width="1" opacity="0.6"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: "",
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
+  });
+}
+
+// Create polygon centroid label showing vertex count and area
+function createPolygonLabel(text: string): L.DivIcon {
   const html = `<span style="font:600 10px 'JetBrains Mono',monospace;color:#d29922;white-space:nowrap;pointer-events:none;background:rgba(13,17,23,0.85);padding:2px 6px;border-radius:3px;border:1px solid #d2992244;">${text}</span>`;
   return L.divIcon({
     html,
@@ -241,6 +253,29 @@ function createPerimeterLabel(text: string): L.DivIcon {
     iconSize: [120, 16],
     iconAnchor: [60, 8],
   });
+}
+
+// Shoelace formula for polygon area in km²
+function shoelaceArea(vertices: { x: number; y: number }[]): number {
+  let area = 0;
+  const n = vertices.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += vertices[i].x * vertices[j].y;
+    area -= vertices[j].x * vertices[i].y;
+  }
+  return Math.abs(area) / 2;
+}
+
+// Centroid of polygon vertices in game XY
+function verticesCentroid(vertices: { x: number; y: number }[]): { x: number; y: number } {
+  let cx = 0;
+  let cy = 0;
+  for (const v of vertices) {
+    cx += v.x;
+    cy += v.y;
+  }
+  return { x: cx / vertices.length, y: cy / vertices.length };
 }
 
 // Create item name label
@@ -459,11 +494,18 @@ export default function PlacementScreen({
   const [facingDeg, setFacingDeg] = useState(0);
   const [showRangeRings, setShowRangeRings] = useState(true);
 
-  // Perimeter box bounds in game XY (km from base center)
-  const [perimMinX, setPerimMinX] = useState(-0.5);
-  const [perimMinY, setPerimMinY] = useState(-0.5);
-  const [perimMaxX, setPerimMaxX] = useState(0.5);
-  const [perimMaxY, setPerimMaxY] = useState(0.5);
+  // Freeform polygon perimeter vertices in game XY (km from base center)
+  const [perimVertices, setPerimVertices] = useState<{x: number; y: number}[]>([
+    { x: -0.5, y: -0.5 },
+    { x: -0.5, y:  0.5 },
+    { x:  0.5, y:  0.5 },
+    { x:  0.5, y: -0.5 },
+  ]);
+
+  // Draggable asset positions
+  const [assetPositions, setAssetPositions] = useState<Record<string, { x: number; y: number }>>(
+    () => Object.fromEntries(baseTemplate.protected_assets.map(a => [a.id, { x: a.x, y: a.y }]))
+  );
 
   const { lat: baseLat, lng: baseLng } = getBaseCenter(baseTemplate);
   const baseCenter: [number, number] = [baseLat, baseLng];
@@ -477,70 +519,39 @@ export default function PlacementScreen({
     return 13;
   }, [baseTemplate.placement_bounds_km]);
 
-  // Perimeter dimensions
-  const perimWidthKm = Math.abs(perimMaxX - perimMinX);
-  const perimHeightKm = Math.abs(perimMaxY - perimMinY);
-
-  // Perimeter corners as lat/lng for the rectangle
-  const perimSW = useMemo(
-    () => gameXYToLatLng(perimMinX, perimMinY, baseLat, baseLng),
-    [perimMinX, perimMinY, baseLat, baseLng],
+  // Polygon perimeter as lat/lng positions
+  const perimPositions = useMemo(
+    () => perimVertices.map(v => gameXYToLatLng(v.x, v.y, baseLat, baseLng)),
+    [perimVertices, baseLat, baseLng],
   );
-  const perimNE = useMemo(
-    () => gameXYToLatLng(perimMaxX, perimMaxY, baseLat, baseLng),
-    [perimMaxX, perimMaxY, baseLat, baseLng],
-  );
-  const perimBounds: L.LatLngBoundsExpression = [perimSW, perimNE];
 
-  // Corner positions for drag handles (SW, NW, NE, SE)
-  const perimCorners = useMemo(() => {
-    const sw = gameXYToLatLng(perimMinX, perimMinY, baseLat, baseLng);
-    const nw = gameXYToLatLng(perimMinX, perimMaxY, baseLat, baseLng);
-    const ne = gameXYToLatLng(perimMaxX, perimMaxY, baseLat, baseLng);
-    const se = gameXYToLatLng(perimMaxX, perimMinY, baseLat, baseLng);
-    return { sw, nw, ne, se };
-  }, [perimMinX, perimMinY, perimMaxX, perimMaxY, baseLat, baseLng]);
-
-  // Perimeter dimension label position (center-top of box)
+  // Polygon area and centroid
+  const perimArea = useMemo(() => shoelaceArea(perimVertices), [perimVertices]);
+  const perimCentroid = useMemo(() => verticesCentroid(perimVertices), [perimVertices]);
   const perimLabelPos = useMemo(
-    () => gameXYToLatLng((perimMinX + perimMaxX) / 2, perimMaxY, baseLat, baseLng),
-    [perimMinX, perimMaxX, perimMaxY, baseLat, baseLng],
+    () => gameXYToLatLng(perimCentroid.x, perimCentroid.y, baseLat, baseLng),
+    [perimCentroid, baseLat, baseLng],
   );
 
-  // Handle corner drag
-  const handleCornerDrag = useCallback(
-    (corner: "sw" | "nw" | "ne" | "se", lat: number, lng: number) => {
-      const { x, y } = latLngToGameXY(lat, lng, baseLat, baseLng);
-      const rx = Math.round(x * 100) / 100;
-      const ry = Math.round(y * 100) / 100;
-      // Enforce minimum 0.2km box
-      switch (corner) {
-        case "sw":
-          setPerimMinX(Math.min(rx, perimMaxX - 0.2));
-          setPerimMinY(Math.min(ry, perimMaxY - 0.2));
-          break;
-        case "nw":
-          setPerimMinX(Math.min(rx, perimMaxX - 0.2));
-          setPerimMaxY(Math.max(ry, perimMinY + 0.2));
-          break;
-        case "ne":
-          setPerimMaxX(Math.max(rx, perimMinX + 0.2));
-          setPerimMaxY(Math.max(ry, perimMinY + 0.2));
-          break;
-        case "se":
-          setPerimMaxX(Math.max(rx, perimMinX + 0.2));
-          setPerimMinY(Math.min(ry, perimMaxY - 0.2));
-          break;
-      }
-    },
-    [baseLat, baseLng, perimMinX, perimMinY, perimMaxX, perimMaxY],
-  );
+  // Midpoints between consecutive vertices
+  const perimMidpoints = useMemo(() => {
+    return perimVertices.map((v, i) => {
+      const next = perimVertices[(i + 1) % perimVertices.length];
+      return {
+        x: (v.x + next.x) / 2,
+        y: (v.y + next.y) / 2,
+        afterIndex: i,
+      };
+    });
+  }, [perimVertices]);
 
   const resetPerimeter = useCallback(() => {
-    setPerimMinX(-0.5);
-    setPerimMinY(-0.5);
-    setPerimMaxX(0.5);
-    setPerimMaxY(0.5);
+    setPerimVertices([
+      { x: -0.5, y: -0.5 },
+      { x: -0.5, y:  0.5 },
+      { x:  0.5, y:  0.5 },
+      { x:  0.5, y: -0.5 },
+    ]);
   }, []);
 
   // Build palette list
@@ -734,16 +745,19 @@ export default function PlacementScreen({
 
   // Build PlacementConfig and confirm
   const handleConfirm = useCallback(() => {
-    // Derive boundary from perimeter box (game XY km coords)
-    const boundary: number[][] = [
-      [perimMinX, perimMinY],
-      [perimMinX, perimMaxY],
-      [perimMaxX, perimMaxY],
-      [perimMaxX, perimMinY],
-    ];
-    // placement_bounds_km = 1.5× largest dimension
-    const maxDim = Math.max(perimWidthKm, perimHeightKm);
+    // Derive boundary from polygon vertices (game XY km coords)
+    const boundary: number[][] = perimVertices.map(v => [v.x, v.y]);
+    // placement_bounds_km = 1.5× largest dimension of bounding box
+    const xs = perimVertices.map(v => v.x);
+    const ys = perimVertices.map(v => v.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    const maxDim = Math.max(width, height);
     const placementBoundsKm = Math.max(maxDim * 1.5, baseTemplate.placement_bounds_km);
+
+    const movedAssets = baseTemplate.protected_assets
+      .filter(a => assetPositions[a.id].x !== a.x || assetPositions[a.id].y !== a.y)
+      .map(a => ({ id: a.id, x: assetPositions[a.id].x, y: assetPositions[a.id].y }));
 
     const config: PlacementConfig = {
       base_id: baseTemplate.id,
@@ -758,9 +772,10 @@ export default function PlacementScreen({
         .map((p) => p.equipment),
       boundary,
       placement_bounds_km: placementBoundsKm,
+      ...(movedAssets.length > 0 ? { moved_assets: movedAssets } : {}),
     };
     onConfirm(config);
-  }, [baseTemplate.id, baseTemplate.placement_bounds_km, placedItems, onConfirm, perimMinX, perimMinY, perimMaxX, perimMaxY, perimWidthKm, perimHeightKm]);
+  }, [baseTemplate.id, baseTemplate.placement_bounds_km, baseTemplate.protected_assets, placedItems, onConfirm, perimVertices, assetPositions]);
 
   // Active selection info for palette
   const activeItem =
@@ -1429,9 +1444,9 @@ export default function PlacementScreen({
               </LayersControl.BaseLayer>
             </LayersControl>
 
-            {/* Resizable perimeter box */}
-            <Rectangle
-              bounds={perimBounds}
+            {/* Freeform polygon perimeter */}
+            <Polygon
+              positions={perimPositions}
               pathOptions={{
                 color: "#d29922",
                 fillColor: "#d29922",
@@ -1440,25 +1455,60 @@ export default function PlacementScreen({
                 dashArray: "8,4",
               }}
             />
-            {/* Corner drag handles */}
-            {(["sw", "nw", "ne", "se"] as const).map((corner) => (
-              <Marker
-                key={`perim-${corner}`}
-                position={perimCorners[corner]}
-                icon={createCornerHandle()}
-                draggable
-                eventHandlers={{
-                  dragend: (e) => {
-                    const latlng = e.target.getLatLng();
-                    handleCornerDrag(corner, latlng.lat, latlng.lng);
-                  },
-                }}
-              />
-            ))}
-            {/* Perimeter dimension label */}
+            {/* Vertex drag handles */}
+            {perimVertices.map((v, i) => {
+              const pos = gameXYToLatLng(v.x, v.y, baseLat, baseLng);
+              return (
+                <Marker
+                  key={`perim-v-${i}`}
+                  position={pos}
+                  icon={createCornerHandle()}
+                  draggable
+                  eventHandlers={{
+                    dragend: (e: L.LeafletEvent) => {
+                      const latlng = (e.target as L.Marker).getLatLng();
+                      const { x, y } = latLngToGameXY(latlng.lat, latlng.lng, baseLat, baseLng);
+                      setPerimVertices(prev => prev.map((pv, j) =>
+                        j === i ? { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 } : pv
+                      ));
+                    },
+                    contextmenu: (e: L.LeafletMouseEvent) => {
+                      L.DomEvent.preventDefault(e.originalEvent);
+                      L.DomEvent.stopPropagation(e.originalEvent);
+                      if (perimVertices.length > 3) {
+                        setPerimVertices(prev => prev.filter((_, j) => j !== i));
+                      }
+                    },
+                  }}
+                />
+              );
+            })}
+            {/* Midpoint handles — click to insert vertex */}
+            {perimMidpoints.map((mp, i) => {
+              const pos = gameXYToLatLng(mp.x, mp.y, baseLat, baseLng);
+              return (
+                <Marker
+                  key={`perim-mid-${i}`}
+                  position={pos}
+                  icon={createMidpointHandle()}
+                  eventHandlers={{
+                    click: (e: L.LeafletMouseEvent) => {
+                      L.DomEvent.stopPropagation(e.originalEvent);
+                      const insertIdx = mp.afterIndex + 1;
+                      setPerimVertices(prev => [
+                        ...prev.slice(0, insertIdx),
+                        { x: Math.round(mp.x * 100) / 100, y: Math.round(mp.y * 100) / 100 },
+                        ...prev.slice(insertIdx),
+                      ]);
+                    },
+                  }}
+                />
+              );
+            })}
+            {/* Polygon centroid label */}
             <Marker
               position={perimLabelPos}
-              icon={createPerimeterLabel(`${perimWidthKm.toFixed(1)}km × ${perimHeightKm.toFixed(1)}km`)}
+              icon={createPolygonLabel(`${perimVertices.length} pts — ${perimArea.toFixed(1)} km²`)}
               interactive={false}
             />
 
@@ -1486,15 +1536,26 @@ export default function PlacementScreen({
               );
             })}
 
-            {/* Protected assets */}
+            {/* Protected assets (draggable) */}
             {baseTemplate.protected_assets.map((asset) => {
-              const pos = gameXYToLatLng(asset.x, asset.y, baseLat, baseLng);
+              const ap = assetPositions[asset.id] || { x: asset.x, y: asset.y };
+              const pos = gameXYToLatLng(ap.x, ap.y, baseLat, baseLng);
               return (
                 <Marker
                   key={asset.id}
                   position={pos}
                   icon={createAssetIcon(asset.priority, asset.name)}
-                  interactive={false}
+                  draggable
+                  eventHandlers={{
+                    dragend: (e: L.LeafletEvent) => {
+                      const latlng = (e.target as L.Marker).getLatLng();
+                      const { x, y } = latLngToGameXY(latlng.lat, latlng.lng, baseLat, baseLng);
+                      setAssetPositions(prev => ({
+                        ...prev,
+                        [asset.id]: { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 },
+                      }));
+                    },
+                  }}
                 />
               );
             })}
@@ -1797,7 +1858,7 @@ export default function PlacementScreen({
                 lineHeight: 1.4,
               }}
             >
-              Drag corners to resize defended area
+              Drag vertices to reshape. Click midpoints to add. Right-click vertex to remove.
             </div>
             <div
               style={{
@@ -1815,7 +1876,7 @@ export default function PlacementScreen({
                   color: "#d29922",
                 }}
               >
-                {perimWidthKm.toFixed(1)} × {perimHeightKm.toFixed(1)}
+                {perimVertices.length} pts — {perimArea.toFixed(1)}
               </span>
               <span
                 style={{
@@ -1824,7 +1885,7 @@ export default function PlacementScreen({
                   fontFamily: "'JetBrains Mono', monospace",
                 }}
               >
-                km
+                km²
               </span>
             </div>
             <button
@@ -1852,7 +1913,7 @@ export default function PlacementScreen({
                 (e.currentTarget as HTMLButtonElement).style.color = COLORS.muted;
               }}
             >
-              Reset to default (1km)
+              Reset to default (1km²)
             </button>
           </div>
 

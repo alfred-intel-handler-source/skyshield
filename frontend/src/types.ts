@@ -350,4 +350,5 @@ export interface PlacementConfig {
   combined: PlacedEquipment[];
   boundary?: number[][];
   placement_bounds_km?: number;
+  moved_assets?: { id: string; x: number; y: number }[];
 }
