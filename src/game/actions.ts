@@ -77,11 +77,10 @@ export function handleIdentify(
         dtid_phase: 'identified',
         classification: (classification as DroneState['classification']) ?? null,
         classified: true,
-        affiliation: affiliationStr as DroneState['affiliation'],
+        affiliation: 'suspicious',
       };
       gs.identify_times.set(targetId, elapsed);
       gs.classification_given.set(targetId, classification ?? '');
-      gs.affiliation_given.set(targetId, affiliationStr);
       gs.confidence_at_identify.set(targetId, d.confidence);
       gs.actions.push({
         action: 'identify',
@@ -130,6 +129,36 @@ export function handleReleaseHoldFire(gs: GameState, targetId: string, elapsed: 
   return msgs;
 }
 
+export function handleDeclareAffiliation(
+  gs: GameState,
+  targetId: string,
+  affiliationStr: string,
+  elapsed: number,
+): Record<string, unknown>[] {
+  const msgs: Record<string, unknown>[] = [];
+  for (let j = 0; j < gs.drones.length; j++) {
+    const d = gs.drones[j];
+    if (d.id === targetId && d.dtid_phase === 'identified') {
+      _recordFirstClick(gs, targetId, elapsed);
+      gs.drones[j] = {
+        ...d,
+        affiliation: affiliationStr as DroneState['affiliation'],
+      };
+      gs.affiliation_given.set(targetId, affiliationStr);
+      gs.actions.push({
+        action: 'declare_affiliation',
+        target_id: targetId,
+        affiliation: affiliationStr,
+        timestamp: elapsed,
+      });
+      const label = gs.drones[j].display_label || targetId;
+      const affilUpper = affiliationStr.toUpperCase();
+      msgs.push(_event(elapsed, `OPERATOR: ${label.toUpperCase()} declared ${affilUpper}`));
+    }
+  }
+  return msgs;
+}
+
 export function handleEngage(
   gs: GameState,
   targetId: string,
@@ -138,6 +167,13 @@ export function handleEngage(
   shenobiCm?: string | null,
 ): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
+
+  // Hostile affiliation gate — defeat only allowed on tracks declared hostile
+  const targetDrone = gs.drones.find(dd => dd.id === targetId);
+  if (targetDrone && targetDrone.affiliation !== 'hostile' && !targetDrone.is_interceptor) {
+    msgs.push(_event(elapsed, `ENGAGEMENT: BLOCKED \u2014 ${_label(gs, targetId).toUpperCase()} not declared HOSTILE (ROE violation)`));
+    return msgs;
+  }
 
   // Hold fire check
   if (gs.hold_fire_tracks.has(targetId)) {

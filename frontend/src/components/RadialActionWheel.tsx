@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DTIDPhase, EffectorStatus } from "../types";
+import type { Affiliation, DTIDPhase, EffectorStatus } from "../types";
 
 interface WheelAction {
   id: string;
@@ -13,6 +13,7 @@ interface WheelAction {
 interface Props {
   trackId: string;
   dtidPhase: DTIDPhase;
+  affiliation?: Affiliation;
   screenX: number;
   screenY: number;
   effectors: EffectorStatus[];
@@ -20,6 +21,7 @@ interface Props {
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
   onEngage: (trackId: string, effectorId: string, shenobiCm?: string) => void;
+  onDeclareAffiliation?: (trackId: string, affiliation: "hostile" | "neutral" | "friendly") => void;
   onSlewCamera: (trackId: string) => void;
   onHoldFire?: (trackId: string) => void;
   onReleaseHoldFire?: (trackId: string) => void;
@@ -67,9 +69,15 @@ const PHASE_COLORS: Record<DTIDPhase, string> = {
   defeated: "#3fb950",   // green
 };
 
-type SubMenu = "none" | "identify" | "engage" | "shenobi_cm";
+const AFFILIATION_OPTIONS = [
+  { value: "hostile" as const, label: "HOSTILE", icon: "\u2620", color: "#f85149" },
+  { value: "neutral" as const, label: "NEUTRAL", icon: "\u25CB", color: "#a371f7" },
+  { value: "friendly" as const, label: "FRIENDLY", icon: "\u2714", color: "#3fb950" },
+];
 
-function getActionsForPhase(dtidPhase: DTIDPhase, holdFire?: boolean, iffStatus?: string, atcCalled?: boolean, classification?: string): WheelAction[] {
+type SubMenu = "none" | "identify" | "engage" | "shenobi_cm" | "affiliation";
+
+function getActionsForPhase(dtidPhase: DTIDPhase, holdFire?: boolean, iffStatus?: string, atcCalled?: boolean, classification?: string, affiliation?: Affiliation): WheelAction[] {
   switch (dtidPhase) {
     case "detected": {
       const actions: WheelAction[] = [
@@ -97,15 +105,26 @@ function getActionsForPhase(dtidPhase: DTIDPhase, holdFire?: boolean, iffStatus?
         { id: "track_history", label: "HISTORY", icon: "\u2630", color: "#484f58", disabled: true },
         { id: "monitor", label: "MONITOR", icon: "\u25C9", color: "#484f58", disabled: true },
       ];
-    case "identified":
+    case "identified": {
+      const isSuspicious = affiliation === "suspicious";
+      if (isSuspicious) {
+        return [
+          { id: "declare_affiliation", label: "DECLARE", icon: "\u2622", color: "#d29922" },
+          { id: "slew_camera", label: "SLEW CAM", icon: "\u25CE", color: "#d29922" },
+          { id: "engage", label: "ENGAGE", icon: "\u{1F3AF}", color: "#484f58", disabled: true, statusText: "DECLARE FIRST" },
+          { id: "re_identify", label: "RE-ID", icon: "\u21BA", color: "#484f58", disabled: true },
+        ];
+      }
+      const engageDisabled = holdFire || affiliation !== "hostile";
       return [
-        { id: "engage", label: "ENGAGE", icon: "\u{1F3AF}", color: holdFire ? "#484f58" : "#f85149", disabled: holdFire },
+        { id: "engage", label: "ENGAGE", icon: "\u{1F3AF}", color: engageDisabled ? "#484f58" : "#f85149", disabled: engageDisabled },
         { id: "slew_camera", label: "SLEW CAM", icon: "\u25CE", color: "#d29922" },
         holdFire
           ? { id: "release_hold_fire", label: "RLS HOLD", icon: "\u25B6", color: "#3fb950" }
           : { id: "hold_fire", label: "HOLD FIRE", icon: "\u270B", color: "#d29922" },
         { id: "re_identify", label: "RE-ID", icon: "\u21BA", color: "#484f58", disabled: true },
       ];
+    }
     case "defeated":
       return [
         { id: "monitor", label: "COMPLETE", icon: "\u2714", color: "#3fb950", disabled: true },
@@ -300,6 +319,7 @@ function WheelSegments({
 export default function RadialActionWheel({
   trackId,
   dtidPhase,
+  affiliation,
   screenX,
   screenY,
   effectors,
@@ -307,6 +327,7 @@ export default function RadialActionWheel({
   onConfirmTrack,
   onIdentify,
   onEngage,
+  onDeclareAffiliation,
   onSlewCamera,
   onHoldFire,
   onReleaseHoldFire,
@@ -367,6 +388,9 @@ export default function RadialActionWheel({
         case "identify":
           setSubMenu("identify");
           break;
+        case "declare_affiliation":
+          setSubMenu("affiliation");
+          break;
         case "engage":
           setSubMenu("engage");
           break;
@@ -412,6 +436,17 @@ export default function RadialActionWheel({
     [trackId, effectors, onEngage, animatedClose],
   );
 
+  const handleAffiliation = useCallback(
+    (affiliationValue: string) => {
+      const aff = AFFILIATION_OPTIONS.find((a) => a.value === affiliationValue);
+      if (aff && onDeclareAffiliation) {
+        onDeclareAffiliation(trackId, aff.value);
+      }
+      animatedClose();
+    },
+    [trackId, onDeclareAffiliation, animatedClose],
+  );
+
   const handleNexusCM = useCallback(
     (cmType: string) => {
       if (selectedNexusEffector) {
@@ -422,7 +457,7 @@ export default function RadialActionWheel({
     [trackId, selectedNexusEffector, onEngage, animatedClose],
   );
 
-  const actions = getActionsForPhase(dtidPhase, holdFire, iffStatus, atcCalled, classification);
+  const actions = getActionsForPhase(dtidPhase, holdFire, iffStatus, atcCalled, classification, affiliation);
 
   // Clamp position so wheel stays on screen
   const size = WHEEL_RADIUS * 2;
@@ -452,6 +487,13 @@ export default function RadialActionWheel({
         statusText: eff.status.toUpperCase(),
       };
     });
+  } else if (subMenu === "affiliation") {
+    subActions = AFFILIATION_OPTIONS.map((aff) => ({
+      id: aff.value,
+      label: aff.label,
+      icon: aff.icon,
+      color: aff.color,
+    }));
   } else if (subMenu === "shenobi_cm") {
     subActions = Shenobi_CM_OPTIONS.map((cm) => ({
       id: cm.id,
@@ -466,6 +508,8 @@ export default function RadialActionWheel({
     if (subMenu === "identify") {
       const cls = CLASSIFICATIONS.find((c) => c.value === id);
       if (cls) handleClassify(cls);
+    } else if (subMenu === "affiliation") {
+      handleAffiliation(id);
     } else if (subMenu === "engage") {
       handleEngage(id);
     } else if (subMenu === "shenobi_cm") {
@@ -707,7 +751,7 @@ export default function RadialActionWheel({
                 userSelect: "none",
               }}
             >
-              {subMenu === "identify" ? "CLASSIFY" : subMenu === "shenobi_cm" ? "Shenobi CM" : "SELECT EFFECTOR"}
+              {subMenu === "identify" ? "CLASSIFY" : subMenu === "affiliation" ? "AFFILIATION" : subMenu === "shenobi_cm" ? "Shenobi CM" : "SELECT EFFECTOR"}
             </text>
           )}
         </svg>

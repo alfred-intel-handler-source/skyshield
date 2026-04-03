@@ -12,6 +12,7 @@ interface Props {
   onConfirmTrack: (trackId: string) => void;
   onIdentify: (trackId: string, classification: string, affiliation: string) => void;
   onEngage: (trackId: string, effectorId: string, shenobiCm?: string) => void;
+  onDeclareAffiliation?: (trackId: string, affiliation: "hostile" | "neutral" | "friendly") => void;
   onSlewCamera?: (trackId: string) => void;
   onCallATC?: (trackId: string) => void;
   atcMessages?: AtcMessage[];
@@ -61,6 +62,7 @@ export default function EngagementPanel({
   onConfirmTrack,
   onIdentify,
   onEngage,
+  onDeclareAffiliation,
   onSlewCamera,
   onCallATC,
   atcMessages = [],
@@ -322,6 +324,67 @@ export default function EngagementPanel({
             </button>
           )}
 
+          {/* Declare Affiliation buttons — shown when track is suspicious */}
+          {track.affiliation === "suspicious" && onDeclareAffiliation && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#d29922", letterSpacing: 1.5, marginBottom: 6 }}>
+                DECLARE AFFILIATION
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {([
+                  { value: "hostile" as const, label: "HOSTILE", color: "#f85149" },
+                  { value: "neutral" as const, label: "NEUTRAL", color: "#a371f7" },
+                  { value: "friendly" as const, label: "FRIENDLY", color: "#3fb950" },
+                ]).map((aff) => (
+                  <button
+                    key={aff.value}
+                    onClick={() => onDeclareAffiliation(track.id, aff.value)}
+                    style={{
+                      flex: 1,
+                      padding: "8px 6px",
+                      background: `${aff.color}12`,
+                      border: `1px solid ${aff.color}44`,
+                      borderRadius: 5,
+                      color: aff.color,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: 0.5,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = `${aff.color}28`;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = `${aff.color}12`;
+                    }}
+                  >
+                    {aff.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Locked defeat tooltip — shown when track not yet declared hostile */}
+          {track.affiliation === "suspicious" && (
+            <div style={{
+              padding: "8px 12px",
+              background: "#484f5810",
+              border: "1px solid #30363d",
+              borderRadius: 5,
+              fontSize: 10,
+              color: "#484f58",
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: 0.5,
+              textAlign: "center",
+              marginBottom: 8,
+            }}>
+              Declare track as Hostile to enable defeat options
+            </div>
+          )}
+
           {/* Shenobi CM submenu — selecting countermeasure type */}
           {shenobiSubMenu && (() => {
             const shenobiEff = effectors.find((e) => e.id === shenobiSubMenu);
@@ -390,8 +453,8 @@ export default function EngagementPanel({
             );
           })()}
 
-          {/* Main effector list (hidden when Shenobi submenu is open) */}
-          {!shenobiSubMenu && (
+          {/* Main effector list (hidden when Shenobi submenu is open or track not hostile) */}
+          {!shenobiSubMenu && track.affiliation === "hostile" && (
             <>
               <div style={{ fontSize: 11, color: "#8b949e", marginBottom: 8 }}>
                 Select effector to engage

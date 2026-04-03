@@ -33,6 +33,7 @@ interface Props {
   onConfirmTrack?: (trackId: string) => void;
   onIdentify?: (trackId: string, classification: string, affiliation: string) => void;
   onEngage?: (trackId: string, effectorId: string) => void;
+  onDeclareAffiliation?: (trackId: string, affiliation: "hostile" | "neutral" | "friendly") => void;
   onSlewCamera?: (trackId: string) => void;
   onHoldFire?: (trackId: string) => void;
   onReleaseHoldFire?: (trackId: string) => void;
@@ -107,6 +108,7 @@ function createRingLabel(name: string, rangeKm: number, color: string): L.DivIco
 
 const AFFILIATION_COLORS: Record<Affiliation, string> = {
   unknown: "#d29922",
+  suspicious: "#d29922",
   hostile: "#f85149",
   friendly: "#58a6ff",
   neutral: "#3fb950",
@@ -841,6 +843,7 @@ export default function TacticalMap({
   onConfirmTrack,
   onIdentify,
   onEngage,
+  onDeclareAffiliation,
   onSlewCamera,
   onHoldFire,
   onReleaseHoldFire,
@@ -1981,6 +1984,7 @@ export default function TacticalMap({
           <RadialActionWheel
             trackId={wheelTrack.id}
             dtidPhase={wheelTrack.dtid_phase}
+            affiliation={wheelTrack.affiliation}
             screenX={wheelState.screenX}
             screenY={wheelState.screenY}
             effectors={effectors}
@@ -1988,6 +1992,7 @@ export default function TacticalMap({
             onConfirmTrack={onConfirmTrack}
             onIdentify={onIdentify}
             onEngage={onEngage}
+            onDeclareAffiliation={onDeclareAffiliation}
             onSlewCamera={onSlewCamera}
             onHoldFire={onHoldFire}
             onReleaseHoldFire={onReleaseHoldFire}

@@ -5,7 +5,7 @@
 // --- Enums (string unions for JSON compatibility) ---
 
 export type DTIDPhase = 'detected' | 'tracked' | 'identified' | 'defeated';
-export type Affiliation = 'unknown' | 'hostile' | 'friendly' | 'neutral';
+export type Affiliation = 'unknown' | 'suspicious' | 'hostile' | 'friendly' | 'neutral';
 
 export type DroneType =
   | 'commercial_quad' | 'fixed_wing' | 'micro' | 'swarm'

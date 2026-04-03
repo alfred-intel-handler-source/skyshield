@@ -1,6 +1,6 @@
 export type GamePhase = "waiting" | "scenario_select" | "roe_briefing" | "equip" | "plan" | "running" | "debrief" | "study";
 export type DTIDPhase = "detected" | "tracked" | "identified" | "defeated";
-export type Affiliation = "unknown" | "hostile" | "friendly" | "neutral";
+export type Affiliation = "unknown" | "suspicious" | "hostile" | "friendly" | "neutral";
 export type ThreatLevel = "green" | "yellow" | "orange" | "red";
 
 export interface TrackData {

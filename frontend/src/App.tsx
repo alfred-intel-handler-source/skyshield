@@ -21,6 +21,7 @@ import PauseOverlay from "./components/PauseOverlay";
 import ROEBriefing from "./components/ROEBriefing";
 import StudyLibrary from "./components/StudyLibrary";
 import StudyModule from "./components/StudyModule";
+import AffiliationModal from "./components/AffiliationModal";
 
 import { useGameEngine as useWebSocket } from "./hooks/useGameEngine";
 import { soundEngine } from "./audio/SoundEngine";
@@ -233,6 +234,9 @@ export default function App() {
   const tracksCriticalRef = useRef<Set<string>>(new Set());
   const engagedTracksRef = useRef<Set<string>>(new Set());
   const detectionPingedRef = useRef<Set<string>>(new Set()); // tracks that have already triggered a detection ping
+
+  // Affiliation modal state (Declare Affiliation step)
+  const [affiliationModalTrackId, setAffiliationModalTrackId] = useState<string | null>(null);
 
   // ATC coordination state
   const [atcCommsMessages, setAtcCommsMessages] = useState<Record<string, { direction: "out" | "in"; text: string }[]>>({});
@@ -923,11 +927,44 @@ export default function App() {
       classification,
       affiliation,
     });
+    // Show Declare Affiliation modal after identification
+    setAffiliationModalTrackId(trackId);
   };
 
+  const declareAffiliation = useCallback((trackId: string, affiliation: "hostile" | "neutral" | "friendly") => {
+    // ROE violation: marking a bird or weather balloon as hostile
+    const t = tracks.find((tr) => tr.id === trackId);
+    const droneType = t?.drone_type ?? t?.classification;
+    if (affiliation === "hostile" && (droneType === "bird" || droneType === "weather_balloon" || droneType === "passenger_aircraft" || droneType === "military_jet")) {
+      const label = t?.display_label ?? trackId;
+      blueOnBlueRef.current++;
+      roeViolationsRef.current.push(`Declared ${label.toUpperCase()} as HOSTILE (actual: ${droneType})`);
+      setEvents((prev) => [
+        ...prev,
+        { timestamp: elapsed, message: `ROE VIOLATION: ${label.toUpperCase()} declared HOSTILE but is ${droneType?.replace(/_/g, " ").toUpperCase()} — score penalty applied` },
+      ]);
+    }
+    send({
+      type: "action",
+      action: "declare_affiliation",
+      target_id: trackId,
+      affiliation,
+    });
+    setAffiliationModalTrackId(null);
+  }, [tracks, elapsed, send]);
+
   const engage = (trackId: string, effectorId: string, shenobiCm?: string) => {
-    // BLUE-ON-BLUE check: engaging UNKNOWN track without ATC response
+    // ROE check: engaging without hostile declaration
     const engTrack = tracks.find((t) => t.id === trackId);
+    if (engTrack && engTrack.affiliation !== "hostile") {
+      const label = engTrack.display_label ?? trackId;
+      roeViolationsRef.current.push(`Attempted defeat on ${label.toUpperCase()} without HOSTILE declaration`);
+      setEvents((prev) => [
+        ...prev,
+        { timestamp: elapsed, message: `ROE VIOLATION: Engagement attempted on ${label.toUpperCase()} — track not declared HOSTILE` },
+      ]);
+    }
+    // BLUE-ON-BLUE check: engaging UNKNOWN track without ATC response
     if (engTrack?.iff_status === "unknown" && !engTrack.atc_response_received) {
       const label = engTrack.display_label ?? trackId;
       blueOnBlueRef.current++;
@@ -1781,6 +1818,7 @@ export default function App() {
           onConfirmTrack={confirmTrack}
           onIdentify={identify}
           onEngage={engage}
+          onDeclareAffiliation={declareAffiliation}
           onSlewCamera={handleSlewCamera}
           onHoldFire={handleHoldFire}
           onReleaseHoldFire={handleReleaseHoldFire}
@@ -1897,6 +1935,7 @@ export default function App() {
             onConfirmTrack={confirmTrack}
             onIdentify={identify}
             onEngage={engage}
+            onDeclareAffiliation={declareAffiliation}
             onSlewCamera={handleSlewCamera}
             onCallATC={callATC}
 
@@ -1926,6 +1965,20 @@ export default function App() {
           onClose={() => { window.clearTimeout(atcPanelTimerRef.current); setAtcPanelTrackId(null); }}
         />
       )}
+
+      {/* Declare Affiliation Modal */}
+      {affiliationModalTrackId && (() => {
+        const modalTrack = tracks.find((t) => t.id === affiliationModalTrackId);
+        if (!modalTrack || modalTrack.affiliation !== "suspicious") return null;
+        return (
+          <AffiliationModal
+            trackId={affiliationModalTrackId}
+            trackLabel={modalTrack.display_label || affiliationModalTrackId}
+            classification={modalTrack.classification}
+            onDeclare={declareAffiliation}
+          />
+        );
+      })()}
 
       {/* Keyboard shortcuts hint */}
       {phase === "running" && (

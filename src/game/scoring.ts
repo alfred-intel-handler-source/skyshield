@@ -217,6 +217,19 @@ function _scoreDroneComponents(
     roeViolationsFound.push('engaged_non_threat');
   }
 
+  // ROE: Check if affiliation was declared before engagement
+  const declareActions = actions.filter((a) => a.action === 'declare_affiliation');
+  if (engageActions.length > 0 && declareActions.length === 0) {
+    roeViolationsFound.push('engaged_without_affiliation_declaration');
+  }
+
+  // ROE: Check if hostile was declared on a non-threat target
+  for (const da of declareActions) {
+    if (da.affiliation === 'hostile' && !shouldEngage) {
+      roeViolationsFound.push('hostile_declared_on_non_threat');
+    }
+  }
+
   if (roeViolationsFound.length === 0) {
     scores['roe'] = 100;
     details['roe'] = 'All actions within ROE';
