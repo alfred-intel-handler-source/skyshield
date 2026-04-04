@@ -10,7 +10,7 @@
 
 > 🗺️ **Train at your actual base.** Drop a pin anywhere on Earth — real satellite imagery loads automatically. Set your perimeter, place your sensors, and run scenarios on terrain your operators actually defend. Not a demo airfield. Your location.
 
-**Version:** v1.6.0 | **Status:** Active development
+**Version:** v1.7.0 | **Status:** Active development
 
 ---
 
@@ -178,9 +178,16 @@ No Python backend required. The game engine runs entirely client-side via `useGa
 - [x] **#47** — Jamming realism: ATTI mode ✓
 - [x] **#48** — Hardened FPV FHSS mechanic ✓
 
-### Backlog (v1.7.0+)
+### Completed (v1.7.0)
+- [x] **#51/52** — MIL-STD-2525 affiliation mechanic (HOSTILE/NEUTRAL/FRIEND/UNKNOWN declaration required before defeat) ✓
+- [x] Polygon breach detection — precise perimeter breach via `pointInPolygon` ✓
+- [x] Shahed-class RF jam immunity — INS-guided threats require kinetic defeat ✓
+- [x] UI compression — TrackDetailPanel 2-column grid, EngagementPanel full-height ✓
+
+### Backlog (v1.8.0+)
+- [ ] Base Defense Architect — terrain-aware sensor placement planning tool (#54, in PR)
 - [ ] After-action replay (timeline scrub)
-- [ ] Terrain LOS checks
+- [ ] Terrain LOS checks in gameplay
 - [ ] Multi-operator / shared mission
 
 ---
