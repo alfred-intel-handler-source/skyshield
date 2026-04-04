@@ -1969,7 +1969,7 @@ export default function App() {
       {/* Declare Affiliation Modal */}
       {affiliationModalTrackId && (() => {
         const modalTrack = tracks.find((t) => t.id === affiliationModalTrackId);
-        if (!modalTrack || modalTrack.affiliation !== "suspicious") return null;
+        if (!modalTrack) return null;
         return (
           <AffiliationModal
             trackId={affiliationModalTrackId}
