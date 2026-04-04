@@ -24,8 +24,9 @@ function getEventColor(message: string): string {
 const AFF_COLOR: Record<string, string> = {
   hostile: "#f85149",
   unknown: "#d29922",
-  neutral: "#3fb950",
-  friendly: "#58a6ff",
+  suspicious: "#f0883e",
+  neutral: "#a371f7",
+  friendly: "#3fb950",
 };
 
 function HookCard({ track, onUnhook, onCallATC, onTagFriendly }: { track: TrackData; onUnhook: () => void; onCallATC?: (id: string) => void; onTagFriendly?: (id: string) => void }) {

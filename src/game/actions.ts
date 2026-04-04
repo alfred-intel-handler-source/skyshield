@@ -140,9 +140,11 @@ export function handleDeclareAffiliation(
     const d = gs.drones[j];
     if (d.id === targetId && d.dtid_phase === 'identified') {
       _recordFirstClick(gs, targetId, elapsed);
+      const dismissed = affiliationStr === 'neutral' || affiliationStr === 'friendly';
       gs.drones[j] = {
         ...d,
         affiliation: affiliationStr as DroneState['affiliation'],
+        ...(dismissed ? { neutralized: true, dtid_phase: 'defeated' as const } : {}),
       };
       gs.affiliation_given.set(targetId, affiliationStr);
       gs.actions.push({

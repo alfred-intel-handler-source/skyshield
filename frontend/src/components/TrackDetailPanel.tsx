@@ -14,9 +14,10 @@ const DTID_LABELS: Record<DTIDPhase, string> = {
 
 const AFFILIATION_COLORS: Record<string, string> = {
   unknown: "#d29922",
+  suspicious: "#f0883e",
   hostile: "#f85149",
-  friendly: "#58a6ff",
-  neutral: "#3fb950",
+  friendly: "#3fb950",
+  neutral: "#a371f7",
 };
 
 function phaseIndex(phase: DTIDPhase): number {

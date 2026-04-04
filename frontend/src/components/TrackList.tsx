@@ -8,9 +8,10 @@ interface Props {
 
 const AFFILIATION_COLORS: Record<string, string> = {
   hostile: "#f85149",
-  friendly: "#58a6ff",
+  friendly: "#3fb950",
   unknown: "#d29922",
-  neutral: "#3fb950",
+  suspicious: "#f0883e",
+  neutral: "#a371f7",
 };
 
 const PHASE_BADGE: Record<string, { label: string; color: string }> = {
