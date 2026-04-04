@@ -140,11 +140,13 @@ export function handleDeclareAffiliation(
     const d = gs.drones[j];
     if (d.id === targetId && d.dtid_phase === 'identified') {
       _recordFirstClick(gs, targetId, elapsed);
-      const dismissed = affiliationStr === 'neutral' || affiliationStr === 'friendly';
       gs.drones[j] = {
         ...d,
         affiliation: affiliationStr as DroneState['affiliation'],
-        ...(dismissed ? { neutralized: true, dtid_phase: 'defeated' as const } : {}),
+        // Neutral/Friendly: stay visible on map for situational awareness (don't neutralize).
+        // dtid_phase stays 'identified' so they render on the map with updated color.
+        // The frontend engagement panel already gates defeat on affiliation === 'hostile',
+        // so no additional field needed — they'll show on map but have no defeat options.
       };
       gs.affiliation_given.set(targetId, affiliationStr);
       gs.actions.push({
