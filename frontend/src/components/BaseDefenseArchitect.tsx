@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -11,6 +11,9 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import type {
+  EquipmentCatalog,
+} from "../types";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -30,165 +33,90 @@ const COLORS = {
   purple: "#a371f7",
 };
 
+const TYPE_COLORS: Record<string, string> = {
+  radar: "#388bfd",
+  eoir: "#e3b341",
+  electronic: "#00bfbf",
+  kinetic: "#f85149",
+  rf: "#bc8cff",
+  shenobi_pm: "#bc8cff",
+};
+
 const ALTITUDE_PRESETS: { value: number; label: string }[] = [
   { value: 2, label: "2m Ground" },
   { value: 10, label: "10m Mast" },
   { value: 30, label: "30m Tower" },
 ];
 
-// System definitions for the palette
+// ─── Unified system definition (built from catalog.json) ─────────────────────
+
 interface SystemDef {
   id: string;
   name: string;
-  category: "sensor" | "effector" | "infrastructure";
+  category: "sensor" | "effector" | "combined";
   type: string;
-  range_km?: number;
-  fov_deg?: number;
+  range_km: number;
+  sensor_range_km?: number;
+  effector_range_km?: number;
+  fov_deg: number;
   color: string;
-  icon: string;
   letter: string;
   description: string;
+  requires_los: boolean;
 }
 
-const SYSTEM_CATALOG: SystemDef[] = [
-  // Sensors
-  {
-    id: "tpq51",
-    name: "L-Band Radar (AN/TPQ-51)",
-    category: "sensor",
-    type: "radar",
-    range_km: 10.0,
-    fov_deg: 360,
-    color: "#58a6ff",
-    icon: "📡",
-    letter: "R",
-    description: "360° surveillance radar, 10km range",
-  },
-  {
-    id: "shenobi",
-    name: "Shenobi (RF Detector)",
-    category: "sensor",
-    type: "rf",
-    range_km: 8.0,
-    fov_deg: 360,
-    color: "#a371f7",
-    icon: "📻",
-    letter: "S",
-    description: "Passive RF detection, 8km range",
-  },
-  {
-    id: "eoir_camera",
-    name: "EO/IR Camera",
-    category: "sensor",
-    type: "eoir",
-    range_km: 8.0,
-    fov_deg: 15,
-    color: "#3fb950",
-    icon: "📷",
-    letter: "E",
-    description: "Electro-optical/infrared, 8km range, 15° FOV",
-  },
-  {
-    id: "acoustic",
-    name: "Acoustic Array",
-    category: "sensor",
-    type: "acoustic",
-    range_km: 3.0,
-    fov_deg: 360,
-    color: "#79c0ff",
-    icon: "🔊",
-    letter: "A",
-    description: "Passive acoustic detection, 3km range",
-  },
-  // Effectors
-  {
-    id: "jackal_pallet",
-    name: "JACKAL Interceptor",
-    category: "effector",
-    type: "kinetic",
-    range_km: 10.0,
-    fov_deg: 360,
-    color: "#f85149",
-    icon: "🚀",
-    letter: "J",
-    description: "Kinetic interceptor pallet, 10km range",
-  },
-  {
-    id: "rf_jammer",
-    name: "RF Jammer",
-    category: "effector",
-    type: "electronic",
-    range_km: 5.0,
-    fov_deg: 360,
-    color: "#e3b341",
-    icon: "⚡",
-    letter: "J",
-    description: "RF/PNT jammer, 5km range",
-  },
-  {
-    id: "lmadis",
-    name: "LMADIS",
-    category: "effector",
-    type: "electronic",
-    range_km: 6.0,
-    fov_deg: 360,
-    color: "#d29922",
-    icon: "🛡️",
-    letter: "L",
-    description: "Light Marine Air Defense, 6km range",
-  },
-  // Infrastructure (no coverage)
-  {
-    id: "command_post",
-    name: "Command Post",
-    category: "infrastructure",
-    type: "structure",
-    color: "#8b949e",
-    icon: "🏢",
-    letter: "C",
-    description: "Tactical operations center",
-  },
-  {
-    id: "main_gate",
-    name: "Main Gate",
-    category: "infrastructure",
-    type: "structure",
-    color: "#8b949e",
-    icon: "🚧",
-    letter: "G",
-    description: "Primary entry control point",
-  },
-  {
-    id: "fuel_depot",
-    name: "Fuel Depot",
-    category: "infrastructure",
-    type: "structure",
-    color: "#8b949e",
-    icon: "⛽",
-    letter: "F",
-    description: "Fuel storage facility",
-  },
-  {
-    id: "barracks",
-    name: "Barracks",
-    category: "infrastructure",
-    type: "structure",
-    color: "#8b949e",
-    icon: "🏠",
-    letter: "B",
-    description: "Personnel housing",
-  },
-  {
-    id: "comms_tower",
-    name: "Comms Tower",
-    category: "infrastructure",
-    type: "structure",
-    color: "#8b949e",
-    icon: "📶",
-    letter: "T",
-    description: "Communications relay tower",
-  },
-];
+function buildSystemDefs(catalog: EquipmentCatalog): SystemDef[] {
+  const defs: SystemDef[] = [];
+
+  for (const s of catalog.sensors) {
+    defs.push({
+      id: s.catalog_id,
+      name: s.name,
+      category: "sensor",
+      type: s.type,
+      range_km: s.range_km,
+      fov_deg: s.fov_deg,
+      color: TYPE_COLORS[s.type] || COLORS.muted,
+      letter: s.catalog_id === "tpq51" ? "L" : s.catalog_id === "kufcs" ? "K" : "E",
+      description: s.description,
+      requires_los: s.requires_los,
+    });
+  }
+
+  for (const e of catalog.effectors) {
+    defs.push({
+      id: e.catalog_id,
+      name: e.name,
+      category: "effector",
+      type: e.type,
+      range_km: e.range_km,
+      fov_deg: e.fov_deg,
+      color: TYPE_COLORS[e.type] || COLORS.muted,
+      letter: e.catalog_id === "rf_jammer" ? "R" : "J",
+      description: e.description,
+      requires_los: e.requires_los,
+    });
+  }
+
+  for (const c of catalog.combined || []) {
+    defs.push({
+      id: c.catalog_id,
+      name: c.name,
+      category: "combined",
+      type: c.sensor_type,
+      range_km: c.sensor_range_km,
+      sensor_range_km: c.sensor_range_km,
+      effector_range_km: c.effector_range_km,
+      fov_deg: c.fov_deg,
+      color: TYPE_COLORS[c.sensor_type] || "#bc8cff",
+      letter: "S",
+      description: c.description,
+      requires_los: c.requires_los,
+    });
+  }
+
+  return defs;
+}
 
 // ─── Placed system type ──────────────────────────────────────────────────────
 
@@ -207,11 +135,12 @@ interface PlacedSystem {
   def: SystemDef;
   lat: number;
   lng: number;
-  altitude: number; // meters
-  viewshed: [number, number][] | null; // visible polygon points
-  blockedSectors: [number, number][][] | null; // blocked area polygons
+  altitude: number;
+  facing_deg: number;
+  viewshed: [number, number][] | null;
+  blockedSectors: [number, number][][] | null;
   viewshedLoading: boolean;
-  viewshedArea: number | null; // km²
+  viewshedArea: number | null;
   viewshedStats: ViewshedStats | null;
 }
 
@@ -231,7 +160,6 @@ function cacheKey(lat: number, lng: number, alt: number): string {
   return `${lat.toFixed(6)},${lng.toFixed(6)},${alt}`;
 }
 
-// Number of radial rays and distance steps for viewshed
 const NUM_RAYS = 72;
 const MAX_RANGE_KM = 15;
 const STEP_KM = 0.15;
@@ -244,7 +172,6 @@ function radToDeg(r: number): number {
   return (r * 180) / Math.PI;
 }
 
-/** Offset a lat/lng by a distance (km) and bearing (radians) */
 function offsetLatLng(
   lat: number,
   lng: number,
@@ -267,11 +194,9 @@ function offsetLatLng(
   return [radToDeg(newLat), radToDeg(newLng)];
 }
 
-/** Fetch elevations from open-elevation API in batches */
 async function fetchElevations(
   points: { latitude: number; longitude: number }[],
 ): Promise<number[]> {
-  // Batch into groups of 200 to avoid oversized requests
   const BATCH = 200;
   const results: number[] = [];
   for (let i = 0; i < points.length; i += BATCH) {
@@ -290,7 +215,6 @@ async function fetchElevations(
   return results;
 }
 
-/** Compute viewshed polygon with blocked areas and terrain stats */
 async function computeViewshed(
   lat: number,
   lng: number,
@@ -305,7 +229,6 @@ async function computeViewshed(
   const effectiveRange = Math.min(rangeKm, MAX_RANGE_KM);
   const steps = Math.ceil(effectiveRange / STEP_KM);
 
-  // Build all sample points: center + rays
   const allPoints: { latitude: number; longitude: number }[] = [
     { latitude: lat, longitude: lng },
   ];
@@ -325,7 +248,6 @@ async function computeViewshed(
   const elevations = await fetchElevations(allPoints);
   const centerElev = elevations[0] + altitudeM;
 
-  // Track terrain stats
   let minElev = Infinity;
   let maxElev = -Infinity;
   for (let i = 1; i < elevations.length; i++) {
@@ -333,7 +255,6 @@ async function computeViewshed(
     if (elevations[i] > maxElev) maxElev = elevations[i];
   }
 
-  // For each ray, walk outward and track visible/blocked cells
   const visibleEdge: [number, number][] = [];
   const blockedSectors: [number, number][][] = [];
   let totalCells = 0;
@@ -360,12 +281,10 @@ async function computeViewshed(
           rayPoints[r * steps + s].lng,
         ];
         visibleCells++;
-        // If we had a blocked region starting, close it
         if (firstBlocked) {
           firstBlocked = null;
         }
       } else {
-        // This cell is blocked
         if (!firstBlocked) {
           firstBlocked = [
             rayPoints[r * steps + s].lat,
@@ -381,39 +300,30 @@ async function computeViewshed(
       visibleEdge.push(offsetLatLng(lat, lng, effectiveRange, bearing));
     }
 
-    // Generate blocked sector: area between lastVisible edge and max range
     if (lastVisible) {
-      const lastVisibleDist = lastVisible
-        ? Math.sqrt(
-            Math.pow((lastVisible[0] - lat) * 111.32, 2) +
-              Math.pow(
-                (lastVisible[1] - lng) *
-                  111.32 *
-                  Math.cos(degToRad(lat)),
-                2,
-              ),
-          )
-        : 0;
+      const lastVisibleDist = Math.sqrt(
+        Math.pow((lastVisible[0] - lat) * 111.32, 2) +
+          Math.pow(
+            (lastVisible[1] - lng) * 111.32 * Math.cos(degToRad(lat)),
+            2,
+          ),
+      );
       if (lastVisibleDist < effectiveRange * 0.95) {
-        // There's blocked area beyond the visible edge
         const sector: [number, number][] = [lastVisible];
-        // Arc at visible edge to next ray
         const nextR = (r + 1) % NUM_RAYS;
-        const nextLastIdx = 1 + nextR * steps + (steps - 1);
         const nextRayEnd: [number, number] = [
           rayPoints[Math.min(nextR * steps + steps - 1, rayPoints.length - 1)]
             ?.lat ?? lat,
           rayPoints[Math.min(nextR * steps + steps - 1, rayPoints.length - 1)]
             ?.lng ?? lng,
         ];
-        // Outer edge
         sector.push(offsetLatLng(lat, lng, effectiveRange, bearing));
         sector.push(offsetLatLng(lat, lng, effectiveRange, nextBearing));
-        // If next ray also has a visible edge, connect to it
+        const nextLastIdx = 1 + nextR * steps + (steps - 1);
         if (nextLastIdx < elevations.length) {
           sector.push(nextRayEnd);
         }
-        sector.push(lastVisible); // close
+        sector.push(lastVisible);
         if (sector.length >= 4) {
           blockedSectors.push(sector);
         }
@@ -421,7 +331,6 @@ async function computeViewshed(
     }
   }
 
-  // Close the polygon
   if (visibleEdge.length > 0) {
     visibleEdge.push(visibleEdge[0]);
   }
@@ -447,7 +356,6 @@ async function computeViewshed(
   };
 }
 
-/** Approximate polygon area in km² using shoelace on equirectangular projection */
 function computePolygonAreaKm2(points: [number, number][]): number {
   if (points.length < 3) return 0;
   const avgLat = points.reduce((s, p) => s + p[0], 0) / points.length;
@@ -463,6 +371,28 @@ function computePolygonAreaKm2(points: [number, number][]): number {
     area += x1 * y2 - x2 * y1;
   }
   return Math.abs(area) / 2;
+}
+
+// ─── FOV cone computation ────────────────────────────────────────────────────
+
+function computeFovCone(
+  lat: number,
+  lng: number,
+  rangeKm: number,
+  facingDeg: number,
+  fovDeg: number,
+): [number, number][] {
+  const points: [number, number][] = [[lat, lng]];
+  const halfFov = fovDeg / 2;
+  const startAngle = facingDeg - halfFov;
+  const steps = Math.max(12, Math.ceil(fovDeg));
+  for (let i = 0; i <= steps; i++) {
+    const angleDeg = startAngle + (i / steps) * fovDeg;
+    const bearingRad = degToRad(angleDeg);
+    points.push(offsetLatLng(lat, lng, rangeKm, bearingRad));
+  }
+  points.push([lat, lng]);
+  return points;
 }
 
 // ─── Leaflet icon factory ────────────────────────────────────────────────────
@@ -608,14 +538,41 @@ interface Props {
 }
 
 export default function BaseDefenseArchitect({ onBack }: Props) {
+  const [catalog, setCatalog] = useState<EquipmentCatalog | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
   const [systems, setSystems] = useState<PlacedSystem[]>([]);
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [placingDef, setPlacingDef] = useState<SystemDef | null>(null);
   const [paletteFilter, setPaletteFilter] = useState<
-    "all" | "sensor" | "effector" | "infrastructure"
-  >("all");
+    "sensor" | "effector" | "combined"
+  >("sensor");
 
   const uidCounter = useRef(0);
+
+  // ─── Load catalog ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/equipment/catalog.json`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: EquipmentCatalog) => {
+        setCatalog(data);
+        setCatalogLoading(false);
+      })
+      .catch((err) => {
+        setCatalogError(err.message);
+        setCatalogLoading(false);
+      });
+  }, []);
+
+  const systemDefs = useMemo(
+    () => (catalog ? buildSystemDefs(catalog) : []),
+    [catalog],
+  );
 
   const selectedSystem = useMemo(
     () => systems.find((s) => s.uid === selectedUid) ?? null,
@@ -634,6 +591,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         lat,
         lng,
         altitude: 10,
+        facing_deg: 0,
         viewshed: null,
         blockedSectors: null,
         viewshedLoading: false,
@@ -644,8 +602,8 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       setSelectedUid(uid);
       setPlacingDef(null);
 
-      // Fetch viewshed for non-infrastructure
-      if (placingDef.range_km) {
+      // Only fetch viewshed for LOS-dependent systems
+      if (placingDef.requires_los && placingDef.range_km) {
         fetchViewshedForSystem(uid, lat, lng, 10, placingDef.range_km);
       }
     },
@@ -676,7 +634,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         return;
       }
 
-      // Mark loading
       setSystems((prev) =>
         prev.map((s) =>
           s.uid === uid ? { ...s, viewshedLoading: true } : s,
@@ -703,7 +660,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         })
         .catch((err) => {
           console.warn("Viewshed fetch failed:", err);
-          // Fall back to a simple circle approximation
           const fallbackPoly: [number, number][] = [];
           for (let i = 0; i <= NUM_RAYS; i++) {
             const bearing = (i / NUM_RAYS) * 2 * Math.PI;
@@ -737,7 +693,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         prev.map((s) => (s.uid === uid ? { ...s, altitude: newAlt } : s)),
       );
       const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.range_km) {
+      if (sys && sys.def.requires_los && sys.def.range_km) {
         fetchViewshedForSystem(uid, sys.lat, sys.lng, newAlt, sys.def.range_km);
       }
     },
@@ -749,8 +705,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
   const handleRecalculate = useCallback(
     (uid: string) => {
       const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.range_km) {
-        // Clear cache for this position
+      if (sys && sys.def.requires_los && sys.def.range_km) {
         const key = cacheKey(sys.lat, sys.lng, sys.altitude);
         viewshedCache.delete(key);
         fetchViewshedForSystem(
@@ -765,6 +720,21 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
     [systems, fetchViewshedForSystem],
   );
 
+  // ─── Rotate facing ─────────────────────────────────────────────────────
+
+  const handleRotate = useCallback(
+    (uid: string, deltaDeg: number) => {
+      setSystems((prev) =>
+        prev.map((s) =>
+          s.uid === uid
+            ? { ...s, facing_deg: (s.facing_deg + deltaDeg + 360) % 360 }
+            : s,
+        ),
+      );
+    },
+    [],
+  );
+
   // ─── Drag end ──────────────────────────────────────────────────────────
 
   const handleDragEnd = useCallback(
@@ -773,7 +743,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         prev.map((s) => (s.uid === uid ? { ...s, lat, lng } : s)),
       );
       const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.range_km) {
+      if (sys && sys.def.requires_los && sys.def.range_km) {
         fetchViewshedForSystem(uid, lat, lng, sys.altitude, sys.def.range_km);
       }
     },
@@ -794,13 +764,72 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
 
   // ─── Filtered palette ──────────────────────────────────────────────────
 
-  const filteredCatalog = useMemo(
-    () =>
-      paletteFilter === "all"
-        ? SYSTEM_CATALOG
-        : SYSTEM_CATALOG.filter((s) => s.category === paletteFilter),
-    [paletteFilter],
+  const filteredDefs = useMemo(
+    () => systemDefs.filter((s) => s.category === paletteFilter),
+    [systemDefs, paletteFilter],
   );
+
+  // ─── Loading / error states ────────────────────────────────────────────
+
+  if (catalogLoading) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: COLORS.bg,
+          color: COLORS.muted,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 14,
+        }}
+      >
+        LOADING EQUIPMENT CATALOG...
+      </div>
+    );
+  }
+
+  if (catalogError || !catalog) {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          background: COLORS.bg,
+          color: COLORS.danger,
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 14,
+        }}
+      >
+        <span>FAILED TO LOAD CATALOG: {catalogError || "Unknown error"}</span>
+        <button
+          onClick={onBack}
+          style={{
+            padding: "8px 20px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: COLORS.card,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 6,
+            color: COLORS.muted,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          BACK
+        </button>
+      </div>
+    );
+  }
+
+  // ─── Helper: is this a narrow-FOV system? ──────────────────────────────
+
+  const isNarrowFov = (def: SystemDef) => def.fov_deg < 360;
 
   // ─── Render ────────────────────────────────────────────────────────────
 
@@ -915,10 +944,9 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
             <div style={{ display: "flex", gap: 4 }}>
               {(
                 [
-                  ["all", "ALL"],
                   ["sensor", "SENSORS"],
                   ["effector", "EFFECTORS"],
-                  ["infrastructure", "INFRA"],
+                  ["combined", "COMBINED"],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -955,16 +983,17 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               gap: 6,
             }}
           >
-            {filteredCatalog.map((def) => {
+            {filteredDefs.map((def) => {
               const isPlacing = placingDef?.id === def.id;
+              const typeColor = TYPE_COLORS[def.type] || COLORS.muted;
               return (
                 <button
                   key={def.id}
                   onClick={() => setPlacingDef(isPlacing ? null : def)}
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    gap: 10,
+                    flexDirection: "column",
+                    gap: 6,
                     padding: "10px 10px",
                     background: isPlacing ? `${def.color}18` : COLORS.bg,
                     border: `1px solid ${isPlacing ? def.color : COLORS.border}`,
@@ -988,41 +1017,81 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                     }
                   }}
                 >
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{def.icon}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
+                  {/* Name + type tag row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span
                       style={{
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 600,
                         color: isPlacing ? def.color : COLORS.text,
                         letterSpacing: 0.3,
                       }}
                     >
                       {def.name}
-                    </div>
-                    <div
+                    </span>
+                    <span
                       style={{
                         fontSize: 9,
-                        color: COLORS.muted,
-                        marginTop: 2,
-                      }}
-                    >
-                      {def.description}
-                    </div>
-                  </div>
-                  {def.category !== "infrastructure" && (
-                    <div
-                      style={{
-                        fontSize: 8,
-                        fontWeight: 700,
-                        color: def.color,
+                        fontWeight: 600,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        textTransform: "uppercase",
                         letterSpacing: 0.5,
-                        flexShrink: 0,
+                        color: typeColor,
+                        background: `${typeColor}1a`,
+                        padding: "1px 6px",
+                        borderRadius: 3,
+                        border: `1px solid ${typeColor}33`,
                       }}
                     >
-                      {def.category.toUpperCase().slice(0, 3)}
-                    </div>
-                  )}
+                      {def.type}
+                    </span>
+                    {def.requires_los && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          color: COLORS.muted,
+                          background: `${COLORS.muted}1a`,
+                          padding: "1px 6px",
+                          borderRadius: 3,
+                          border: `1px solid ${COLORS.muted}33`,
+                        }}
+                      >
+                        LOS
+                      </span>
+                    )}
+                  </div>
+                  {/* Stats row */}
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      fontSize: 10,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      color: COLORS.muted,
+                    }}
+                  >
+                    {def.category === "combined" ? (
+                      <>
+                        <span>
+                          DET <span style={{ color: COLORS.text, fontWeight: 600 }}>{def.sensor_range_km}km</span>
+                        </span>
+                        <span>
+                          DEF <span style={{ color: COLORS.text, fontWeight: 600 }}>{def.effector_range_km}km</span>
+                        </span>
+                      </>
+                    ) : (
+                      <span>
+                        RNG <span style={{ color: COLORS.text, fontWeight: 600 }}>{def.range_km}km</span>
+                      </span>
+                    )}
+                    {def.fov_deg < 360 && (
+                      <span>
+                        FOV <span style={{ color: COLORS.text, fontWeight: 600 }}>{def.fov_deg}&deg;</span>
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}
@@ -1045,8 +1114,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
             <span>
               {systems.filter((s) => s.def.category === "sensor").length}S /{" "}
               {systems.filter((s) => s.def.category === "effector").length}E /{" "}
-              {systems.filter((s) => s.def.category === "infrastructure").length}
-              I
+              {systems.filter((s) => s.def.category === "combined").length}C
             </span>
           </div>
         </div>
@@ -1068,7 +1136,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
 
             <MapClickHandler placingDef={placingDef} onPlace={handlePlace} />
 
-            {/* Viewshed polygons — green for visible */}
+            {/* Viewshed polygons — green for visible (LOS systems only) */}
             {systems.map(
               (sys) =>
                 sys.viewshed && (
@@ -1085,7 +1153,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                 ),
             )}
 
-            {/* Blocked sectors — red */}
+            {/* Blocked sectors — red (LOS systems only) */}
             {systems.map((sys) =>
               sys.blockedSectors?.map((sector, i) => (
                 <Polygon
@@ -1101,13 +1169,140 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               )),
             )}
 
-            {/* Range rings for systems without viewshed yet */}
+            {/* Range rings for non-LOS systems (no viewshed) */}
+            {systems.map((sys) => {
+              if (sys.def.requires_los) return null;
+              if (sys.def.category === "combined") {
+                // Shenobi: dual rings
+                return (
+                  <React.Fragment key={`rr-${sys.uid}`}>
+                    {/* Outer ring — sensor/detect (blue tint) */}
+                    <Circle
+                      center={[sys.lat, sys.lng]}
+                      radius={(sys.def.sensor_range_km ?? sys.def.range_km) * 1000}
+                      pathOptions={{
+                        color: "#388bfd",
+                        fillColor: "#388bfd",
+                        fillOpacity: 0.06,
+                        weight: 1,
+                        dashArray: "6,4",
+                      }}
+                    />
+                    {/* Inner ring — effector/defeat (red tint) */}
+                    <Circle
+                      center={[sys.lat, sys.lng]}
+                      radius={(sys.def.effector_range_km ?? sys.def.range_km) * 1000}
+                      pathOptions={{
+                        color: "#f85149",
+                        fillColor: "#f85149",
+                        fillOpacity: 0.06,
+                        weight: 1,
+                        dashArray: "6,4",
+                      }}
+                    />
+                  </React.Fragment>
+                );
+              }
+              // Standard non-LOS system: single range ring
+              return (
+                <Circle
+                  key={`rr-${sys.uid}`}
+                  center={[sys.lat, sys.lng]}
+                  radius={sys.def.range_km * 1000}
+                  pathOptions={{
+                    color: sys.def.color,
+                    fillColor: sys.def.color,
+                    fillOpacity: 0.06,
+                    weight: 1,
+                    dashArray: "6,4",
+                  }}
+                />
+              );
+            })}
+
+            {/* FOV cone for narrow-FOV systems (e.g. EO/IR Camera) */}
+            {systems.map((sys) => {
+              if (!isNarrowFov(sys.def)) return null;
+              const cone = computeFovCone(
+                sys.lat,
+                sys.lng,
+                sys.def.range_km,
+                sys.facing_deg,
+                sys.def.fov_deg,
+              );
+              return (
+                <Polygon
+                  key={`fov-${sys.uid}`}
+                  positions={cone}
+                  pathOptions={{
+                    color: sys.def.color,
+                    fillColor: sys.def.color,
+                    fillOpacity: selectedUid === sys.uid ? 0.25 : 0.15,
+                    weight: selectedUid === sys.uid ? 2 : 1,
+                  }}
+                />
+              );
+            })}
+
+            {/* Range ring / cone labels */}
+            {systems.map((sys) => {
+              if (sys.def.category === "combined") {
+                // Shenobi: label for outer (detect) ring
+                return (
+                  <React.Fragment key={`rl-${sys.uid}`}>
+                    <Marker
+                      position={[
+                        sys.lat + (sys.def.sensor_range_km ?? sys.def.range_km) / 111.32,
+                        sys.lng,
+                      ]}
+                      icon={createRingLabel(
+                        `${sys.def.name} DET`,
+                        sys.def.sensor_range_km ?? sys.def.range_km,
+                        "#388bfd",
+                      )}
+                      interactive={false}
+                    />
+                    <Marker
+                      position={[
+                        sys.lat + (sys.def.effector_range_km ?? sys.def.range_km) / 111.32,
+                        sys.lng + 0.01,
+                      ]}
+                      icon={createRingLabel(
+                        `${sys.def.name} DEF`,
+                        sys.def.effector_range_km ?? sys.def.range_km,
+                        "#f85149",
+                      )}
+                      interactive={false}
+                    />
+                  </React.Fragment>
+                );
+              }
+              return (
+                <Marker
+                  key={`rl-${sys.uid}`}
+                  position={[
+                    sys.lat + sys.def.range_km / 111.32,
+                    sys.lng,
+                  ]}
+                  icon={createRingLabel(
+                    sys.def.name,
+                    sys.def.range_km,
+                    sys.def.color,
+                  )}
+                  interactive={false}
+                />
+              );
+            })}
+
+            {/* Fallback range ring for LOS systems while viewshed not yet loaded */}
             {systems.map(
               (sys) =>
-                sys.def.range_km &&
-                !sys.viewshed && (
+                sys.def.requires_los &&
+                !sys.viewshed &&
+                !sys.viewshedLoading &&
+                !isNarrowFov(sys.def) && (
                   <Circle
-                    key={`rr-${sys.uid}`}
+                    key={`rr-fallback-${sys.uid}`}
                     center={[sys.lat, sys.lng]}
                     radius={sys.def.range_km * 1000}
                     pathOptions={{
@@ -1117,26 +1312,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                       weight: 1,
                       dashArray: "6,4",
                     }}
-                  />
-                ),
-            )}
-
-            {/* Range ring labels */}
-            {systems.map(
-              (sys) =>
-                sys.def.range_km && (
-                  <Marker
-                    key={`rl-${sys.uid}`}
-                    position={[
-                      sys.lat + sys.def.range_km / 111.32,
-                      sys.lng,
-                    ]}
-                    icon={createRingLabel(
-                      sys.def.name.split("(")[0].trim(),
-                      sys.def.range_km,
-                      sys.def.color,
-                    )}
-                    interactive={false}
                   />
                 ),
             )}
@@ -1189,7 +1364,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
             </div>
           )}
 
-          {/* Spinner animation */}
           <style>{`
             @keyframes bda-spin {
               to { transform: rotate(360deg); }
@@ -1213,7 +1387,17 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
               {/* SENSOR section */}
               <div style={{ padding: "14px 14px 12px" }}>
-                <SectionHeader title="SENSOR" />
+                <SectionHeader title={selectedSystem.def.category.toUpperCase()} />
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: COLORS.text,
+                    marginBottom: 6,
+                  }}
+                >
+                  {selectedSystem.def.name}
+                </div>
                 <div
                   style={{
                     fontSize: 11,
@@ -1231,64 +1415,154 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               </div>
 
               {/* Altitude slider */}
-              {selectedSystem.def.category !== "infrastructure" && (
+              <div style={{ padding: "0 14px 14px" }}>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={selectedSystem.altitude}
+                  onChange={(e) =>
+                    handleAltitudeChange(
+                      selectedSystem.uid,
+                      parseInt(e.target.value),
+                    )
+                  }
+                  style={{
+                    width: "100%",
+                    accentColor: COLORS.accent,
+                    marginBottom: 8,
+                  }}
+                />
+                <div style={{ display: "flex", gap: 6 }}>
+                  {ALTITUDE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      onClick={() =>
+                        handleAltitudeChange(selectedSystem.uid, preset.value)
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "6px 4px",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        border: `1px solid ${selectedSystem.altitude === preset.value ? COLORS.accent : COLORS.border}`,
+                        borderRadius: 4,
+                        background:
+                          selectedSystem.altitude === preset.value
+                            ? `${COLORS.accent}22`
+                            : "transparent",
+                        color:
+                          selectedSystem.altitude === preset.value
+                            ? COLORS.accent
+                            : COLORS.muted,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* FOV rotation controls — only for narrow-FOV systems */}
+              {isNarrowFov(selectedSystem.def) && (
                 <div
                   style={{
-                    padding: "0 14px 14px",
+                    padding: "14px",
+                    borderTop: `1px solid ${COLORS.border}`,
                   }}
                 >
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    value={selectedSystem.altitude}
-                    onChange={(e) =>
-                      handleAltitudeChange(
-                        selectedSystem.uid,
-                        parseInt(e.target.value),
-                      )
-                    }
+                  <SectionHeader title="FACING" />
+                  <div
                     style={{
-                      width: "100%",
-                      accentColor: COLORS.accent,
-                      marginBottom: 8,
+                      fontSize: 11,
+                      color: COLORS.text,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      marginBottom: 10,
                     }}
-                  />
+                  >
+                    {selectedSystem.facing_deg}&deg; ({selectedSystem.def.fov_deg}&deg; FOV)
+                  </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    {ALTITUDE_PRESETS.map((preset) => (
-                      <button
-                        key={preset.value}
-                        onClick={() =>
-                          handleAltitudeChange(selectedSystem.uid, preset.value)
-                        }
-                        style={{
-                          flex: 1,
-                          padding: "6px 4px",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          border: `1px solid ${selectedSystem.altitude === preset.value ? COLORS.accent : COLORS.border}`,
-                          borderRadius: 4,
-                          background:
-                            selectedSystem.altitude === preset.value
-                              ? `${COLORS.accent}22`
-                              : "transparent",
-                          color:
-                            selectedSystem.altitude === preset.value
-                              ? COLORS.accent
-                              : COLORS.muted,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
+                    <button
+                      onClick={() => handleRotate(selectedSystem.uid, -15)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        background: COLORS.bg,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 5,
+                        color: COLORS.text,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      -15&deg;
+                    </button>
+                    <button
+                      onClick={() => handleRotate(selectedSystem.uid, -5)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        background: COLORS.bg,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 5,
+                        color: COLORS.text,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      -5&deg;
+                    </button>
+                    <button
+                      onClick={() => handleRotate(selectedSystem.uid, 5)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        background: COLORS.bg,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 5,
+                        color: COLORS.text,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      +5&deg;
+                    </button>
+                    <button
+                      onClick={() => handleRotate(selectedSystem.uid, 15)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 0",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                        background: COLORS.bg,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 5,
+                        color: COLORS.text,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      +15&deg;
+                    </button>
                   </div>
                 </div>
               )}
 
-              {/* VIEWSHED section */}
-              {selectedSystem.def.range_km && (
+              {/* VIEWSHED section — LOS systems only */}
+              {selectedSystem.def.requires_los && (
                 <div
                   style={{
                     padding: "14px",
@@ -1321,7 +1595,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                     </div>
                   ) : (
                     <>
-                      {/* Big coverage % */}
                       <div style={{ textAlign: "center", marginBottom: 12 }}>
                         <div
                           style={{
@@ -1347,7 +1620,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                         </div>
                       </div>
 
-                      {/* Stats grid */}
                       {selectedSystem.viewshedStats && (
                         <div
                           style={{
@@ -1394,7 +1666,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                         </div>
                       )}
 
-                      {/* Recalculate button */}
                       <button
                         onClick={() => handleRecalculate(selectedSystem.uid)}
                         style={{
@@ -1500,7 +1771,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               {/* Spacer */}
               <div style={{ flex: 1 }} />
 
-              {/* Delete */}
+              {/* Delete + Export */}
               <div
                 style={{
                   padding: "10px 14px",
@@ -1527,7 +1798,6 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                   DELETE SYSTEM
                 </button>
 
-                {/* Export button */}
                 <button
                   disabled
                   style={{
