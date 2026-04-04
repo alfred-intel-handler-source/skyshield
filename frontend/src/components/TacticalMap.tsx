@@ -37,6 +37,7 @@ interface Props {
   onHoldFire?: (trackId: string) => void;
   onReleaseHoldFire?: (trackId: string) => void;
   onCallATC?: (trackId: string) => void;
+  onDeclareAffiliation?: (trackId: string, affiliation: string) => void;
   cameraTrackId?: string | null;
   sensorConfigs?: SensorStatus[];
   protectedArea?: ProtectedAreaInfo | null;
@@ -845,6 +846,7 @@ export default function TacticalMap({
   onHoldFire,
   onReleaseHoldFire,
   onCallATC,
+  onDeclareAffiliation,
   cameraTrackId,
   sensorConfigs = [],
   protectedArea,
@@ -1992,6 +1994,7 @@ export default function TacticalMap({
             onHoldFire={onHoldFire}
             onReleaseHoldFire={onReleaseHoldFire}
             onCallATC={onCallATC}
+            onDeclareAffiliation={onDeclareAffiliation}
             iffStatus={wheelTrack.iff_status ?? (wheelTrack.affiliation?.toLowerCase() === "unknown" ? "unknown" : undefined)}
             atcCalled={wheelTrack.atc_called}
             classification={wheelTrack.classification ?? undefined}
