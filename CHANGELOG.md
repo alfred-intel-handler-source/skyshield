@@ -8,6 +8,31 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [1.7.0] — 2026-04-04
+
+### Added
+- **MIL-STD-2525 Affiliation Mechanic** (#51/52) — Operators must now declare track affiliation (HOSTILE / NEUTRAL / FRIEND / UNKNOWN) as a mandatory step before defeat options unlock. Replaces implicit hostile assumption.
+- **Affiliation Declaration UI** — Four affiliation buttons appear after classification. Selection collapses to a badge (`[ HOSTILE ▼ ]`) that can be re-expanded to change affiliation mid-engagement.
+- **MIL-STD-2525 Color Coding** — Tracks, icons, and labels use standard symbology colors: UNKNOWN=yellow, SUSPECT=amber, HOSTILE=red, NEUTRAL=green, FRIEND=cyan.
+- **Polygon Breach Detection** — Base perimeter polygon now used for precise breach detection via `pointInPolygon` algorithm. BASE COMPROMISED banner triggers on breach.
+- **Base Boundary on Tactical Map** — Perimeter polygon rendered on the tactical map during gameplay.
+- **Shahed Jam Immunity** — OW-UAS (Shahed-class) threats are now immune to RF/PNT jamming — reflects real-world INS/autonomous guidance. Operators must use kinetic or DE effectors.
+
+### Changed
+- **Track Detail Panel** — Compressed to 2-column data grid with max-height 280px. All telemetry visible without scrolling.
+- **Engagement Panel** — Full sidebar height, no camera competing for space. All action buttons visible throughout DTID flow.
+- **Camera Panel** — Relocated from right sidebar to bottom-right corner, sharing bottom row with EventLog.
+
+### Fixed
+- Classification buttons: all 9 types now start yellow (no affiliation bias before operator decision).
+- SUSPECT/SUSPICIOUS tracks added to MIL-STD type system.
+
+---
+
+## [1.6.0] — 2026-04-01
+
 ### Added
 - **Jamming Realism — ATTI Mode** (#47) — RF-jammed drones now transition to attitude-hold mode with degraded flight behavior instead of instant defeat.
 - **Hardened FPV FHSS Mechanic** (#48) — Frequency-hopping spread spectrum resistance for FPV-class drones.
