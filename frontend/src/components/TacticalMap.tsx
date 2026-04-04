@@ -110,8 +110,8 @@ const AFFILIATION_COLORS: Record<Affiliation, string> = {
   unknown: "#d29922",
   suspicious: "#f0883e",
   hostile: "#f85149",
-  friendly: "#3fb950",
-  neutral: "#a371f7",
+  friendly: "#00bfbf",
+  neutral: "#00c853",
 };
 
 // SVG icon generators for MIL-STD-2525 symbology
@@ -767,7 +767,7 @@ function TrackDataBlock({
   const phaseColors: Record<string, string> = {
     detected: "#8b949e",
     tracked: "#d29922",
-    identified: track.affiliation === "hostile" ? "#f85149" : track.affiliation === "friendly" ? "#3fb950" : "#d29922",
+    identified: track.affiliation === "hostile" ? "#f85149" : track.affiliation === "friendly" ? "#00bfbf" : track.affiliation === "neutral" ? "#00c853" : "#d29922",
     defeated: "#484f58",
   };
   const phaseColor = isInterceptor ? "#3fb950" : (phaseColors[track.dtid_phase] || "#8b949e");

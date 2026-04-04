@@ -38,10 +38,10 @@ const CLASSIFICATIONS = [
   { value: "micro", label: "MICRO UAS", icon: "\u25C7", affiliation: "hostile", color: "#f85149" },
   { value: "improvised", label: "IMPROVISED", icon: "\u26A0", affiliation: "hostile", color: "#f85149" },
   { value: "shahed", label: "SHAHED", icon: "\u2622", affiliation: "hostile", color: "#f85149" },
-  { value: "passenger_aircraft", label: "AIRLINER", icon: "\u2708", affiliation: "friendly", color: "#3fb950" },
-  { value: "military_jet", label: "MIL JET", icon: "\u2708", affiliation: "friendly", color: "#3fb950" },
-  { value: "bird", label: "BIRD", icon: "\u{1F426}", affiliation: "neutral", color: "#a371f7" },
-  { value: "weather_balloon", label: "BALLOON", icon: "\u25CB", affiliation: "neutral", color: "#a371f7" },
+  { value: "passenger_aircraft", label: "AIRLINER", icon: "\u2708", affiliation: "friendly", color: "#00bfbf" },
+  { value: "military_jet", label: "MIL JET", icon: "\u2708", affiliation: "friendly", color: "#00bfbf" },
+  { value: "bird", label: "BIRD", icon: "\u{1F426}", affiliation: "neutral", color: "#00c853" },
+  { value: "weather_balloon", label: "BALLOON", icon: "\u25CB", affiliation: "neutral", color: "#00c853" },
 ];
 
 const EFFECTOR_COLORS: Record<string, string> = {
@@ -71,8 +71,8 @@ const PHASE_COLORS: Record<DTIDPhase, string> = {
 
 const AFFILIATION_OPTIONS = [
   { value: "hostile" as const, label: "HOSTILE", icon: "\u2620", color: "#f85149" },
-  { value: "neutral" as const, label: "NEUTRAL", icon: "\u25CB", color: "#a371f7" },
-  { value: "friendly" as const, label: "FRIENDLY", icon: "\u2714", color: "#3fb950" },
+  { value: "neutral" as const, label: "NEUTRAL", icon: "\u25CB", color: "#00c853" },
+  { value: "friendly" as const, label: "FRIENDLY", icon: "\u2714", color: "#00bfbf" },
 ];
 
 type SubMenu = "none" | "identify" | "engage" | "shenobi_cm" | "affiliation";

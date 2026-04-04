@@ -256,7 +256,7 @@ export default function EngagementPanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {CLASSIFICATIONS.map((cls, idx) => {
               const clsColor = cls.affiliation === "hostile" ? "#f85149"
-                : cls.affiliation === "friendly" ? "#3fb950" : "#a371f7";
+                : cls.affiliation === "friendly" ? "#00bfbf" : "#00c853";
               return (
                 <button
                   className={tutorialStep === 4 ? "tutorial-pulse" : undefined}
@@ -333,8 +333,8 @@ export default function EngagementPanel({
               <div style={{ display: "flex", gap: 4 }}>
                 {([
                   { value: "hostile" as const, label: "HOSTILE", color: "#f85149" },
-                  { value: "neutral" as const, label: "NEUTRAL", color: "#a371f7" },
-                  { value: "friendly" as const, label: "FRIENDLY", color: "#3fb950" },
+                  { value: "neutral" as const, label: "NEUTRAL", color: "#00c853" },
+                  { value: "friendly" as const, label: "FRIENDLY", color: "#00bfbf" },
                 ]).map((aff) => (
                   <button
                     key={aff.value}
