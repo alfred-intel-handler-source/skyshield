@@ -14,6 +14,7 @@ import LoadoutScreen from "./components/LoadoutScreen";
 import PlacementScreen from "./components/PlacementScreen";
 import CameraPanel from "./components/CameraPanel";
 import TutorialStepTracker from "./components/TutorialStepTracker";
+import TutorialOverlay, { UI_TOUR_STEPS } from "./components/TutorialOverlay";
 import FeedbackModal from "./components/FeedbackModal";
 import TutorialFeedback from "./components/TutorialFeedback";
 import ATCCommsPanel from "./components/ATCCommsPanel";
@@ -204,6 +205,8 @@ export default function App() {
   const tutorialTimeoutRef = useRef<number>(0);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialFeedback, setTutorialFeedback] = useState<string | null>(null);
+  const [tutorialTourActive, setTutorialTourActive] = useState(false);
+  const [tutorialTourStep, setTutorialTourStep] = useState(0);
 
   // Pause state
   const [paused, setPaused] = useState(false);
@@ -1317,6 +1320,8 @@ export default function App() {
         setIsFreePlay(scenarioId === "thermopylae" || scenarioId === "free_play");
         setTutorialStep(0);
         setTutorialFeedback(null);
+        setTutorialTourActive(isTut);
+        setTutorialTourStep(0);
         setPaused(false);
         setPlacementConfig(placement);
         setWaveNumber(1);
@@ -1686,6 +1691,7 @@ export default function App() {
       }}
     >
       {/* Header */}
+      <div data-tutorial-id="tutorial-header" style={{ gridRow: "1", gridColumn: "1 / -1" }}>
       <HeaderBar
         elapsed={elapsed}
         timeRemaining={timeRemaining}
@@ -1710,6 +1716,7 @@ export default function App() {
         freePlayPhase={isFreePlay ? (elapsed >= 1200 ? "ENDLESS" : elapsed >= 720 ? "OVERWHELM" : elapsed >= 300 ? "BUILDUP" : "RECON") : null}
         isEndless={isFreePlay && elapsed >= 1200}
       />
+      </div>
 
       {/* Left sidebar */}
       <div
@@ -1723,11 +1730,12 @@ export default function App() {
           overflow: "hidden",
         }}
       >
-        {isTutorial && (
+        {isTutorial && !tutorialTourActive && (
           <TutorialStepTracker tutorialStep={tutorialStep} />
         )}
-        <SensorPanel sensors={sensors} />
-        <EffectorPanel effectors={effectors} activeJammers={activeJammers} />
+        <div data-tutorial-id="tutorial-sensors"><SensorPanel sensors={sensors} /></div>
+        <div data-tutorial-id="tutorial-effectors"><EffectorPanel effectors={effectors} activeJammers={activeJammers} /></div>
+        <div data-tutorial-id="tutorial-tracklist" style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}>
         <TrackList
           tracks={tracks.filter((t) => !t.neutralized && !t.is_interceptor)}
           selectedTrackId={selectedTrackId}
@@ -1736,10 +1744,12 @@ export default function App() {
             if (id) setHookedTrackIds((prev) => { const next = new Set(prev); next.add(id); return next; });
           }}
         />
+        </div>
       </div>
 
       {/* Center: Tactical Map */}
       <div
+        data-tutorial-id="tutorial-map"
         style={{
           gridRow: "2",
           gridColumn: "2",
@@ -1876,9 +1886,10 @@ export default function App() {
       >
         {/* Scrollable area: TrackDetail + Engagement */}
         <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-          <div style={{ maxHeight: "220px", flexShrink: 0, overflow: "hidden" }}>
+          <div data-tutorial-id="tutorial-trackdetail" style={{ maxHeight: "220px", flexShrink: 0, overflow: "hidden" }}>
             <TrackDetailPanel track={selectedTrack} />
           </div>
+          <div data-tutorial-id="tutorial-engagement">
           <EngagementPanel
             track={selectedTrack}
             effectors={effectors}
@@ -1889,11 +1900,12 @@ export default function App() {
             onCallATC={callATC}
             onDeclareAffiliation={declareAffiliation}
 
-            tutorialStep={isTutorial ? tutorialStep : undefined}
+            tutorialStep={isTutorial && !tutorialTourActive ? tutorialStep : undefined}
           />
+          </div>
         </div>
         {/* Fixed bottom: Camera */}
-        <div style={{ borderTop: "1px solid #30363d", background: "#161b22", flexShrink: 0 }}>
+        <div data-tutorial-id="tutorial-camera" style={{ borderTop: "1px solid #30363d", background: "#161b22", flexShrink: 0 }}>
           <CameraPanel
             track={cameraTrack}
             allTracks={tracks}
@@ -1904,6 +1916,7 @@ export default function App() {
 
       {/* Bottom: Event Log (left side only, stops before sidebar) */}
       <div
+        data-tutorial-id="tutorial-eventlog"
         style={{
           gridRow: "3",
           gridColumn: "1 / 3",
@@ -1944,6 +1957,17 @@ export default function App() {
         >
           P:Pause TAB:Cycle 1:Confirm 2:Slew 4:Unslew M:Mute ESC:End Mission
         </div>
+      )}
+
+      {/* Tutorial UI Tour overlay */}
+      {isTutorial && tutorialTourActive && phase === "running" && (
+        <TutorialOverlay
+          currentStep={tutorialTourStep}
+          totalSteps={UI_TOUR_STEPS.length}
+          onNext={() => setTutorialTourStep((s) => Math.min(s + 1, UI_TOUR_STEPS.length - 1))}
+          onBack={() => setTutorialTourStep((s) => Math.max(s - 1, 0))}
+          onComplete={() => setTutorialTourActive(false)}
+        />
       )}
 
       {/* ROE overlay (viewable during mission) */}
