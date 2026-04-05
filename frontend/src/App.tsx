@@ -1326,21 +1326,13 @@ export default function App() {
           justifyContent: "center",
           background: "#0d1117",
           position: "relative",
-          overflowX: "hidden",
           overflowY: "auto",
           padding: "40px 0",
+          backgroundImage:
+            "linear-gradient(#1c233322 1px, transparent 1px), linear-gradient(90deg, #1c233322 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(#1c233322 1px, transparent 1px), linear-gradient(90deg, #1c233322 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-            opacity: 0.6,
-          }}
-        />
         <div
           style={{
             position: "relative",
