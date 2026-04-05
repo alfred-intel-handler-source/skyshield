@@ -1652,6 +1652,7 @@ export default function App() {
     <div
       style={{
         height: "100vh",
+        overflow: "hidden",
         display: "grid",
         gridTemplateRows: "48px 1fr 120px",
         gridTemplateColumns: "220px 1fr 360px",
