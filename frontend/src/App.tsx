@@ -380,6 +380,8 @@ export default function App() {
         if (msg.tracks.length > 0) {
           setSelectedTrackId((prev) => {
             if (prev && msg.tracks.some((t) => t.id === prev)) return prev;
+            // During tutorial steps 0-1, don't auto-select — player must click the track themselves
+            if (isTutorialRef.current && tutorialStepRef.current < 2) return prev;
             const first = msg.tracks.find((t) => !t.neutralized);
             return first ? first.id : prev;
           });
@@ -533,6 +535,8 @@ export default function App() {
   }, []);
 
   const { connect, send, connected } = useWebSocket(handleMessage);
+  const sendRef = useRef(send);
+  sendRef.current = send;
 
   // Alert system: detect new tracks, zone entries, threat escalation
   useEffect(() => {
@@ -1016,8 +1020,14 @@ export default function App() {
   };
 
   const callATC = useCallback((trackId: string) => {
-    // Tutorial step 2→3: ATC call advances tutorial
-    if (isTutorialRef.current && tutorialStepRef.current === 2) setTutorialStep(3);
+    // Tutorial: if player clicks CALL ATC while still on step 1, auto-advance step 1→2 first
+    if (isTutorialRef.current && tutorialStepRef.current === 1) {
+      sendRef.current({ type: "action", action: "select_track", target_id: trackId });
+    }
+    // Tutorial step 2→3: ATC call advances tutorial (via game engine)
+    if (isTutorialRef.current && (tutorialStepRef.current === 2 || tutorialStepRef.current === 1)) {
+      sendRef.current({ type: "action", action: "call_atc", target_id: trackId });
+    }
     atcCallsMadeRef.current++;
     setTracks((prev) =>
       prev.map((t) =>
@@ -1746,7 +1756,7 @@ export default function App() {
           onSelectTrack={(id) => {
             setSelectedTrackId(id);
             if (id) setHookedTrackIds((prev) => { const next = new Set(prev); next.add(id); return next; });
-            if (id && isTutorial && tutorialStep === 1) setTutorialStep(2);
+            if (id && isTutorial && tutorialStep === 1) send({ type: "action", action: "select_track", target_id: id });
           }}
         />
         </div>
@@ -1768,7 +1778,7 @@ export default function App() {
           onSelectTrack={(id) => {
             setSelectedTrackId(id);
             if (id) setHookedTrackIds((prev) => { const next = new Set(prev); next.add(id); return next; });
-            if (id && isTutorial && tutorialStep === 1) setTutorialStep(2);
+            if (id && isTutorial && tutorialStep === 1) send({ type: "action", action: "select_track", target_id: id });
           }}
           engagementZones={engagementZones}
           elapsed={elapsed}

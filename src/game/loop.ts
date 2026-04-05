@@ -873,14 +873,26 @@ export function advanceTutorialStep(
 
   // New tutorial flow:
   // 0→1: drone detected (automatic, handled by _tutorialGateActive)
-  // 1→2: player selects track (handled client-side in App.tsx)
-  // 2→3: player calls ATC (handled client-side in App.tsx)
+  // 1→2: player selects track
+  // 2→3: player calls ATC
   // 3→4: player slews camera
   // 4→5: player confirms track + identifies
   // 5→6: player declares affiliation
   // 6→7: player engages
 
-  if (step === 3 && actionName === 'slew_camera') {
+  if (step === 1 && actionName === 'select_track') {
+    gs.tutorial_step = 2;
+    msgs.push({
+      type: 'tutorial',
+      message: 'Track selected. Now call ATC to request an IFF check — click CALL ATC in the Engagement Panel.',
+    });
+  } else if (step === 2 && actionName === 'call_atc') {
+    gs.tutorial_step = 3;
+    msgs.push({
+      type: 'tutorial',
+      message: 'ATC request sent. While you wait for the response, slew your EO/IR camera onto the target — click SLEW CAMERA.',
+    });
+  } else if (step === 3 && actionName === 'slew_camera') {
     gs.tutorial_step = 4;
     gs.tutorial_camera_slewed = true;
     msgs.push({

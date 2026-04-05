@@ -398,6 +398,16 @@ export function useGameEngine(onMessage: MessageHandler) {
           dispatchAll(advanceTutorialStep(gs, "slew_camera", targetId));
           break;
 
+        case "select_track":
+          // Tutorial step 1→2: track selected (client-side action, game engine gating only)
+          dispatchAll(advanceTutorialStep(gs, "select_track", targetId));
+          break;
+
+        case "call_atc":
+          // Tutorial step 2→3: ATC called (client-side action, game engine gating only)
+          dispatchAll(advanceTutorialStep(gs, "call_atc", targetId));
+          break;
+
         default:
           console.warn("[OpenSentry Engine] Unknown action:", action);
       }
