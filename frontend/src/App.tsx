@@ -1141,6 +1141,14 @@ export default function App() {
       accent: "#8b949e",
       duration: "20+ min",
     },
+    {
+      id: "free_play",
+      name: "FREE PLAY",
+      description: "Open sandbox — steady mixed threats, one of each system, no timer. Practice at your own pace.",
+      difficulty: "CASUAL",
+      accent: "#79c0ff",
+      duration: "∞",
+    },
   ];
 
   // --- Scenario Launch handler (replaces handleTutorialStart + handleQuickStart) ---
@@ -1306,7 +1314,7 @@ export default function App() {
         detectionPingedRef.current.clear();
         setTutorialMessage(null);
         setIsTutorial(isTut);
-        setIsFreePlay(scenarioId === "thermopylae");
+        setIsFreePlay(scenarioId === "thermopylae" || scenarioId === "free_play");
         setTutorialStep(0);
         setTutorialFeedback(null);
         setPaused(false);
