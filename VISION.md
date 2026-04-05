@@ -46,9 +46,10 @@ Free, browser-based C-UAS training simulator that any military member worldwide 
 - Realistic EW effects (jamming → ATTI mode with degraded flight, not instant defeat) — *Implemented v1.6.0*
 - Shift handoff concept (stretch)
 
-### Scoring & AAR — *Partially implemented (scoring v1.1.0, debrief v1.5.0)*
+### Scoring & AAR — *Implemented (scoring v1.1.0, debrief v1.5.0, affiliation v1.7.0)*
 - Per-wave and cumulative scoring
-- ROE tracking (friendly fire penalties)
+- ROE tracking (friendly fire penalties, Blue-on-Blue detection)
+- MIL-STD-2525 affiliation mechanic (v1.7.0)
 - After-action replay (timeline scrub) — *Backlog*
 - Training metrics: reaction time, correct identification rate, engagement effectiveness
 

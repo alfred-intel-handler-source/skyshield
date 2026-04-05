@@ -1,7 +1,11 @@
-export type GamePhase = "waiting" | "scenario_select" | "roe_briefing" | "equip" | "plan" | "running" | "debrief" | "study";
+export type GamePhase = "waiting" | "scenario_select" | "roe_briefing" | "equip" | "plan" | "running" | "debrief" | "study" | "architect";
 export type DTIDPhase = "detected" | "tracked" | "identified" | "defeated";
 export type Affiliation = "unknown" | "hostile" | "friendly" | "neutral";
 export type ThreatLevel = "green" | "yellow" | "orange" | "red";
+export type NexusCMState = "pending" | "1/2" | "2/2";
+export type NexusCMType = "shenobi_hold" | "shenobi_land_now" | "shenobi_deafen";
+export type JammedBehavior = "loss_of_control" | "rth" | "forced_landing" | "atti_mode" | "gps_spoof";
+export type InterceptPhase = "spinup" | "launch" | "midcourse" | "terminal" | "self_destruct";
 
 export interface TrackData {
   id: string;
@@ -26,17 +30,17 @@ export interface TrackData {
   wave_number?: number;
   is_ambient?: boolean;
   jammed?: boolean;
-  jammed_behavior?: string | null;
+  jammed_behavior?: JammedBehavior | null;
   pnt_jammed?: boolean;
   is_interceptor?: boolean;
   interceptor_target?: string | null;
-  intercept_phase?: string | null;
+  intercept_phase?: InterceptPhase | null;
   // Shenobi RF track properties
   frequency_band?: string | null;
   uplink_detected?: boolean;
   downlink_detected?: boolean;
-  shenobi_cm_active?: string | null;
-  shenobi_cm_state?: string | null;  // "pending", "1/2", "2/2"
+  shenobi_cm_active?: NexusCMType | null;
+  shenobi_cm_state?: NexusCMState | null;
   // ATC coordination fields
   iff_status?: "confirmed" | "unknown";
   atc_called?: boolean;
@@ -177,10 +181,10 @@ export interface EngagementResultMsg {
   effective: boolean;
   effectiveness: number;
   jammed?: boolean;
-  jammed_behavior?: string;
+  jammed_behavior?: JammedBehavior;
   pnt_jammed?: boolean;
-  shenobi_cm?: string;
-  shenobi_cm_state?: string;
+  shenobi_cm?: NexusCMType;
+  shenobi_cm_state?: NexusCMState;
 }
 
 export interface DebriefMsg {

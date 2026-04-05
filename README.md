@@ -10,7 +10,7 @@
 
 > 🗺️ **Train at your actual base.** Drop a pin anywhere on Earth — real satellite imagery loads automatically. Set your perimeter, place your sensors, and run scenarios on terrain your operators actually defend. Not a demo airfield. Your location.
 
-**Version:** v1.7.0 | **Status:** Active development
+**Version:** v1.7.1 | **Status:** Active development
 
 ---
 
@@ -184,11 +184,20 @@ No Python backend required. The game engine runs entirely client-side via `useGa
 - [x] Shahed-class RF jam immunity — INS-guided threats require kinetic defeat ✓
 - [x] UI compression — TrackDetailPanel 2-column grid, EngagementPanel full-height ✓
 
+### Code Review (v1.7.1)
+- [x] Bug fixes: stale closures, negative detection probability, type safety gaps, parallel data loading
+- [x] Test suite: 28 vitest unit tests covering game engine core (detection, movement, jamming, scoring)
+- [x] Slop cleanup: CSS hover classes, standardized trail management, proper type guards
+- [x] Type tightening: union types for CM state, jam behavior, intercept phase
+- [x] Documentation: naming consistency, version alignment, architecture updates
+
 ### Backlog (v1.8.0+)
 - [ ] Base Defense Architect — terrain-aware sensor placement planning tool (#54, in PR)
 - [ ] After-action replay (timeline scrub)
 - [ ] Terrain LOS checks in gameplay
 - [ ] Multi-operator / shared mission
+- [ ] React.lazy() code splitting for bundle size reduction
+- [ ] Accessibility pass (ARIA labels, keyboard navigation)
 
 ---
 

@@ -30,6 +30,11 @@ import { updateJammedDrone, updatePntJammedDrone, pickJamBehavior, applyPntJammi
 import { updateShenobiDrone } from './shenobi.js';
 import { updateJackal } from './jackal.js';
 import { updateSensors, calculateConfidence } from './detection.js';
+import type { RfReading, SensorReading } from './detection.js';
+
+function isRfReading(r: SensorReading): r is RfReading {
+  return 'bearing_deg' in r && !('range_km' in r);
+}
 import { generateWaveDrones, generateAmbientObject, initialAmbientSchedule, AMBIENT_INTERVALS } from './waves.js';
 import { calculateScore, calculateScoreMulti, applyCompletionMultiplier } from './scoring.js';
 
@@ -118,8 +123,8 @@ export function initGameState(
 
   // Load boundary polygon for polygon-accurate breach checks
   // Placement config boundary (custom drawn polygon) takes priority over base template default
-  if (placementConfig && (placementConfig as any).boundary && (placementConfig as any).boundary.length >= 3) {
-    gs.boundary_polygon = (placementConfig as any).boundary.map((p: number[]) => [p[0], p[1]] as [number, number]);
+  if (placementConfig && placementConfig.boundary && placementConfig.boundary.length >= 3) {
+    gs.boundary_polygon = placementConfig.boundary.map(p => [p[0], p[1]] as [number, number]);
   } else if (baseTemplate && baseTemplate.boundary && baseTemplate.boundary.length >= 3) {
     gs.boundary_polygon = baseTemplate.boundary.map(p => [p[0], p[1]] as [number, number]);
   }
@@ -623,11 +628,10 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
   // Shenobi RF data
   const shenobiUpdates: Partial<DroneState> = {};
   for (const reading of readings) {
-    const r = reading as unknown as Record<string, unknown>;
-    if (r.is_shenobi) {
-      shenobiUpdates.frequency_band = r.frequency_band as string;
-      shenobiUpdates.downlink_detected = r.downlink_detected as boolean;
-      shenobiUpdates.uplink_detected = r.uplink_detected as boolean;
+    if (isRfReading(reading) && reading.is_shenobi) {
+      shenobiUpdates.frequency_band = reading.frequency_band ?? null;
+      shenobiUpdates.downlink_detected = reading.downlink_detected ?? false;
+      shenobiUpdates.uplink_detected = reading.uplink_detected ?? false;
     }
   }
   if (Object.keys(shenobiUpdates).length > 0) {
@@ -653,7 +657,7 @@ function _runSensorsForDrone(gs: GameState, i: number, elapsed: number): Msg[] {
   const prev = gs.previously_detected.get(drone.id) ?? new Set<string>();
   const newSensors = new Set(detectingIds.filter(id => !prev.has(id)));
   if (prev.size === 0 && detectingIds.length > 0) {
-    const hasNexus = readings.some(r => (r as unknown as Record<string, unknown>).is_shenobi);
+    const hasNexus = readings.some(r => isRfReading(r) && r.is_shenobi);
     const hasNonNexusRadar = detectingIds.some(sid =>
       !sid.toLowerCase().includes('shenobi') &&
       (sid.toLowerCase().includes('radar') || sid.toLowerCase().includes('tpq') || sid.toLowerCase().includes('kufcs'))

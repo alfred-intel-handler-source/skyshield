@@ -1,7 +1,7 @@
 {
   "name": "skyshield",
-  "version": "1.7.0",
-  "description": "SKYSHIELD — Browser-based C-UAS training simulator",
+  "version": "1.7.1",
+  "description": "OpenSentry — Browser-based C-UAS training simulator",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",

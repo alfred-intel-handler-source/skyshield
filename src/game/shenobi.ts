@@ -275,10 +275,7 @@ function applyDeafen(
     // Failsafe: hover then descend
     const newSpeed = Math.max(0, drone.speed * 0.8);
     const newAlt = Math.max(0, drone.altitude - 30 * tickRate);
-    const trail = [...drone.trail, [Math.round(drone.x * 1000) / 1000, Math.round(drone.y * 1000) / 1000]];
-    if (trail.length > 20) {
-      trail.splice(0, trail.length - 20);
-    }
+    const trail = [...drone.trail, [Math.round(drone.x * 1000) / 1000, Math.round(drone.y * 1000) / 1000]].slice(-20);
     drone = { ...drone, speed: newSpeed, altitude: newAlt, trail };
 
     if (newAlt <= 0) {
@@ -302,10 +299,7 @@ function applyDeafen(
     const speedKms = drone.speed * KTS_TO_KMS;
     const newX = drone.x + Math.sin(headingRad) * speedKms * tickRate;
     const newY = drone.y + Math.cos(headingRad) * speedKms * tickRate;
-    const trail = [...drone.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-    if (trail.length > 20) {
-      trail.splice(0, trail.length - 20);
-    }
+    const trail = [...drone.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     drone = { ...drone, x: newX, y: newY, trail };
 
     // Leave area check

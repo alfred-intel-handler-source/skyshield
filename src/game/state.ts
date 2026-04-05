@@ -349,6 +349,9 @@ export interface PlacementConfig {
   sensors: PlacedEquipment[];
   effectors: PlacedEquipment[];
   combined: PlacedEquipment[];
+  boundary?: number[][] | [number, number][];
+  placement_bounds_km?: number;
+  moved_assets?: { id: string; x: number; y: number }[];
 }
 
 // --- Effector runtime state (mutable dict in Python) ---

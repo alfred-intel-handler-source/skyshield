@@ -1,12 +1,12 @@
-# SKYSHIELD — Training Curriculum Design
-**Version 1.0 | March 19, 2026**
+# OpenSentry — Training Curriculum Design
+**Version 1.1 | April 4, 2026**
 **Aligned to: AFJQS 3CS (C-sUAS SEI), ATP 3-01.81 (May 2025), JCO C-sUAS Playbook**
 
 ---
 
 ## Purpose
 
-SKYSHIELD is a system-agnostic, browser-based C-UAS training simulator designed to prepare operators at any level for the cognitive and procedural demands of the DTID kill chain. This curriculum maps SKYSHIELD scenarios to real doctrinal standards, defines learning objectives with measurable performance criteria, and provides a structured progression from novice to proficient operator.
+OpenSentry is a system-agnostic, browser-based C-UAS training simulator designed to prepare operators at any level for the cognitive and procedural demands of the DTID kill chain. This curriculum maps OpenSentry scenarios to real doctrinal standards, defines learning objectives with measurable performance criteria, and provides a structured progression from novice to proficient operator.
 
 **Target Audience:** Any military or civilian personnel assigned a C-UAS duty position — regardless of platform or service branch.
 
@@ -16,7 +16,7 @@ SKYSHIELD is a system-agnostic, browser-based C-UAS training simulator designed 
 
 ## Doctrinal Alignment
 
-| Doctrine | Relevance to SKYSHIELD |
+| Doctrine | Relevance to OpenSentry |
 |----------|------------------------|
 | AFJQS 3CS (C-sUAS Operators, Mar 2023) | Core operator tasks, GO/NO GO standards, MQT requirements |
 | ATP 3-01.81 (May 2025) | DTID framework, ROE, layered defense, threat characterization |
@@ -38,7 +38,7 @@ Foundation  Procedures  Discipline  Complexity  Mastery
 ---
 
 ## MODULE 1 — Foundation of the DTID Kill Chain
-**SKYSHIELD Scenario:** Tutorial
+**OpenSentry Scenario:** Tutorial
 **Difficulty:** Beginner | **Time:** 20–30 min
 
 ### Learning Objectives
@@ -69,7 +69,7 @@ Upon completion, the operator will be able to:
 ---
 
 ## MODULE 2 — Procedural Fluency Under Time Pressure
-**SKYSHIELD Scenario:** Lone Wolf (Easy)
+**OpenSentry Scenario:** Lone Wolf (Easy)
 **Difficulty:** Easy | **Time:** 15–25 min
 
 ### Learning Objectives
@@ -99,7 +99,7 @@ Upon completion, the operator will be able to:
 ---
 
 ## MODULE 3 — Rules of Engagement and Threat Discrimination
-**SKYSHIELD Scenario:** Recon Probe (Medium)
+**OpenSentry Scenario:** Recon Probe (Medium)
 **Difficulty:** Medium | **Time:** 20–35 min
 
 ### Learning Objectives
@@ -129,7 +129,7 @@ Upon completion, the operator will be able to:
 ---
 
 ## MODULE 4 — Multi-Threat Management and Effector Economy
-**SKYSHIELD Scenario:** Swarm Attack (Hard)
+**OpenSentry Scenario:** Swarm Attack (Hard)
 **Difficulty:** Hard | **Time:** 25–45 min
 
 ### Learning Objectives
@@ -160,7 +160,7 @@ Upon completion, the operator will be able to:
 ---
 
 ## MODULE 5 — Operator Proficiency Assessment (Custom Mission)
-**SKYSHIELD Scenario:** Custom (User-defined location and loadout)
+**OpenSentry Scenario:** Custom (User-defined location and loadout)
 **Difficulty:** Variable | **Time:** 30–60 min
 
 ### Purpose
@@ -205,7 +205,7 @@ TIER 3: Oral/Written Debrief (Post-sim)
 ```
 
 ### Scoring Philosophy
-SKYSHIELD debrief scores map to curriculum outcomes as follows:
+OpenSentry debrief scores map to curriculum outcomes as follows:
 
 | Debrief Category | Curriculum Objective |
 |-----------------|---------------------|
@@ -241,7 +241,7 @@ Modules 3 and 4 are the evaluation scenarios. Module 3 maps directly to ROE/enga
 
 ---
 
-## Gaps SKYSHIELD Should Close (Future Development)
+## Gaps OpenSentry Should Close (Future Development)
 
 | Gap | Proposed Feature |
 |-----|-----------------|
@@ -262,4 +262,4 @@ Modules 3 and 4 are the evaluation scenarios. Module 3 maps directly to ROE/enga
 - DAFI 36-2670 — Total Force Development
 
 ---
-*SKYSHIELD is not a replacement for system-specific IQT. It is a pre-qualification familiarization tool and procedural trainer designed to reduce time-to-proficiency on system-specific platforms.*
+*OpenSentry is not a replacement for system-specific IQT. It is a pre-qualification familiarization tool and procedural trainer designed to reduce time-to-proficiency on system-specific platforms.*

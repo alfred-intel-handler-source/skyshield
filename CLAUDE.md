@@ -1,4 +1,4 @@
-# CLAUDE.md — OpenSentry Project Guide (Updated 2026-04-01)
+# CLAUDE.md — OpenSentry Project Guide (Updated 2026-04-04)
 
 ## What Is This?
 OpenSentry is a **free, browser-based C-UAS training simulator** designed to teach military operators the **DTID kill chain** (Detect → Track → Identify → Defeat). It's built to emulate real-world C-UAS command and control systems. No clearance required — purely training.
@@ -10,7 +10,7 @@ OpenSentry is a **free, browser-based C-UAS training simulator** designed to tea
 
 ---
 
-## Architecture (as of 2026-03-20)
+## Architecture (as of 2026-04-04)
 
 ### Stack
 - **Frontend:** React 19, TypeScript, Vite, Leaflet.js, HTML5 Canvas
@@ -26,12 +26,14 @@ The game loop runs in the browser via `setInterval` at 10Hz. `useGameEngine.ts` 
 frontend/                   ← React app (the game UI)
   src/
     App.tsx                 ← Main state machine, phase transitions, doctrine loadouts
+    app.css                 ← CSS hover classes for main menu buttons
     hooks/useGameEngine.ts  ← 10Hz game loop in browser (replaces WebSocket)
     hooks/useWebSocket.ts   ← Legacy hook (kept for local dev with Python backend)
     components/             ← All UI components
     types.ts                ← TypeScript interfaces for all ServerMessage types
+    __tests__/              ← vitest unit tests for game engine
   public/data/              ← Static JSON data (served on GitHub Pages)
-    scenarios/              ← lone_wolf.json, swarm_attack.json, recon_probe.json, tutorial.json + index.json
+    scenarios/              ← lone_wolf.json, swarm_attack.json, recon_probe.json, tutorial.json, thermopylae.json + index.json
     bases/                  ← small_fob.json, medium_airbase.json, large_installation.json + index.json
     equipment/catalog.json  ← All equipment definitions
 
@@ -78,12 +80,13 @@ Two independent jamming layers:
 
 | Drone Type | RF Jam Resistance | PNT Drift (km/s/tick) |
 |-----------|-----------------|----------------------|
-| commercial_quad | 0% | 0.008 |
-| micro | 10% | 0.006 |
+| commercial_quad | 15% | 0.008 |
+| micro | 20% | 0.006 |
 | fixed_wing | 40% | 0.004 |
 | improvised | 50% | 0.005 |
-| shahed | 100% (RF-immune) | 0.003 (minor drift only) |
-| bird / ambient | immune | immune |
+| improvised_hardened | 70% | 0.001 |
+| shahed | 100% (RF-immune) | 0.0 (INS-primary, fully PNT-immune) |
+| bird / ambient | 50% (default) | 0.0 (default — immunity via rf_emitting=false) |
 
 **Tactical note:** Jammer won't defeat a Shahed — it gets `pnt_jammed` + navigation drift, shown as "PNT DEGRADED" in the panel. Use jammer to degrade Shahed accuracy + buy JACKAL spinup time. JACKAL is the only reliable defeat.
 
@@ -147,6 +150,12 @@ cd frontend && npm run dev   # port 5173
 cd frontend && npm run dev   # uses useGameEngine.ts, fetches /data/ from public/
 ```
 
+### Run tests
+```bash
+cd frontend && npm test      # vitest — 28 game engine unit tests
+cd backend && python -m pytest  # Python backend tests (5 modules)
+```
+
 ### Deploy
 ```bash
 git push origin main   # GitHub Actions auto-builds and deploys to Pages
@@ -180,12 +189,25 @@ These are Claude Code subagent types, not custom-built tools. They run as part o
 
 ## Known Issues / Open TODO
 - Intermittent stuck bogey in Lone Wolf — root cause unconfirmed
-- Shenobi `uplink_detected` — CM state 1/2 → 2/2 transition depends on detection loop correctly setting this field; verify in TypeScript port
 - `_evasive_state` dict in drone.py is module-level (shared across connections) — blocks multiplayer, fine for single-player
+- App.tsx has 51 `useState` declarations — should be refactored into useReducer slices (audio, tracks, ATC, phase, UI)
+- Bundle size 689 KB (193 KB gzipped) — should lazy-load BaseDefenseArchitect, StudyModule, PlacementScreen with React.lazy()
+- No accessibility — missing ARIA labels, color-only indicators, no keyboard nav on RadialActionWheel
+- Backend Python tests not run in CI — GitHub Actions only builds frontend
+- Duplicate constants (CLASSIFICATIONS, color maps) across multiple components — should centralize into constants.ts
 - Phase 2 features (terrain LOS, planning score, after-action replay) — deferred
 
+## Testing
+- **Frontend:** vitest with 28 unit tests in `frontend/src/__tests__/game-engine.test.ts`
+  - Coverage: detection math (radar/RF/EO-IR/acoustic), FOV, terrain LOS, confidence calculation, segment intersection, drone creation/movement/trail limits, jam behavior rolls, PNT drift, GameState factory
+  - Run: `cd frontend && npm test`
+- **Backend:** pytest with 5 test modules in `backend/tests/`
+  - Coverage: security, detection, drone, models, scoring
+  - Run: `cd backend && python -m pytest`
+- **Not yet tested:** React components, hooks, phase transitions, integration tests
+
 ## Next Session — Priority Work
-1. Merge jamming realism branch (#47/#48) to main
-2. Smoke test ATTI mode and FHSS mechanic across all scenarios on live GitHub Pages URL
-3. Investigate stuck bogey (Lone Wolf) — still unconfirmed
+1. Investigate stuck bogey (Lone Wolf) — still unconfirmed
+2. Add CI test step to GitHub Actions workflow (both vitest and pytest)
+3. Code-split bundle with React.lazy() for heavy components
 4. Draft AFWERX/DIU one-pager for OpenSentry innovation submission
