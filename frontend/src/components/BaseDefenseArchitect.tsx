@@ -156,8 +156,8 @@ const viewshedCache = new Map<
   }
 >();
 
-function cacheKey(lat: number, lng: number, alt: number): string {
-  return `${lat.toFixed(6)},${lng.toFixed(6)},${alt}`;
+function cacheKey(lat: number, lng: number, alt: number, rangeKm?: number): string {
+  return `${lat.toFixed(6)},${lng.toFixed(6)},${alt}${rangeKm != null ? `,${rangeKm}` : ''}`;
 }
 
 const NUM_RAYS = 72;
@@ -400,11 +400,11 @@ function computeFovCone(
 
 function createSystemIcon(
   letter: string,
-  _color: string,
+  color: string,
   selected: boolean,
 ): L.DivIcon {
-  const bgColor = selected ? "#1a8fff" : "#2563eb";
-  const borderColor = selected ? "#ffffff" : "#3b82f6";
+  const bgColor = selected ? "#1a8fff" : color;
+  const borderColor = selected ? "#ffffff" : color;
   const glow = selected ? "0 0 12px rgba(59,130,246,0.6)" : "none";
   return L.divIcon({
     html: `<div style="
@@ -608,6 +608,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         fetchViewshedForSystem(uid, lat, lng, 10, placingDef.range_km);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [placingDef],
   );
 
@@ -615,7 +616,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
 
   const fetchViewshedForSystem = useCallback(
     (uid: string, lat: number, lng: number, alt: number, rangeKm: number) => {
-      const key = cacheKey(lat, lng, alt);
+      const key = cacheKey(lat, lng, alt, rangeKm);
       const cached = viewshedCache.get(key);
       if (cached) {
         setSystems((prev) =>
@@ -690,12 +691,14 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
 
   const handleAltitudeChange = useCallback(
     (uid: string, newAlt: number) => {
+      const sys = systems.find((s) => s.uid === uid);
+      if (!sys) return;
+      const { lat, lng } = sys;
       setSystems((prev) =>
         prev.map((s) => (s.uid === uid ? { ...s, altitude: newAlt } : s)),
       );
-      const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.requires_los && sys.def.range_km) {
-        fetchViewshedForSystem(uid, sys.lat, sys.lng, newAlt, sys.def.range_km);
+      if (sys.def.requires_los && sys.def.range_km) {
+        fetchViewshedForSystem(uid, lat, lng, newAlt, sys.def.range_km);
       }
     },
     [systems, fetchViewshedForSystem],
@@ -707,7 +710,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
     (uid: string) => {
       const sys = systems.find((s) => s.uid === uid);
       if (sys && sys.def.requires_los && sys.def.range_km) {
-        const key = cacheKey(sys.lat, sys.lng, sys.altitude);
+        const key = cacheKey(sys.lat, sys.lng, sys.altitude, sys.def.range_km);
         viewshedCache.delete(key);
         fetchViewshedForSystem(
           uid,
@@ -740,12 +743,14 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
 
   const handleDragEnd = useCallback(
     (uid: string, lat: number, lng: number) => {
+      const sys = systems.find((s) => s.uid === uid);
+      if (!sys) return;
+      const { altitude } = sys;
       setSystems((prev) =>
         prev.map((s) => (s.uid === uid ? { ...s, lat, lng } : s)),
       );
-      const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.requires_los && sys.def.range_km) {
-        fetchViewshedForSystem(uid, lat, lng, sys.altitude, sys.def.range_km);
+      if (sys.def.requires_los && sys.def.range_km) {
+        fetchViewshedForSystem(uid, lat, lng, altitude, sys.def.range_km);
       }
     },
     [systems, fetchViewshedForSystem],
