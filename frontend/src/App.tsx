@@ -14,7 +14,7 @@ import LoadoutScreen from "./components/LoadoutScreen";
 import PlacementScreen from "./components/PlacementScreen";
 import CameraPanel from "./components/CameraPanel";
 import TutorialStepTracker from "./components/TutorialStepTracker";
-import TutorialOverlay, { UI_TOUR_STEPS } from "./components/TutorialOverlay";
+import { TutorialTourOverlay, TutorialPracticeOverlay, UI_TOUR_STEPS } from "./components/TutorialOverlay";
 import FeedbackModal from "./components/FeedbackModal";
 import TutorialFeedback from "./components/TutorialFeedback";
 import ATCCommsPanel from "./components/ATCCommsPanel";
@@ -1959,15 +1959,20 @@ export default function App() {
         </div>
       )}
 
-      {/* Tutorial UI Tour overlay */}
+      {/* Tutorial Phase 1: UI Tour overlay (Next/Back navigation) */}
       {isTutorial && tutorialTourActive && phase === "running" && (
-        <TutorialOverlay
+        <TutorialTourOverlay
           currentStep={tutorialTourStep}
           totalSteps={UI_TOUR_STEPS.length}
           onNext={() => setTutorialTourStep((s) => Math.min(s + 1, UI_TOUR_STEPS.length - 1))}
           onBack={() => setTutorialTourStep((s) => Math.max(s - 1, 0))}
           onComplete={() => setTutorialTourActive(false)}
         />
+      )}
+
+      {/* Tutorial Phase 2: DTID Practice guide (advances with game engine) */}
+      {isTutorial && !tutorialTourActive && phase === "running" && tutorialStep < 7 && (
+        <TutorialPracticeOverlay gameStep={tutorialStep} />
       )}
 
       {/* ROE overlay (viewable during mission) */}

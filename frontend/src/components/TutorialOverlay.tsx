@@ -4,24 +4,22 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 export interface TutorialStep {
   id: string;
-  phase: "ui_tour" | "dtid_practice";
   title: string;
   description: string;
   targetId?: string; // matches data-tutorial-id on DOM element
-  arrowSide?: "top" | "bottom" | "left" | "right"; // which side of tooltip the arrow points from
+  arrowSide?: "top" | "bottom" | "left" | "right";
 }
 
+// Phase 1: UI Tour — user clicks Next/Back to advance
 export const UI_TOUR_STEPS: TutorialStep[] = [
   {
     id: "welcome",
-    phase: "ui_tour",
     title: "Welcome to OpenSentry",
     description:
       "This tutorial will walk you through every panel on screen, then guide you through your first engagement. A slow drone is already airborne — let's learn the interface first.",
   },
   {
     id: "header",
-    phase: "ui_tour",
     title: "Header Bar",
     description:
       "The top bar shows elapsed mission time, current threat level, and mission controls. You can pause, adjust audio, and end the mission from here.",
@@ -30,7 +28,6 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "sensors",
-    phase: "ui_tour",
     title: "Sensor Panel",
     description:
       "Your active sensors are listed here — radar, EO/IR camera, and RF detection. Each shows its type, range, and current status.",
@@ -39,7 +36,6 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "effectors",
-    phase: "ui_tour",
     title: "Effector Panel",
     description:
       "Your weapons and countermeasures. The RF Jammer disrupts drone control links. The Shenobi does protocol-level manipulation. Check status and cooldown timers here.",
@@ -48,7 +44,6 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "tracklist",
-    phase: "ui_tour",
     title: "Track List",
     description:
       "Detected contacts appear here. Click a track to select it for inspection. Tracks are color-coded: yellow = unknown, red = hostile, green = friendly.",
@@ -57,16 +52,14 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "map",
-    phase: "ui_tour",
     title: "Tactical Map",
     description:
-      "The main map shows your base, sensor coverage rings, and all detected tracks. Right-click a track for quick actions. Blue rings show engagement zones.",
+      "The main map shows your base, sensor coverage rings, and all detected tracks. Right-click a track for the Radial Action Wheel — a quick shortcut menu. Blue rings show engagement zones.",
     targetId: "tutorial-map",
     arrowSide: "left",
   },
   {
     id: "trackdetail",
-    phase: "ui_tour",
     title: "Track Detail Panel",
     description:
       "When you select a track, its details appear here — position, altitude, speed, heading, which sensors are detecting it, and its current DTID status.",
@@ -75,7 +68,6 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "engagement",
-    phase: "ui_tour",
     title: "Engagement Panel",
     description:
       "This is your action center. Confirm Track, Slew Camera, Identify, declare Affiliation, and Engage — the full DTID kill chain, in order. Buttons light up when available.",
@@ -84,7 +76,6 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "camera",
-    phase: "ui_tour",
     title: "Camera Panel",
     description:
       "The EO/IR camera feed. Slew it onto a target to get a visual — the silhouette helps you classify the drone type (quad, fixed-wing, etc.).",
@@ -92,35 +83,7 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
     arrowSide: "left",
   },
   {
-    id: "radial_wheel",
-    phase: "ui_tour",
-    title: "Radial Action Wheel",
-    description:
-      "Right-click any track on the tactical map to open the Radial Action Wheel — a quick-access menu for Confirm Track, Slew Camera, Identify, Engage, and more. It's the fastest way to act on a contact without scrolling through panels.",
-    targetId: "tutorial-map",
-    arrowSide: "left",
-  },
-  {
-    id: "engagement_flow",
-    phase: "ui_tour",
-    title: "The DTID Kill Chain",
-    description:
-      "Every contact follows the same flow: DETECT (sensors find it) → TRACK (you confirm it's real) → IDENTIFY (classify it and declare hostile/friendly) → DEFEAT (engage with the right effector). The engagement panel buttons guide you through this sequence. Unknown contacts must go through ATC clearance before engagement.",
-    targetId: "tutorial-engagement",
-    arrowSide: "left",
-  },
-  {
-    id: "effector_selection",
-    phase: "ui_tour",
-    title: "Choosing the Right Effector",
-    description:
-      "Match the effector to the threat. RF Jammer works on most commercial drones. Shenobi does protocol manipulation — hold, land, or deafen. JACKAL is a kinetic interceptor for jam-resistant targets like the Shahed. Using the wrong tool wastes resources and costs points.",
-    targetId: "tutorial-effectors",
-    arrowSide: "right",
-  },
-  {
     id: "eventlog",
-    phase: "ui_tour",
     title: "Event Log",
     description:
       "A running log of everything that happens — detections, engagements, ROE events, and system messages. Color-coded by severity.",
@@ -129,50 +92,92 @@ export const UI_TOUR_STEPS: TutorialStep[] = [
   },
   {
     id: "tour_complete",
-    phase: "ui_tour",
     title: "UI Tour Complete",
     description:
-      "You've seen every panel. Now let's put it all together — a slow drone is approaching your base. Follow the DTID kill chain to detect, track, identify, and defeat it. The buttons will pulse blue when it's time to act.",
+      "Now let's put it all together. A slow drone is approaching your base. We'll walk you through each step of the DTID kill chain — the buttons will pulse blue when it's time to act. You can also right-click the track on the map for a quick-action menu.",
   },
 ];
 
-// --- Component ---
+// Phase 2: DTID Practice — driven by game engine tutorialStep (0-7)
+// These are NOT advanced with Next/Back — they update automatically
+// as the player performs actions and the game engine advances tutorialStep.
+export const DTID_PRACTICE_STEPS: Record<number, TutorialStep> = {
+  0: {
+    id: "dtid_waiting",
+    title: "Step 1: Detect",
+    description:
+      "Sensors are scanning... wait for a contact to appear in the Track List on the left. The radar will pick it up automatically.",
+    targetId: "tutorial-tracklist",
+    arrowSide: "right",
+  },
+  1: {
+    id: "dtid_detected",
+    title: "Step 1: Detect — Contact!",
+    description:
+      "A contact just appeared! Click it in the Track List to select it. You'll see its details populate on the right side.",
+    targetId: "tutorial-tracklist",
+    arrowSide: "right",
+  },
+  2: {
+    id: "dtid_confirm",
+    title: "Step 2: Track — Confirm It",
+    description:
+      "Good — you've selected the contact. Now click the pulsing CONFIRM TRACK button in the Engagement Panel. This tells the system you're actively monitoring it. You can also right-click the track on the map and select Confirm from the radial wheel.",
+    targetId: "tutorial-engagement",
+    arrowSide: "left",
+  },
+  3: {
+    id: "dtid_slew",
+    title: "Step 3: Slew Camera",
+    description:
+      "Track confirmed. Now click SLEW CAMERA to point your EO/IR camera at the target. Watch the Camera Panel in the bottom-right — you'll see a visual of the drone.",
+    targetId: "tutorial-engagement",
+    arrowSide: "left",
+  },
+  4: {
+    id: "dtid_identify",
+    title: "Step 4: Identify — Classify the Threat",
+    description:
+      "Camera is locked on. Look at the silhouette in the Camera Panel — what type of drone is it? Select the correct classification from the list. This is a commercial quadcopter.",
+    targetId: "tutorial-engagement",
+    arrowSide: "left",
+  },
+  5: {
+    id: "dtid_affiliate",
+    title: "Step 5: Declare Affiliation",
+    description:
+      "You've classified it. Now declare whether it's HOSTILE, FRIENDLY, or NEUTRAL. For unknown contacts you'd normally call ATC first, but this one is clearly hostile — declare it HOSTILE.",
+    targetId: "tutorial-engagement",
+    arrowSide: "left",
+  },
+  6: {
+    id: "dtid_engage",
+    title: "Step 6: Defeat — Engage!",
+    description:
+      "Target is confirmed hostile. Choose your effector and click ENGAGE. The RF Jammer is the best choice for a commercial quad — it's proportional and effective. JACKAL works but is overkill. Try right-clicking the track on the map for the radial wheel too!",
+    targetId: "tutorial-engagement",
+    arrowSide: "left",
+  },
+  7: {
+    id: "dtid_complete",
+    title: "Target Neutralized!",
+    description:
+      "Outstanding work. You just completed the full DTID kill chain: Detect → Track → Identify → Defeat. The debrief screen will show your score shortly. Remember: match the effector to the threat, follow ROE, and don't rush your identification.",
+  },
+};
 
-interface Props {
-  /** Current step index into UI_TOUR_STEPS */
-  currentStep: number;
-  /** Total steps for the counter display */
-  totalSteps: number;
-  /** Advance to next step */
-  onNext: () => void;
-  /** Go back one step */
-  onBack: () => void;
-  /** Called when the tour is finished */
-  onComplete: () => void;
-}
+// --- Tooltip positioning logic (shared between both phases) ---
 
-export default function TutorialOverlay({
-  currentStep,
-  totalSteps,
-  onNext,
-  onBack,
-  onComplete,
-}: Props) {
-  const step = UI_TOUR_STEPS[currentStep];
+function useTooltipPosition(step: TutorialStep | undefined) {
   const [tooltipPos, setTooltipPos] = useState<{
     top: number;
     left: number;
     arrowSide: string;
   } | null>(null);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
-  const tooltipRef = useRef<HTMLDivElement>(null);
-
-  const isLastStep = currentStep === totalSteps - 1;
-  const isFirstStep = currentStep === 0;
 
   const positionTooltip = useCallback(() => {
     if (!step?.targetId) {
-      // No target — center the tooltip on screen
       setTooltipPos({ top: 0, left: 0, arrowSide: "none" });
       setHighlightRect(null);
       return;
@@ -189,7 +194,7 @@ export default function TutorialOverlay({
     setHighlightRect(rect);
 
     const tooltipWidth = 360;
-    const tooltipHeight = 200; // approximate
+    const tooltipHeight = 200;
     const gap = 16;
     const side = step.arrowSide || "left";
 
@@ -198,28 +203,23 @@ export default function TutorialOverlay({
 
     switch (side) {
       case "right":
-        // Tooltip is to the RIGHT of the element, arrow points left
         top = rect.top + rect.height / 2 - tooltipHeight / 2;
         left = rect.right + gap;
         break;
       case "left":
-        // Tooltip is to the LEFT of the element, arrow points right
         top = rect.top + rect.height / 2 - tooltipHeight / 2;
         left = rect.left - tooltipWidth - gap;
         break;
       case "bottom":
-        // Tooltip is BELOW the element, arrow points up
         top = rect.bottom + gap;
         left = rect.left + rect.width / 2 - tooltipWidth / 2;
         break;
       case "top":
-        // Tooltip is ABOVE the element, arrow points down
         top = rect.top - tooltipHeight - gap;
         left = rect.left + rect.width / 2 - tooltipWidth / 2;
         break;
     }
 
-    // Clamp to viewport
     top = Math.max(8, Math.min(top, window.innerHeight - tooltipHeight - 8));
     left = Math.max(8, Math.min(left, window.innerWidth - tooltipWidth - 8));
 
@@ -232,94 +232,85 @@ export default function TutorialOverlay({
     return () => window.removeEventListener("resize", positionTooltip);
   }, [positionTooltip]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" || e.key === "Enter") {
-        e.preventDefault();
-        if (isLastStep) onComplete();
-        else onNext();
-      } else if (e.key === "ArrowLeft" && !isFirstStep) {
-        e.preventDefault();
-        onBack();
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [isLastStep, isFirstStep, onNext, onBack, onComplete]);
+  return { tooltipPos, highlightRect };
+}
 
-  if (!step) return null;
+// --- Arrow renderer ---
 
+function TooltipArrow({ arrowSide }: { arrowSide: string }) {
+  if (arrowSide === "none") return null;
+  const size = 10;
+  const style: React.CSSProperties = { position: "absolute", width: 0, height: 0 };
+
+  switch (arrowSide) {
+    case "right":
+      Object.assign(style, {
+        left: -size, top: "50%", transform: "translateY(-50%)",
+        borderTop: `${size}px solid transparent`,
+        borderBottom: `${size}px solid transparent`,
+        borderRight: `${size}px solid #58a6ff`,
+      });
+      break;
+    case "left":
+      Object.assign(style, {
+        right: -size, top: "50%", transform: "translateY(-50%)",
+        borderTop: `${size}px solid transparent`,
+        borderBottom: `${size}px solid transparent`,
+        borderLeft: `${size}px solid #58a6ff`,
+      });
+      break;
+    case "bottom":
+      Object.assign(style, {
+        top: -size, left: "50%", transform: "translateX(-50%)",
+        borderLeft: `${size}px solid transparent`,
+        borderRight: `${size}px solid transparent`,
+        borderBottom: `${size}px solid #58a6ff`,
+      });
+      break;
+    case "top":
+      Object.assign(style, {
+        bottom: -size, left: "50%", transform: "translateX(-50%)",
+        borderLeft: `${size}px solid transparent`,
+        borderRight: `${size}px solid transparent`,
+        borderTop: `${size}px solid #58a6ff`,
+      });
+      break;
+  }
+
+  return <div style={style} />;
+}
+
+// --- Shared backdrop + highlight + tooltip shell ---
+
+function TutorialTooltipShell({
+  step,
+  tooltipPos,
+  highlightRect,
+  counterText,
+  children,
+  allowClickThrough,
+}: {
+  step: TutorialStep;
+  tooltipPos: { top: number; left: number; arrowSide: string } | null;
+  highlightRect: DOMRect | null;
+  counterText: string;
+  children: React.ReactNode;
+  allowClickThrough?: boolean;
+}) {
   const isCentered = !step.targetId;
-
-  // Arrow SVG based on side
-  const renderArrow = () => {
-    if (!tooltipPos || tooltipPos.arrowSide === "none") return null;
-    const size = 10;
-    const style: React.CSSProperties = { position: "absolute", width: 0, height: 0 };
-
-    switch (tooltipPos.arrowSide) {
-      case "right":
-        // Arrow on LEFT side of tooltip, pointing left toward element
-        Object.assign(style, {
-          left: -size,
-          top: "50%",
-          transform: "translateY(-50%)",
-          borderTop: `${size}px solid transparent`,
-          borderBottom: `${size}px solid transparent`,
-          borderRight: `${size}px solid #58a6ff`,
-        });
-        break;
-      case "left":
-        // Arrow on RIGHT side of tooltip, pointing right toward element
-        Object.assign(style, {
-          right: -size,
-          top: "50%",
-          transform: "translateY(-50%)",
-          borderTop: `${size}px solid transparent`,
-          borderBottom: `${size}px solid transparent`,
-          borderLeft: `${size}px solid #58a6ff`,
-        });
-        break;
-      case "bottom":
-        // Arrow on TOP of tooltip, pointing up toward element
-        Object.assign(style, {
-          top: -size,
-          left: "50%",
-          transform: "translateX(-50%)",
-          borderLeft: `${size}px solid transparent`,
-          borderRight: `${size}px solid transparent`,
-          borderBottom: `${size}px solid #58a6ff`,
-        });
-        break;
-      case "top":
-        // Arrow on BOTTOM of tooltip, pointing down toward element
-        Object.assign(style, {
-          bottom: -size,
-          left: "50%",
-          transform: "translateX(-50%)",
-          borderLeft: `${size}px solid transparent`,
-          borderRight: `${size}px solid transparent`,
-          borderTop: `${size}px solid #58a6ff`,
-        });
-        break;
-    }
-
-    return <div style={style} />;
-  };
 
   return (
     <>
-      {/* Dimmed backdrop — but cut out a hole for the highlighted element */}
+      {/* Dimmed backdrop with cutout */}
       <div
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 9998,
-          pointerEvents: "none",
+          pointerEvents: allowClickThrough ? "none" : "auto",
         }}
       >
-        <svg width="100%" height="100%" style={{ position: "absolute", inset: 0 }}>
+        <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
           <defs>
             <mask id="tutorial-mask">
               <rect width="100%" height="100%" fill="white" />
@@ -338,12 +329,12 @@ export default function TutorialOverlay({
           <rect
             width="100%"
             height="100%"
-            fill="rgba(0, 0, 0, 0.5)"
+            fill={allowClickThrough ? "rgba(0, 0, 0, 0.25)" : "rgba(0, 0, 0, 0.5)"}
             mask="url(#tutorial-mask)"
+            style={{ pointerEvents: "none" }}
           />
         </svg>
 
-        {/* Highlight border around target */}
         {highlightRect && (
           <div
             style={{
@@ -363,20 +354,12 @@ export default function TutorialOverlay({
 
       {/* Tooltip */}
       <div
-        ref={tooltipRef}
         style={{
           position: "fixed",
           zIndex: 9999,
           ...(isCentered
-            ? {
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-              }
-            : {
-                top: tooltipPos?.top ?? 0,
-                left: tooltipPos?.left ?? 0,
-              }),
+            ? { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }
+            : { top: tooltipPos?.top ?? 0, left: tooltipPos?.left ?? 0 }),
           width: 360,
           background: "#161b22",
           border: "1px solid #58a6ff",
@@ -386,94 +369,178 @@ export default function TutorialOverlay({
           fontFamily: "'Inter', sans-serif",
         }}
       >
-        {!isCentered && renderArrow()}
+        {!isCentered && tooltipPos && <TooltipArrow arrowSide={tooltipPos.arrowSide} />}
 
-        {/* Step counter */}
-        <div
-          style={{
-            fontSize: 10,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: "#58a6ff",
-            letterSpacing: 1.5,
-            marginBottom: 8,
-            fontWeight: 600,
-          }}
-        >
-          {currentStep + 1} OF {totalSteps}
+        {/* Counter */}
+        <div style={{
+          fontSize: 10,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: "#58a6ff",
+          letterSpacing: 1.5,
+          marginBottom: 8,
+          fontWeight: 600,
+        }}>
+          {counterText}
         </div>
 
         {/* Title */}
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            color: "#e6edf3",
-            marginBottom: 8,
-          }}
-        >
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#e6edf3", marginBottom: 8 }}>
           {step.title}
         </div>
 
         {/* Description */}
-        <div
-          style={{
-            fontSize: 13,
-            color: "#8b949e",
-            lineHeight: 1.6,
-            marginBottom: 20,
-          }}
-        >
+        <div style={{ fontSize: 13, color: "#8b949e", lineHeight: 1.6, marginBottom: 16 }}>
           {step.description}
         </div>
 
-        {/* Navigation buttons */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <button
-            onClick={onBack}
-            disabled={isFirstStep}
-            style={{
-              background: "none",
-              border: "1px solid #30363d",
-              color: isFirstStep ? "#30363d" : "#8b949e",
-              padding: "6px 16px",
-              borderRadius: 6,
-              cursor: isFirstStep ? "default" : "pointer",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            Back
-          </button>
-
-          <span
-            style={{
-              fontSize: 10,
-              color: "#484f58",
-              fontFamily: "'JetBrains Mono', monospace",
-            }}
-          >
-            Arrow keys or Enter
-          </span>
-
-          <button
-            onClick={isLastStep ? onComplete : onNext}
-            style={{
-              background: "#58a6ff",
-              border: "none",
-              color: "#0d1117",
-              padding: "6px 20px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 12,
-              fontWeight: 700,
-            }}
-          >
-            {isLastStep ? "Start Practice" : "Next"}
-          </button>
-        </div>
+        {children}
       </div>
     </>
   );
 }
+
+// ====================
+// Phase 1: UI Tour
+// ====================
+
+interface TourProps {
+  currentStep: number;
+  totalSteps: number;
+  onNext: () => void;
+  onBack: () => void;
+  onComplete: () => void;
+}
+
+export function TutorialTourOverlay({
+  currentStep,
+  totalSteps,
+  onNext,
+  onBack,
+  onComplete,
+}: TourProps) {
+  const step = UI_TOUR_STEPS[currentStep];
+  const { tooltipPos, highlightRect } = useTooltipPosition(step);
+
+  const isLastStep = currentStep === totalSteps - 1;
+  const isFirstStep = currentStep === 0;
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "Enter") {
+        e.preventDefault();
+        if (isLastStep) onComplete();
+        else onNext();
+      } else if (e.key === "ArrowLeft" && !isFirstStep) {
+        e.preventDefault();
+        onBack();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isLastStep, isFirstStep, onNext, onBack, onComplete]);
+
+  if (!step) return null;
+
+  return (
+    <TutorialTooltipShell
+      step={step}
+      tooltipPos={tooltipPos}
+      highlightRect={highlightRect}
+      counterText={`UI TOUR — ${currentStep + 1} OF ${totalSteps}`}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <button
+          onClick={onBack}
+          disabled={isFirstStep}
+          style={{
+            background: "none",
+            border: "1px solid #30363d",
+            color: isFirstStep ? "#30363d" : "#8b949e",
+            padding: "6px 16px",
+            borderRadius: 6,
+            cursor: isFirstStep ? "default" : "pointer",
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Back
+        </button>
+
+        <span style={{
+          fontSize: 10,
+          color: "#484f58",
+          fontFamily: "'JetBrains Mono', monospace",
+        }}>
+          Arrow keys or Enter
+        </span>
+
+        <button
+          onClick={isLastStep ? onComplete : onNext}
+          style={{
+            background: "#58a6ff",
+            border: "none",
+            color: "#0d1117",
+            padding: "6px 20px",
+            borderRadius: 6,
+            cursor: "pointer",
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          {isLastStep ? "Start Practice" : "Next"}
+        </button>
+      </div>
+    </TutorialTooltipShell>
+  );
+}
+
+// ====================
+// Phase 2: DTID Practice Guide
+// ====================
+
+interface PracticeProps {
+  /** The game engine's current tutorial step (0-7) */
+  gameStep: number;
+}
+
+export function TutorialPracticeOverlay({ gameStep }: PracticeProps) {
+  const step = DTID_PRACTICE_STEPS[gameStep];
+  const { tooltipPos, highlightRect } = useTooltipPosition(step);
+  const prevStepRef = useRef(gameStep);
+
+  // Re-position when game step changes
+  useEffect(() => {
+    prevStepRef.current = gameStep;
+  }, [gameStep]);
+
+  if (!step) return null;
+
+  return (
+    <TutorialTooltipShell
+      step={step}
+      tooltipPos={tooltipPos}
+      highlightRect={highlightRect}
+      counterText={`DTID PRACTICE — STEP ${Math.min(gameStep + 1, 7)} OF 7`}
+      allowClickThrough={true}
+    >
+      <div style={{
+        fontSize: 11,
+        color: "#58a6ff",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontWeight: 600,
+        letterSpacing: 0.5,
+        opacity: 0.8,
+      }}>
+        {gameStep < 7
+          ? "Perform the action — the guide will advance automatically"
+          : "Mission complete!"}
+      </div>
+    </TutorialTooltipShell>
+  );
+}
+
+// Default export for backward compat
+export default TutorialTourOverlay;
