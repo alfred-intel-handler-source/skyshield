@@ -695,7 +695,19 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       if (!sys) return;
       const { lat, lng } = sys;
       setSystems((prev) =>
-        prev.map((s) => (s.uid === uid ? { ...s, altitude: newAlt } : s)),
+        prev.map((s) =>
+          s.uid === uid
+            ? {
+                ...s,
+                altitude: newAlt,
+                viewshed: null,
+                blockedSectors: null,
+                viewshedArea: null,
+                viewshedStats: null,
+                viewshedLoading: sys.def.requires_los,
+              }
+            : s,
+        ),
       );
       if (sys.def.requires_los && sys.def.range_km) {
         fetchViewshedForSystem(uid, lat, lng, newAlt, sys.def.range_km);
