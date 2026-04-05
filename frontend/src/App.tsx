@@ -1141,6 +1141,14 @@ export default function App() {
       accent: "#8b949e",
       duration: "20+ min",
     },
+    {
+      id: "free_play",
+      name: "FREE PLAY",
+      description: "Open sandbox — steady mixed threats, one of each system, no timer. Practice at your own pace.",
+      difficulty: "CASUAL",
+      accent: "#79c0ff",
+      duration: "∞",
+    },
   ];
 
   // --- Scenario Launch handler (replaces handleTutorialStart + handleQuickStart) ---
@@ -1222,6 +1230,23 @@ export default function App() {
       ],
     };
 
+    // Free Play: one of each system — casual sandbox loadout
+    const freePlayPlacement: PlacementConfig = {
+      base_id: "medium_airbase",
+      sensors: [
+        { catalog_id: "tpq51", x: 0.0, y: -0.1, facing_deg: 0 },
+        { catalog_id: "kufcs", x: 0.2, y: 0.1, facing_deg: 0 },
+        { catalog_id: "eoir_camera", x: -0.3, y: 0.15, facing_deg: 0 },
+      ],
+      effectors: [
+        { catalog_id: "rf_jammer", x: 0.0, y: 0.05, facing_deg: 0 },
+        { catalog_id: "jackal_pallet", x: 0.15, y: 0.0, facing_deg: 0 },
+      ],
+      combined: [
+        { catalog_id: "shenobi", x: 0.0, y: 0.0, facing_deg: 0 },
+      ],
+    };
+
     // Thermopylae gets the full swarm loadout (heavy threat environment)
     const openSkiesPlacement: PlacementConfig = {
       base_id: "medium_airbase",
@@ -1249,6 +1274,7 @@ export default function App() {
       swarm_attack: swarmPlacement,
       recon_probe: reconPlacement,
       thermopylae: openSkiesPlacement,
+      free_play: freePlayPlacement,
     };
     const placement = placementMap[scenarioId] ?? loneWolfPlacement;
 
@@ -1288,7 +1314,7 @@ export default function App() {
         detectionPingedRef.current.clear();
         setTutorialMessage(null);
         setIsTutorial(isTut);
-        setIsFreePlay(scenarioId === "thermopylae");
+        setIsFreePlay(scenarioId === "thermopylae" || scenarioId === "free_play");
         setTutorialStep(0);
         setTutorialFeedback(null);
         setPaused(false);
