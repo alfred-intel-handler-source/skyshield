@@ -146,7 +146,7 @@ export class SensorSimulator {
     const ratio = dist / sensor.range_km;
     let detectProb: number;
     if (ratio > 0.9) {
-      detectProb = 1.0 - (ratio - 0.9) * 5.0;
+      detectProb = Math.max(0, 1.0 - (ratio - 0.9) * 5.0);
     } else {
       detectProb = 1.0;
     }

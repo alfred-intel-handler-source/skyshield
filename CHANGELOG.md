@@ -8,6 +8,25 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Test suite** — vitest configured with 28 unit tests covering detection math, confidence calculation, drone movement, jamming behavior, segment intersection, and GameState factory.
+- **CSS hover classes** — `app.css` with `.menu-btn` and `.footer-btn` classes replaces inline DOM style manipulation on main menu.
+
+### Fixed
+- **Stale closures in ATC callbacks** — `callATC` and `tagFriendly` now use refs (`tracksRef`, `elapsedRef`) instead of capturing stale `tracks`/`elapsed` values. ATC response timestamps were showing the time of the *call*, not the *response*.
+- **Negative detection probability** — `detect_radar` could produce negative probability when ratio > 1.0; now clamped with `Math.max(0, ...)`.
+- **`thermopylae` missing from server whitelist** — backend `VALID_SCENARIO_IDS` now includes the Thermopylae scenario.
+- **`PlacementConfig.boundary` type missing** — added to game engine's `PlacementConfig` interface, eliminating all `as any` casts in `loop.ts`.
+- **Sequential async fetches** — `useGameEngine` now loads base template and equipment catalog in parallel via `Promise.all()`.
+- **Double type casts in loop.ts** — replaced `as unknown as Record<string, unknown>` with proper `isRfReading()` type guard for Shenobi RF detection.
+- **Health endpoint version mismatch** — server reported v2.0.0 instead of actual version; corrected to 1.7.1.
+
+### Changed
+- **Tighter TypeScript types** — `shenobi_cm_state`, `shenobi_cm_active`, `jammed_behavior`, and `intercept_phase` narrowed from `string` to proper union types (`NexusCMState`, `NexusCMType`, `JammedBehavior`, `InterceptPhase`).
+- **Trail array management standardized** — all files now use immutable `.slice(-20)` instead of mixed `splice`/`slice` patterns (jamming.ts, shenobi.ts).
+- **Documentation updated** — SKYSHIELD references updated to OpenSentry in package.json descriptions, server health endpoint, and training curriculum.
+- **Removed 5 `as unknown as` type casts** from `useGameEngine.ts` by aligning `PlacementConfig` types between frontend and game engine.
+
 ---
 
 ## [1.7.0] — 2026-04-04

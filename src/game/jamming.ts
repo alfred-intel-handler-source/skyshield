@@ -103,8 +103,7 @@ export function updatePntJammedDrone(
   const newX = drone.x + Math.cos(driftAngle) * driftKm * tickRate;
   const newY = drone.y + Math.sin(driftAngle) * driftKm * tickRate;
 
-  const trail = [...drone.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-  if (trail.length > 20) trail.splice(0, trail.length - 20);
+  const trail = [...drone.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
 
   const updated: DroneState = {
     ...drone,
@@ -153,8 +152,7 @@ export function updateJammedDrone(
     const newX = d.x + Math.sin(headingRad) * speedKms * tickRate;
     const newY = d.y + Math.cos(headingRad) * speedKms * tickRate;
     const newAlt = Math.max(0, d.altitude - 15 * tickRate);
-    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-    if (trail.length > 20) trail.splice(0, trail.length - 20);
+    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, altitude: newAlt, speed: d.speed * 0.95, trail };
     if (newAlt <= 0 || d.jammed_time_remaining <= 0) {
       d = { ...d, neutralized: true, dtid_phase: 'defeated', jammed_time_remaining: 0, altitude: 0 };
@@ -170,8 +168,7 @@ export function updateJammedDrone(
     const newX = d.x + Math.cos(awayAngle) * speedKms * tickRate;
     const newY = d.y + Math.sin(awayAngle) * speedKms * tickRate;
     const headingDeg = ((awayAngle * 180) / Math.PI + 360) % 360;
-    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-    if (trail.length > 20) trail.splice(0, trail.length - 20);
+    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, heading: headingDeg, trail };
     if (Math.sqrt(newX ** 2 + newY ** 2) > 10.0 || d.jammed_time_remaining <= 0) {
       d = { ...d, neutralized: true, dtid_phase: 'defeated', jammed_time_remaining: 0 };
@@ -198,8 +195,7 @@ export function updateJammedDrone(
     const headingRad = (d.heading * Math.PI) / 180;
     const newX = d.x + Math.sin(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
     const newY = d.y + Math.cos(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
-    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-    if (trail.length > 20) trail.splice(0, trail.length - 20);
+    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, trail };
     // ATTI mode does NOT neutralize — clears when timer expires
     // jam_cooldown prevents tickPassiveJamming from immediately re-jamming
@@ -218,8 +214,7 @@ export function updateJammedDrone(
     const speedKms = d.speed * KTS_TO_KMS;
     const newX = d.x + Math.sin(headingRad) * speedKms * tickRate;
     const newY = d.y + Math.cos(headingRad) * speedKms * tickRate;
-    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]];
-    if (trail.length > 20) trail.splice(0, trail.length - 20);
+    const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, heading: spoofHeading, trail };
     if (Math.sqrt(newX ** 2 + newY ** 2) > 10.0 || d.jammed_time_remaining <= 0) {
       d = { ...d, neutralized: true, dtid_phase: 'defeated', jammed_time_remaining: 0 };

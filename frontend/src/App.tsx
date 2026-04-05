@@ -24,6 +24,7 @@ import StudyModule from "./components/StudyModule";
 import BaseDefenseArchitect from "./components/BaseDefenseArchitect";
 
 import { useGameEngine as useWebSocket } from "./hooks/useGameEngine";
+import "./app.css";
 import { soundEngine } from "./audio/SoundEngine";
 import type {
   BaseTemplate,
@@ -1016,15 +1017,15 @@ export default function App() {
         t.id === trackId ? { ...t, atc_called: true, atc_response_pending: true } : t,
       ),
     );
-    const label = tracks.find((t) => t.id === trackId)?.display_label ?? trackId;
+    const label = tracksRef.current.find((t) => t.id === trackId)?.display_label ?? trackId;
     const outMsg = `Requesting IFF check — Track ${label.toUpperCase()}`;
     setAtcCommsMessages((prev) => ({ ...prev, [trackId]: [...(prev[trackId] ?? []), { direction: "out", text: outMsg }] }));
     setAtcPanelTrackId(trackId);
     window.clearTimeout(atcPanelTimerRef.current);
-    setEvents((prev) => [...prev, { timestamp: elapsed, message: `ATC CALL: IFF check requested — ${label.toUpperCase()}` }]);
+    setEvents((prev) => [...prev, { timestamp: elapsedRef.current, message: `ATC CALL: IFF check requested — ${label.toUpperCase()}` }]);
 
     const delay = 6000 + Math.random() * 2000;
-    const track = tracks.find((t) => t.id === trackId);
+    const track = tracksRef.current.find((t) => t.id === trackId);
     const cls = (track?.classification ?? "").toLowerCase();
     // Only manned aircraft can be ATC-authorized; UAS/drone/quad/rotor are never in the system
     const canBeAuthorized = cls.includes("fixed-wing") || cls.includes("manned") || cls.includes("helicopter") || cls.includes("aircraft");
@@ -1044,12 +1045,12 @@ export default function App() {
       const inMsg = responseText;
       atcCallLogRef.current.push({ trackId: label.toUpperCase(), response: responseText });
       setAtcCommsMessages((prev) => ({ ...prev, [trackId]: [...(prev[trackId] ?? []), { direction: "in", text: inMsg }] }));
-      setEvents((prev) => [...prev, { timestamp: elapsed, message: `ATC RESPONSE: ${responseText}` }]);
+      setEvents((prev) => [...prev, { timestamp: elapsedRef.current, message: `ATC RESPONSE: ${responseText}` }]);
       // Auto-dismiss panel 10s after response
       window.clearTimeout(atcPanelTimerRef.current);
       atcPanelTimerRef.current = window.setTimeout(() => setAtcPanelTrackId(null), 10000);
     }, delay);
-  }, [tracks, elapsed]);
+  }, []);
 
   const tagFriendly = useCallback((trackId: string) => {
     setTracks((prev) =>
@@ -1057,9 +1058,9 @@ export default function App() {
         t.id === trackId ? { ...t, affiliation: "friendly" } : t,
       ),
     );
-    const label = tracks.find((t) => t.id === trackId)?.display_label ?? trackId;
-    setEvents((prev) => [...prev, { timestamp: elapsed, message: `TAGGED FRIENDLY: ${label.toUpperCase()} re-classified as FRIENDLY by operator` }]);
-  }, [tracks, elapsed]);
+    const label = tracksRef.current.find((t) => t.id === trackId)?.display_label ?? trackId;
+    setEvents((prev) => [...prev, { timestamp: elapsedRef.current, message: `TAGGED FRIENDLY: ${label.toUpperCase()} re-classified as FRIENDLY by operator` }]);
+  }, []);
 
   const handlePause = () => {
     send({ type: "action", action: "pause_mission" });
@@ -1490,29 +1491,7 @@ export default function App() {
           {/* Custom Mission button */}
           <button
             onClick={() => { soundEngine.init(); setPhase("scenario_select"); }}
-            style={{
-              padding: "12px 40px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: 2,
-              cursor: "pointer",
-              transition: "all 0.15s",
-              width: "100%",
-              maxWidth: 640,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#58a6ff";
-              (e.currentTarget as HTMLElement).style.color = "#58a6ff";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#30363d";
-              (e.currentTarget as HTMLElement).style.color = "#8b949e";
-            }}
+            className="menu-btn"
           >
             CUSTOM MISSION
           </button>
@@ -1520,32 +1499,12 @@ export default function App() {
           {/* Base Defense Architect */}
           <button
             onClick={() => { soundEngine.init(); setPhase("architect"); }}
+            className="menu-btn menu-btn--gold"
             style={{
-              padding: "12px 40px",
-              background: "transparent",
-              border: "1px solid #30363d",
-              borderRadius: 6,
-              color: "#8b949e",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              letterSpacing: 2,
-              cursor: "pointer",
-              transition: "all 0.15s",
-              width: "100%",
-              maxWidth: 640,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 10,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#d29922";
-              (e.currentTarget as HTMLElement).style.color = "#d29922";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.borderColor = "#30363d";
-              (e.currentTarget as HTMLElement).style.color = "#8b949e";
             }}
           >
             BASE DEFENSE ARCHITECT
@@ -1556,26 +1515,7 @@ export default function App() {
           <div style={{ marginTop: 40, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             <button
               onClick={() => setShowFeedback(true)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 10,
-                color: "#8b949e", fontSize: 13, textDecoration: "none",
-                letterSpacing: 1, padding: "10px 20px",
-                border: "1px solid #21262d", borderRadius: 8,
-                background: "#161b22", transition: "all 0.15s", cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#3fb950";
-                el.style.color = "#3fb950";
-                el.style.background = "#1a2a1a";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#21262d";
-                el.style.color = "#8b949e";
-                el.style.background = "#161b22";
-              }}
+              className="footer-btn footer-btn--green"
             >
               <span style={{ fontSize: 16 }}>💬</span>
               <span><span style={{ fontWeight: 700, letterSpacing: 1.5 }}>Feedback</span><span style={{ color: "#484f58", margin: "0 6px" }}>·</span><span style={{ fontWeight: 400 }}>Bug reports &amp; suggestions</span></span>
@@ -1584,32 +1524,7 @@ export default function App() {
               href="https://github.com/alfred-intel-handler-source/skyshield#readme"
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 10,
-                color: "#8b949e",
-                fontSize: 13,
-                textDecoration: "none",
-                letterSpacing: 1,
-                padding: "10px 20px",
-                border: "1px solid #21262d",
-                borderRadius: 8,
-                background: "#161b22",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#58a6ff";
-                el.style.color = "#58a6ff";
-                el.style.background = "#1a2332";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#21262d";
-                el.style.color = "#8b949e";
-                el.style.background = "#161b22";
-              }}
+              className="footer-btn"
             >
               <span style={{ fontSize: 16 }}>📖</span>
               <span>
@@ -1621,26 +1536,7 @@ export default function App() {
             </a>
             <button
               onClick={() => { setPhase("study"); setActiveStudyModule(null); }}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 10,
-                color: "#8b949e", fontSize: 13, textDecoration: "none",
-                letterSpacing: 1, padding: "10px 20px",
-                border: "1px solid #21262d", borderRadius: 8,
-                background: "#161b22", transition: "all 0.15s", cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#d29922";
-                el.style.color = "#d29922";
-                el.style.background = "#2a2215";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLElement;
-                el.style.borderColor = "#21262d";
-                el.style.color = "#8b949e";
-                el.style.background = "#161b22";
-              }}
+              className="footer-btn footer-btn--gold"
             >
               <span style={{ fontSize: 16 }}>📚</span>
               <span><span style={{ fontWeight: 700, letterSpacing: 1.5 }}>Training Library</span><span style={{ color: "#484f58", margin: "0 6px" }}>·</span><span style={{ fontWeight: 400 }}>5-module C-UAS curriculum</span></span>

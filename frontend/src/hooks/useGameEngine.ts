@@ -149,34 +149,33 @@ export function useGameEngine(onMessage: MessageHandler) {
           ),
         };
 
-        // Load base template if specified
-        let baseTemplate: BaseTemplate | null = null;
+        // Load base template + equipment catalog in parallel
         const resolvedBaseId = baseId ?? (placement?.base_id ?? null);
-        if (resolvedBaseId) {
-          try {
-            const baseRes = await fetch(`${import.meta.env.BASE_URL}data/bases/${resolvedBaseId}.json`);
-            if (baseRes.ok) {
-              baseTemplate = await baseRes.json();
-            } else {
+        const [baseTemplate, catalog] = await Promise.all([
+          // Base template
+          (async (): Promise<BaseTemplate | null> => {
+            if (!resolvedBaseId) return null;
+            try {
+              const baseRes = await fetch(`${import.meta.env.BASE_URL}data/bases/${resolvedBaseId}.json`);
+              if (baseRes.ok) return await baseRes.json();
               console.warn(`[OpenSentry Engine] Base template not found: ${resolvedBaseId}`);
+            } catch (err) {
+              console.warn(`[OpenSentry Engine] Failed to load base template:`, err);
             }
-          } catch (err) {
-            console.warn(`[OpenSentry Engine] Failed to load base template:`, err);
-          }
-        }
-
-        // Load equipment catalog (for placement builds + debrief scoring)
-        let catalog: EquipmentCatalog | null = null;
-        try {
-          const catRes = await fetch(`${import.meta.env.BASE_URL}data/equipment/catalog.json`);
-          if (catRes.ok) {
-            catalog = await catRes.json();
-          } else {
-            console.warn("[OpenSentry Engine] Equipment catalog not found — placement scoring unavailable");
-          }
-        } catch (err) {
-          console.warn("[OpenSentry Engine] Failed to load equipment catalog:", err);
-        }
+            return null;
+          })(),
+          // Equipment catalog
+          (async (): Promise<EquipmentCatalog | null> => {
+            try {
+              const catRes = await fetch(`${import.meta.env.BASE_URL}data/equipment/catalog.json`);
+              if (catRes.ok) return await catRes.json();
+              console.warn("[OpenSentry Engine] Equipment catalog not found — placement scoring unavailable");
+            } catch (err) {
+              console.warn("[OpenSentry Engine] Failed to load equipment catalog:", err);
+            }
+            return null;
+          })(),
+        ]);
         catalogRef.current = catalog;
 
         // Build sensor/effector configs from placement or scenario defaults
@@ -192,12 +191,12 @@ export function useGameEngine(onMessage: MessageHandler) {
           for (const c of catalog.combined) catCombined.set(c.catalog_id, c);
 
           sensorConfigs = buildSensorsFromPlacement(
-            placement as unknown as import("@skyshield/game/state").PlacementConfig,
+            placement,
             catSensors,
             catCombined,
           );
           effectorConfigs = buildEffectorsFromPlacement(
-            placement as unknown as import("@skyshield/game/state").PlacementConfig,
+            placement,
             catEffectors,
             catCombined,
           );
@@ -211,10 +210,8 @@ export function useGameEngine(onMessage: MessageHandler) {
           scenario,
           sensorConfigs,
           effectorConfigs,
-          placement && scorePlacement
-            ? (placement as unknown as import("@skyshield/game/state").PlacementConfig)
-            : null,
-          baseTemplate as unknown as import("@skyshield/game/state").BaseTemplate | null,
+          placement && scorePlacement ? placement : null,
+          baseTemplate,
           baseTemplate?.terrain ?? [],
         );
 

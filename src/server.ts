@@ -48,7 +48,7 @@ const FRONTEND_DIST = join(projectRoot, 'frontend', 'dist');
 // Data loaders
 // ---------------------------------------------------------------------------
 
-const VALID_SCENARIO_IDS = new Set(['lone_wolf', 'swarm_attack', 'recon_probe', 'tutorial']);
+const VALID_SCENARIO_IDS = new Set(['lone_wolf', 'swarm_attack', 'recon_probe', 'tutorial', 'thermopylae']);
 const VALID_BASE_IDS = new Set(['small_fob', 'medium_airbase', 'large_installation']);
 const VALID_ACTION_NAMES = new Set([
   'confirm_track', 'identify', 'declare_affiliation', 'engage', 'hold_fire',
@@ -142,7 +142,7 @@ fastify.addHook('onSend', async (_request, reply, payload) => {
 // REST endpoints
 // ---------------------------------------------------------------------------
 
-fastify.get('/api/health', async () => ({ name: 'SKYSHIELD', version: '2.0.0' }));
+fastify.get('/api/health', async () => ({ name: 'OpenSentry', version: '1.7.1' }));
 
 fastify.get('/scenarios', async () => {
   try { return listScenarios(); }
