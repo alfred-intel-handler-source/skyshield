@@ -201,6 +201,32 @@ function offsetLatLng(
   return [radToDeg(newLat), radToDeg(newLng)];
 }
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 2,
+  delayMs = 1000,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, options);
+      if (resp.ok) return resp;
+      if (attempt < retries && (resp.status === 429 || resp.status >= 500)) {
+        await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw new Error(`Elevation API error: ${resp.status}`);
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Elevation API: max retries exceeded");
+}
+
 async function fetchElevations(
   points: { latitude: number; longitude: number }[],
 ): Promise<number[]> {
@@ -208,12 +234,14 @@ async function fetchElevations(
   const results: number[] = [];
   for (let i = 0; i < points.length; i += BATCH) {
     const batch = points.slice(i, i + BATCH);
-    const resp = await fetch("https://api.open-elevation.com/api/v1/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locations: batch }),
-    });
-    if (!resp.ok) throw new Error(`Elevation API error: ${resp.status}`);
+    const resp = await fetchWithRetry(
+      "https://api.open-elevation.com/api/v1/lookup",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations: batch }),
+      },
+    );
     const data = await resp.json();
     for (const r of data.results) {
       results.push(r.elevation);
