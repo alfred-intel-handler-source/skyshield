@@ -149,8 +149,8 @@ export function updateJammedDrone(
   if (jb === 'loss_of_control') {
     const speedKms = d.speed * KTS_TO_KMS * 0.5;
     const headingRad = (d.heading * Math.PI) / 180;
-    const newX = d.x + Math.sin(headingRad) * speedKms * tickRate;
-    const newY = d.y + Math.cos(headingRad) * speedKms * tickRate;
+    const newX = d.x + Math.cos(headingRad) * speedKms * tickRate;
+    const newY = d.y + Math.sin(headingRad) * speedKms * tickRate;
     const newAlt = Math.max(0, d.altitude - 15 * tickRate);
     const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, altitude: newAlt, speed: d.speed * 0.95, trail };
@@ -193,8 +193,8 @@ export function updateJammedDrone(
     // ATTI mode: drone maintains heading/speed with small random lateral drift
     const speedKms = d.speed * KTS_TO_KMS;
     const headingRad = (d.heading * Math.PI) / 180;
-    const newX = d.x + Math.sin(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
-    const newY = d.y + Math.cos(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
+    const newX = d.x + Math.cos(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
+    const newY = d.y + Math.sin(headingRad) * speedKms * tickRate + (Math.random() - 0.5) * 0.004;
     const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, trail };
     // ATTI mode does NOT neutralize — clears when timer expires
@@ -212,8 +212,8 @@ export function updateJammedDrone(
     const spoofHeading = (d.heading + (90 + Math.random() * 90) * sign + 360) % 360;
     const headingRad = (spoofHeading * Math.PI) / 180;
     const speedKms = d.speed * KTS_TO_KMS;
-    const newX = d.x + Math.sin(headingRad) * speedKms * tickRate;
-    const newY = d.y + Math.cos(headingRad) * speedKms * tickRate;
+    const newX = d.x + Math.cos(headingRad) * speedKms * tickRate;
+    const newY = d.y + Math.sin(headingRad) * speedKms * tickRate;
     const trail = [...d.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     d = { ...d, x: newX, y: newY, heading: spoofHeading, trail };
     if (Math.sqrt(newX ** 2 + newY ** 2) > 10.0 || d.jammed_time_remaining <= 0) {

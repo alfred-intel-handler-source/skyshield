@@ -217,7 +217,7 @@ export function tickSpawns(gs: GameState, elapsed: number): Msg[] {
 
   // Ambient traffic
   if (gs.scenario.no_ambient) return events;
-  const ATC_CLEARABLE_AMB = new Set(['commercial_aircraft', 'military_jet']);
+  const ATC_CLEARABLE_AMB = new Set(['passenger_aircraft', 'military_jet']);
 
   for (const [ambType, nextTime] of gs.next_ambient_times) {
     if (elapsed < gs.ambient_suppressed_until && ATC_CLEARABLE_AMB.has(ambType)) continue;

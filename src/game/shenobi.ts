@@ -297,8 +297,8 @@ function applyDeafen(
     // Fixed-wing / swarm: continue on last heading (no corrections)
     const headingRad = (drone.heading * Math.PI) / 180;
     const speedKms = drone.speed * KTS_TO_KMS;
-    const newX = drone.x + Math.sin(headingRad) * speedKms * tickRate;
-    const newY = drone.y + Math.cos(headingRad) * speedKms * tickRate;
+    const newX = drone.x + Math.cos(headingRad) * speedKms * tickRate;
+    const newY = drone.y + Math.sin(headingRad) * speedKms * tickRate;
     const trail = [...drone.trail, [Math.round(newX * 1000) / 1000, Math.round(newY * 1000) / 1000]].slice(-20);
     drone = { ...drone, x: newX, y: newY, trail };
 
