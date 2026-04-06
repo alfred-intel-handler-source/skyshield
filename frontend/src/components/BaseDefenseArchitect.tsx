@@ -13,7 +13,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type {
   EquipmentCatalog,
+  BaseTemplate,
 } from "../types";
+import LocationSearch from "./map/LocationSearch";
+import BoundaryEditor from "./map/BoundaryEditor";
+import TerrainOverlay from "./map/TerrainOverlay";
+import AssetMarkers from "./map/AssetMarkers";
+import CorridorLines from "./map/CorridorLines";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -23,6 +29,7 @@ const DEFAULT_ZOOM = 14;
 const COLORS = {
   bg: "#0a0e1a",
   card: "#0f1520",
+  surface: "#0f1520",
   border: "#1a2235",
   text: "#e6edf3",
   muted: "#6b7b8d",
@@ -63,6 +70,11 @@ interface SystemDef {
   letter: string;
   description: string;
   requires_los: boolean;
+}
+
+/** In the Architect, show terrain-aware viewshed for everything except JACKAL (kinetic — flies over terrain) */
+function shouldComputeViewshed(def: SystemDef): boolean {
+  return def.id !== "jackal_pallet";
 }
 
 function buildSystemDefs(catalog: EquipmentCatalog): SystemDef[] {
@@ -194,6 +206,32 @@ function offsetLatLng(
   return [radToDeg(newLat), radToDeg(newLng)];
 }
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 2,
+  delayMs = 1000,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, options);
+      if (resp.ok) return resp;
+      if (attempt < retries && (resp.status === 429 || resp.status >= 500)) {
+        await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw new Error(`Elevation API error: ${resp.status}`);
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Elevation API: max retries exceeded");
+}
+
 async function fetchElevations(
   points: { latitude: number; longitude: number }[],
 ): Promise<number[]> {
@@ -201,12 +239,14 @@ async function fetchElevations(
   const results: number[] = [];
   for (let i = 0; i < points.length; i += BATCH) {
     const batch = points.slice(i, i + BATCH);
-    const resp = await fetch("https://api.open-elevation.com/api/v1/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locations: batch }),
-    });
-    if (!resp.ok) throw new Error(`Elevation API error: ${resp.status}`);
+    const resp = await fetchWithRetry(
+      "https://api.open-elevation.com/api/v1/lookup",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locations: batch }),
+      },
+    );
     const data = await resp.json();
     for (const r of data.results) {
       results.push(r.elevation);
@@ -551,6 +591,26 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
   >("sensor");
 
   const uidCounter = useRef(0);
+  const mapRef = useRef<L.Map | null>(null);
+
+  const [baseIndex, setBaseIndex] = useState<
+    { id: string; name: string; description: string; size: string }[]
+  >([]);
+  const [baseTemplate, setBaseTemplate] = useState<BaseTemplate | null>(null);
+  const [selectedBaseId, setSelectedBaseId] = useState<string>("");
+  const [perimVertices, setPerimVertices] = useState<{ x: number; y: number }[]>([]);
+  const [assetPositions, setAssetPositions] = useState<
+    Record<string, { x: number; y: number }>
+  >({});
+
+  // ─── Load base index ────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}data/bases/index.json`)
+      .then((r) => r.json())
+      .then((data) => setBaseIndex(data))
+      .catch((err) => console.warn("Failed to load base index:", err));
+  }, []);
 
   // ─── Load catalog ───────────────────────────────────────────────────────
 
@@ -603,9 +663,12 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       setSelectedUid(uid);
       setPlacingDef(null);
 
-      // Only fetch viewshed for LOS-dependent systems
-      if (placingDef.requires_los && placingDef.range_km) {
-        fetchViewshedForSystem(uid, lat, lng, 10, placingDef.range_km);
+      // Fetch viewshed for all systems except JACKAL (kinetic — flies over terrain)
+      if (shouldComputeViewshed(placingDef) && placingDef.range_km) {
+        const range = placingDef.range_km;
+        queueMicrotask(() => {
+          fetchViewshedForSystem(uid, lat, lng, 10, range);
+        });
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -662,6 +725,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         })
         .catch((err) => {
           console.warn("Viewshed fetch failed:", err);
+          viewshedCache.delete(key);
           const fallbackPoly: [number, number][] = [];
           for (let i = 0; i <= NUM_RAYS; i++) {
             const bearing = (i / NUM_RAYS) * 2 * Math.PI;
@@ -694,6 +758,8 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       const sys = systems.find((s) => s.uid === uid);
       if (!sys) return;
       const { lat, lng } = sys;
+      const oldKey = cacheKey(lat, lng, sys.altitude, sys.def.range_km);
+      viewshedCache.delete(oldKey);
       setSystems((prev) =>
         prev.map((s) =>
           s.uid === uid
@@ -704,12 +770,12 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                 blockedSectors: null,
                 viewshedArea: null,
                 viewshedStats: null,
-                viewshedLoading: sys.def.requires_los,
+                viewshedLoading: shouldComputeViewshed(sys.def),
               }
             : s,
         ),
       );
-      if (sys.def.requires_los && sys.def.range_km) {
+      if (shouldComputeViewshed(sys.def) && sys.def.range_km) {
         fetchViewshedForSystem(uid, lat, lng, newAlt, sys.def.range_km);
       }
     },
@@ -721,7 +787,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
   const handleRecalculate = useCallback(
     (uid: string) => {
       const sys = systems.find((s) => s.uid === uid);
-      if (sys && sys.def.requires_los && sys.def.range_km) {
+      if (sys && shouldComputeViewshed(sys.def) && sys.def.range_km) {
         const key = cacheKey(sys.lat, sys.lng, sys.altitude, sys.def.range_km);
         viewshedCache.delete(key);
         fetchViewshedForSystem(
@@ -761,7 +827,7 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       setSystems((prev) =>
         prev.map((s) => (s.uid === uid ? { ...s, lat, lng } : s)),
       );
-      if (sys.def.requires_los && sys.def.range_km) {
+      if (shouldComputeViewshed(sys.def) && sys.def.range_km) {
         fetchViewshedForSystem(uid, lat, lng, altitude, sys.def.range_km);
       }
     },
@@ -776,6 +842,99 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
       if (selectedUid === uid) setSelectedUid(null);
     },
     [selectedUid],
+  );
+
+  // ─── Base template selection ───────────────────────────────────────────
+
+  const handleBaseSelect = useCallback(
+    (baseId: string) => {
+      if (systems.length > 0) {
+        const confirmed = window.confirm(
+          "Switching base will clear all placed equipment. Continue?",
+        );
+        if (!confirmed) return;
+      }
+      setSelectedBaseId(baseId);
+      setSystems([]);
+      setSelectedUid(null);
+
+      if (!baseId) {
+        setBaseTemplate(null);
+        setPerimVertices([]);
+        setAssetPositions({});
+        return;
+      }
+
+      fetch(`${import.meta.env.BASE_URL}data/bases/${baseId}.json`)
+        .then((r) => r.json())
+        .then((base: BaseTemplate) => {
+          setBaseTemplate(base);
+          setPerimVertices(
+            base.boundary.map(([x, y]) => ({ x, y })),
+          );
+          const positions: Record<string, { x: number; y: number }> = {};
+          for (const asset of base.protected_assets) {
+            positions[asset.id] = { x: asset.x, y: asset.y };
+          }
+          setAssetPositions(positions);
+          if (mapRef.current && base.center_lat && base.center_lng) {
+            mapRef.current.flyTo(
+              [base.center_lat, base.center_lng],
+              base.default_zoom || 15,
+            );
+          }
+        })
+        .catch((err) => console.warn("Failed to load base template:", err));
+    },
+    [systems.length],
+  );
+
+  // ─── Location search selection ─────────────────────────────────────────
+
+  const handleLocationSelect = useCallback(
+    (lat: number, lng: number, name: string) => {
+      if (systems.length > 0) {
+        const confirmed = window.confirm(
+          "Switching location will clear all placed equipment. Continue?",
+        );
+        if (!confirmed) return;
+      }
+      setSelectedBaseId("");
+      setSystems([]);
+      setSelectedUid(null);
+      setBaseTemplate({
+        id: "custom_location",
+        name,
+        description: `Custom location: ${name}`,
+        size: "small",
+        center_lat: lat,
+        center_lng: lng,
+        default_zoom: 15,
+        boundary: [
+          [-0.3, -0.3],
+          [-0.3, 0.3],
+          [0.3, 0.3],
+          [0.3, -0.3],
+        ],
+        protected_assets: [],
+        terrain: [],
+        approach_corridors: [],
+        max_sensors: 3,
+        max_effectors: 2,
+        placement_bounds_km: 0.35,
+      });
+      setPerimVertices([
+        { x: -0.3, y: -0.3 },
+        { x: -0.3, y: 0.3 },
+        { x: 0.3, y: 0.3 },
+        { x: 0.3, y: -0.3 },
+      ]);
+      setAssetPositions({});
+      if (mapRef.current) {
+        mapRef.current.flyTo([lat, lng], 15);
+      }
+    },
+    [systems.length],
   );
 
   const loadingSystems = systems.filter((s) => s.viewshedLoading).length;
@@ -863,70 +1022,87 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         overflow: "hidden",
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 16px",
-          background: COLORS.card,
-          borderBottom: `1px solid ${COLORS.border}`,
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {/* Top bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "8px 16px",
+            background: COLORS.surface,
+            borderBottom: `1px solid ${COLORS.border}`,
+          }}
+        >
           <button
             onClick={onBack}
             style={{
-              padding: "4px 12px",
-              fontSize: 11,
-              fontWeight: 600,
-              background: "transparent",
+              background: "none",
               border: `1px solid ${COLORS.border}`,
-              borderRadius: 4,
-              color: COLORS.muted,
+              color: COLORS.text,
+              padding: "4px 12px",
+              borderRadius: "4px",
               cursor: "pointer",
-              fontFamily: "inherit",
+              fontSize: "13px",
             }}
           >
-            &lt; BACK
+            BACK
           </button>
-          <div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: 2,
-                color: COLORS.text,
-              }}
-            >
-              BASE DEFENSE ARCHITECT
-            </div>
-            <div style={{ fontSize: 10, color: COLORS.muted, letterSpacing: 0.5 }}>
-              Viewshed Analysis — Terrain-aware sensor coverage
-              {placingDef && (
-                <span style={{ color: COLORS.accent, marginLeft: 12 }}>
-                  PLACING: {placingDef.name} — click map to place
-                </span>
-              )}
-            </div>
-          </div>
+          <span
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: COLORS.accent,
+              letterSpacing: "0.05em",
+            }}
+          >
+            BASE DEFENSE ARCHITECT
+          </span>
+          <span
+            style={{
+              fontSize: "10px",
+              background: "#d29922",
+              color: "#000",
+              padding: "1px 6px",
+              borderRadius: "3px",
+              fontWeight: 700,
+            }}
+          >
+            BETA
+          </span>
+
+          <div style={{ width: "1px", height: "20px", background: COLORS.border }} />
+
+          <select
+            value={selectedBaseId}
+            onChange={(e) => handleBaseSelect(e.target.value)}
+            style={{
+              padding: "6px 10px",
+              background: COLORS.surface,
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: "4px",
+              color: COLORS.text,
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+          >
+            <option value="">Free Placement</option>
+            {baseIndex.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.size})
+              </option>
+            ))}
+          </select>
+
+          <div style={{ width: "1px", height: "20px", background: COLORS.border }} />
+
+          <LocationSearch onSelect={handleLocationSelect} />
+
+          {placingDef && (
+            <span style={{ marginLeft: "auto", fontSize: "12px", color: COLORS.accent }}>
+              Click map to place {placingDef.name}
+            </span>
+          )}
         </div>
-        <span
-          style={{
-            fontSize: 9,
-            fontWeight: 700,
-            letterSpacing: 1,
-            padding: "3px 8px",
-            borderRadius: 4,
-            background: `${COLORS.warning}20`,
-            color: COLORS.warning,
-          }}
-        >
-          BETA
-        </span>
-      </div>
 
       {/* Main 3-column layout */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -1140,7 +1316,12 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
         {/* Center — Map */}
         <div style={{ flex: 1, position: "relative" }}>
           <MapContainer
-            center={[SHAW_AFB.lat, SHAW_AFB.lng]}
+            ref={mapRef}
+            center={
+              baseTemplate?.center_lat && baseTemplate?.center_lng
+                ? [baseTemplate.center_lat, baseTemplate.center_lng]
+                : [SHAW_AFB.lat, SHAW_AFB.lng]
+            }
             zoom={DEFAULT_ZOOM}
             style={{ width: "100%", height: "100%" }}
             zoomControl={false}
@@ -1187,9 +1368,9 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               )),
             )}
 
-            {/* Range rings for non-LOS systems (no viewshed) */}
+            {/* Range rings for systems without viewshed (JACKAL only) */}
             {systems.map((sys) => {
-              if (sys.def.requires_los) return null;
+              if (shouldComputeViewshed(sys.def)) return null;
               if (sys.def.category === "combined") {
                 // Shenobi: dual rings
                 return (
@@ -1312,10 +1493,10 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
               );
             })}
 
-            {/* Fallback range ring for LOS systems while viewshed not yet loaded */}
+            {/* Fallback range ring while viewshed not yet loaded */}
             {systems.map(
               (sys) =>
-                sys.def.requires_los &&
+                shouldComputeViewshed(sys.def) &&
                 !sys.viewshed &&
                 !sys.viewshedLoading &&
                 !isNarrowFov(sys.def) && (
@@ -1344,6 +1525,47 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                 onDragEnd={(lat, lng) => handleDragEnd(sys.uid, lat, lng)}
               />
             ))}
+
+            {baseTemplate && perimVertices.length >= 3 && (
+              <BoundaryEditor
+                vertices={perimVertices}
+                baseLat={baseTemplate.center_lat ?? 33.9722}
+                baseLng={baseTemplate.center_lng ?? -80.4756}
+                onChange={setPerimVertices}
+              />
+            )}
+
+            {baseTemplate && baseTemplate.terrain.length > 0 && (
+              <TerrainOverlay
+                terrain={baseTemplate.terrain}
+                baseLat={baseTemplate.center_lat ?? 33.9722}
+                baseLng={baseTemplate.center_lng ?? -80.4756}
+              />
+            )}
+
+            {baseTemplate && baseTemplate.protected_assets.length > 0 && (
+              <AssetMarkers
+                assets={baseTemplate.protected_assets}
+                positions={assetPositions}
+                baseLat={baseTemplate.center_lat ?? 33.9722}
+                baseLng={baseTemplate.center_lng ?? -80.4756}
+                onMove={(id, x, y) =>
+                  setAssetPositions((prev) => ({
+                    ...prev,
+                    [id]: { x, y },
+                  }))
+                }
+              />
+            )}
+
+            {baseTemplate && baseTemplate.approach_corridors.length > 0 && (
+              <CorridorLines
+                corridors={baseTemplate.approach_corridors}
+                baseLat={baseTemplate.center_lat ?? 33.9722}
+                baseLng={baseTemplate.center_lng ?? -80.4756}
+                boundsKm={baseTemplate.placement_bounds_km}
+              />
+            )}
           </MapContainer>
 
           {/* Loading indicator */}
@@ -1579,8 +1801,8 @@ export default function BaseDefenseArchitect({ onBack }: Props) {
                 </div>
               )}
 
-              {/* VIEWSHED section — LOS systems only */}
-              {selectedSystem.def.requires_los && (
+              {/* VIEWSHED section — all systems except JACKAL */}
+              {shouldComputeViewshed(selectedSystem.def) && (
                 <div
                   style={{
                     padding: "14px",
